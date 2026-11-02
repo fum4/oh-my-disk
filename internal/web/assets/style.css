@@ -1741,3 +1741,9 @@ dialog pre {
 .main-content:has(#notes:not([hidden])) footer {
   position: static;
 }
+
+@media (min-width: 1250px) {
+  .scan-options {
+    right: calc(50% - 72px);
+  }
+}

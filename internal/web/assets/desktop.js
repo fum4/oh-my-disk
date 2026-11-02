@@ -35,9 +35,15 @@ if (nativeApp) {
     $("content-grid").hidden = !show;
     $("welcome").hidden = show;
     document.querySelector(".view-switch").hidden = true;
-    if (show && snapshot) showMode(mode);
+    if (show && snapshot) {
+      chosen = snapshot.scan.root.path;
+      $("scan-root").value = "custom";
+      $("chosen-path").textContent = chosen;
+      showMode(mode);
+    }
   }
   showResults(false);
+  scanState(false);
   async function pick() {
     const path = await nativeApp.PickFolder();
     if (path) {

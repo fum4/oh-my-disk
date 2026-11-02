@@ -781,20 +781,39 @@ async function refreshSuggestions() {
     $("scan-info").textContent = e.message;
   }
 }
-for (const b of document.querySelectorAll("[data-suggest-sort]"))
+for (const b of document.querySelectorAll("[data-suggest-sort]")) {
+  b.setAttribute(
+    "aria-pressed",
+    String(b.dataset.suggestSort === suggestionSort),
+  );
+  b.title = "Sort suggestions; click again to reverse the order";
   b.onclick = () => {
     suggestionAsc =
       b.dataset.suggestSort === suggestionSort ? !suggestionAsc : false;
     suggestionSort = b.dataset.suggestSort;
-    for (const c of document.querySelectorAll("[data-suggest-sort]"))
+    for (const c of document.querySelectorAll("[data-suggest-sort]")) {
       c.classList.toggle("active", c.dataset.suggestSort === suggestionSort);
-    $("sort-hint").textContent = {
-      score: "Safest and biggest at the top",
-      size: "Largest items at the top",
-      stale: "Longest unused at the top",
-    }[suggestionSort];
+      c.setAttribute(
+        "aria-pressed",
+        String(c.dataset.suggestSort === suggestionSort),
+      );
+    }
+    $("sort-hint").textContent = (
+      suggestionAsc
+        ? {
+            score: "Lower scores at the top",
+            size: "Smallest items at the top",
+            stale: "Most recently used at the top",
+          }
+        : {
+            score: "Safest and biggest at the top",
+            size: "Largest items at the top",
+            stale: "Longest unused at the top",
+          }
+    )[suggestionSort];
     return refreshSuggestions();
   };
+}
 $("suggest-category").onchange = $("suggest-safety").onchange = () =>
   refreshSuggestions();
 const selected = new Map();
