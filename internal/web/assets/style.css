@@ -3158,3 +3158,83 @@ body:has(#welcome:not([hidden])) #agent-tip {
     margin-top: 0;
   }
 }
+
+/* Round 4: one scan decision, then results and cleanup. */
+#welcome .launch-cards {
+  display: block;
+  max-width: 500px;
+}
+#welcome .launch-card {
+  display: flex;
+  position: static;
+  padding: 24px;
+  gap: 16px;
+  align-items: stretch;
+}
+#welcome .launch-card h3 { font-size: 17px; margin: 0; }
+#welcome .launch-card > .i { display: none; }
+.scan-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+#welcome .launch-card .btn { margin: 0; }
+.agent-control { display: flex; align-items: center; gap: 12px; font-size: 12px; }
+.agent-control[hidden], #ask-agent[hidden] { display: none; }
+#agent-picker { position: relative; }
+#agent-picker summary { cursor: pointer; color: var(--label-2); padding: 8px 0; }
+#agent-choice { color: var(--label); font-weight: 600; margin-left: 6px; }
+.agent-menu {
+  position: absolute; top: 100%; right: 0; z-index: 50;
+  width: 240px; max-width: calc(100vw - 48px);
+  background: var(--card); color: var(--label);
+  border: 1px solid var(--hair-2); border-radius: 12px;
+  box-shadow: 0 8px 24px #0002; padding: 8px;
+}
+.agent-option {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; padding: 10px; border: 0; border-radius: 6px;
+  background: none; color: var(--label); text-align: left; font: inherit;
+}
+button.agent-option { cursor: pointer; }
+button.agent-option:hover, .agent-option[aria-pressed="true"] { background: var(--fill); }
+.agent-option[aria-pressed="true"]::after { content: "✓"; }
+.agent-option.unavailable { color: var(--label-2); }
+.agent-option a { color: var(--blue); font-size: 12px; }
+#agent-check { margin: 8px 10px; }
+#welcome #agent-tip { display: flex; gap: 12px; font-size: 12px; margin: 0; }
+#welcome #agent-tip[hidden] { display: none; }
+#results-agent-slot { order: 2; margin: 0 0 12px; }
+#suggestions > .ch { order: 0; }
+#suggestions > .gain { order: 1; }
+#suggestions > :not(.ch):not(.gain):not(#results-agent-slot) { order: 3; }
+#suggestions .gain .v { font-size: 40px; }
+#suggestions .step, .overview-left .step { display: none; }
+#suggestions .cnt, #suggestions .ba { display: none; }
+/* Put the cleanup opportunity first in both reading and visual order. */
+#content-grid:not(.full-view) #suggestions { grid-column: 1; grid-row: 1; }
+#content-grid:not(.full-view) #overview-panel { grid-column: 2; grid-row: 1; }
+.is-scanning #content-grid, .is-scanning #welcome,
+.is-scanning #agent-terminal, .is-scanning #access-banner,
+.is-scanning .bar .btn, .is-scanning #toolbar-agent-slot,
+.is-scanning #options-toggle, .is-scanning footer { display: none; }
+.is-scanning #scan-strip { flex: 1; justify-content: center; }
+.is-scanning .side { pointer-events: none; opacity: .45; }
+body:has(#welcome:not([hidden])) .vol,
+body:has(#welcome:not([hidden])) footer { visibility: hidden; }
+#trash-results { white-space: normal; }
+.trash-details { margin-top: 6px; font-size: 12px; color: var(--label-2); }
+.trash-details pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+  #content-grid:not(.full-view) #suggestions { order: -1; }
+  #content-grid:not(.full-view) #overview-panel { order: 0; }
+  #results-agent-slot .agent-control { flex-wrap: wrap; }
+  #welcome .launch-card { padding: 20px; }
+}
+#content-grid:not(.full-view) {
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(340px, 1fr) minmax(0, 1fr);
+}
+#results-agent-slot { flex-shrink: 0; }
+#content-grid:not(.full-view) #suggestions .tools,
+.side .ct { display: none; }
+
+#welcome { background: transparent; box-shadow: none; }
+#welcome .launch-card { background: var(--card); box-shadow: var(--shadow-card); border-radius: 16px; }
+.agent-option-label { display: inline-flex; align-items: center; gap: 8px; }

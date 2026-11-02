@@ -118,3 +118,58 @@ func TestConfigAndArgs(t *testing.T) {
 		t.Fatal("unknown accepted")
 	}
 }
+
+func TestRegistry(t *testing.T) {
+	seen := map[string]bool{}
+	for _, d := range Registry() {
+		if seen[d.Name] || d.Name == "" || d.Label == "" || d.Icon == "" || !strings.HasPrefix(d.InstallURL, "https://") || d.Command == "" || d.Launch == nil {
+			t.Fatalf("invalid definition: %+v", d)
+		}
+		seen[d.Name] = true
+		if strings.ContainsAny(d.Command, " ;$`/\\\n") {
+			t.Fatalf("unsafe detection command %q", d.Command)
+		}
+		bin := "/mock/" + d.Command
+		got := resolve(d.Name, "/home", "", func(name string) (string, error) { return bin, nil }, nil, func(p string) bool { return p == bin })
+		if got != bin {
+			t.Fatalf("%s: detection = %q", d.Name, got)
+		}
+		args, err := Args(d.Name, "/binary", "/session", "specific prompt")
+		if err != nil || len(args) == 0 || args[len(args)-1] != "specific prompt" {
+			t.Fatal(d.Name, args, err)
+		}
+	}
+	copy := Registry()
+	copy[0].Name = "changed"
+	if Registry()[0].Name == "changed" {
+		t.Fatal("registry exposed mutable slice")
+	}
+	b, err := json.Marshal([]CLI{{Definition: Registry()[0], Path: "/mock/agent"}})
+	if err != nil || !strings.Contains(string(b), `"installURL"`) || strings.Contains(string(b), `"Launch"`) {
+		t.Fatal(string(b), err)
+	}
+}
+
+func TestSingleEntryAgent(t *testing.T) {
+	original := registry
+	defer func() { registry = original }()
+	registry = append(Registry(), Definition{Name: "future", Label: "Future agent", Icon: "F", Command: "future-cli", InstallURL: "https://example.com/install", Fallback: "/bundled/future", Launch: func(binary, dir, prompt string) []string { return []string{binary, dir, prompt} }})
+	missing := func(name string) (string, error) {
+		if name != "future-cli" {
+			t.Fatalf("wrong command %q", name)
+		}
+		return "", errors.New("missing")
+	}
+	got := resolve("future", "/h", "", missing, nil, func(p string) bool { return p == "/bundled/future" })
+	if got != "/bundled/future" {
+		t.Fatal(got)
+	}
+	args, err := Args("future", "/binary", "/session", "prompt")
+	if err != nil || !reflect.DeepEqual(args, []string{"/binary", "/session", "prompt"}) {
+		t.Fatal(args, err)
+	}
+	data, err := json.Marshal(Registry())
+	if err != nil || !strings.Contains(string(data), `"name":"future"`) {
+		t.Fatal(string(data), err)
+	}
+}

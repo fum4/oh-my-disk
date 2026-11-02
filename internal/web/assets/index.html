@@ -444,8 +444,7 @@
           ><span id="scan-info">Scan Home to see what’s taking space.</span>
         </div>
         <div class="sp"></div>
-        <button id="ask-claude" class="btn sec" disabled>Ask Claude</button
-        ><button id="ask-codex" class="btn sec" disabled>Ask Codex</button>
+        <div id="toolbar-agent-slot"></div>
         <button id="toolbar-choose" class="btn sec">
           <svg class="i" aria-hidden="true">
             <use href="#regular-folder-open" /></svg
@@ -459,7 +458,7 @@
         >
           <svg class="i" aria-hidden="true"><use href="#regular-sliders" /></svg
           >Options</button
-        ><button id="hub-scan" class="btn pri">
+        ><button id="hub-scan" class="btn sec">
           <svg class="i" aria-hidden="true">
             <use href="#regular-arrow-clockwise" /></svg
           >Scan Again<span class="kbd">⌘R</span>
@@ -477,78 +476,37 @@
         hidden
       ></div>
       <section id="welcome" class="card empty" hidden>
-        <h2 id="empty-title">Your disk, a little clearer.</h2>
-        <p id="empty-description">
+        <h2 id="empty-title" hidden>Your disk, a little clearer.</h2>
+        <p id="empty-description" hidden>
           Scan Home to explore your disk, on your own or with an agent.
         </p>
         <div class="launch-cards" id="launch-cards">
           <article class="launch-card">
-            <svg class="i"><use href="#regular-hard-drive" /></svg>
+            <svg class="i" aria-hidden="true"><use href="#regular-hard-drive" /></svg>
             <h3>Scan my disk</h3>
-            <p>Explore your disk and review cleanup suggestions.</p>
-            <button id="plain-scan" class="btn pri">Scan</button>
-          </article>
-          <article class="launch-card">
-            <svg class="i"><use href="#regular-magnifying-glass" /></svg>
-            <h3>Scan with Claude</h3>
-            <p>Scan, then chat about your biggest safe wins.</p>
-            <button id="scan-claude" class="btn sec" disabled>Checking…</button
-            ><a
-              id="install-claude"
-              hidden
-              href="https://code.claude.com/docs/en/setup"
-              target="_blank"
-              rel="noopener"
-              >Install Claude Code ↗</a
-            >
-          </article>
-          <article class="launch-card">
-            <svg class="i"><use href="#regular-magnifying-glass" /></svg>
-            <h3>Scan with Codex</h3>
-            <p>Scan, then get help making sense of your disk.</p>
-            <button id="scan-codex" class="btn sec" disabled>Checking…</button
-            ><a
-              id="install-codex"
-              hidden
-              href="https://developers.openai.com/codex/cli"
-              target="_blank"
-              rel="noopener"
-              >Install Codex CLI ↗</a
-            >
+            <div class="scan-actions">
+              <button id="plain-scan" class="btn pri">Scan</button>
+              <div id="scan-agent-slot"></div>
+            </div>
+            <aside id="agent-tip" hidden>
+              <span>Want help with results? Install an agent from the picker.</span>
+              <button id="agent-dismiss" class="link" aria-label="Dismiss agent tip">Dismiss</button>
+            </aside>
           </article>
         </div>
-        <p class="agent-disclosure">
-          Agent chats use your CLI account and share requested scan metadata
-          with its provider.
-        </p>
-        <button id="empty-scan" class="btn pri" hidden>Scan</button>
-        <button id="welcome-scan" class="btn sec">Choose Folder…</button>
+        <button id="empty-scan" hidden>Scan</button>
+        <button id="welcome-scan" class="link">Choose Folder…</button>
       </section>
-      <aside id="agent-tip">
-        <span id="agent-tip-text">Available in the desktop app</span
-        ><a
-          id="tip-install-claude"
-          href="https://code.claude.com/docs/en/setup"
-          target="_blank"
-          rel="noopener"
-          hidden
-          >Install Claude</a
-        ><a
-          id="tip-install-codex"
-          href="https://developers.openai.com/codex/cli"
-          target="_blank"
-          rel="noopener"
-          hidden
-          >Install Codex</a
-        ><button id="agent-check" class="btn sec" hidden>Check again</button
-        ><button
-          id="agent-dismiss"
-          class="btn ghost"
-          aria-label="Dismiss agent tip"
-        >
-          Dismiss
-        </button>
-      </aside>
+      <div id="agent-control" class="agent-control" hidden>
+        <button id="ask-agent" class="btn sec" hidden>Ask agent</button>
+        <details id="agent-picker">
+          <summary>Analyze with <span id="agent-choice">None</span></summary>
+          <div class="agent-menu">
+            <div id="agent-options" role="group" aria-label="Analyze with"></div>
+            <button id="agent-check" class="link">Check again</button>
+          </div>
+        </details>
+      </div>
       <aside id="access-banner" class="banner banner-warning" hidden>
         <strong
           ><svg class="i" aria-hidden="true">
@@ -562,6 +520,72 @@
         <button id="full-disk-access" class="btn sec">Open settings</button>
       </aside>
       <div id="content-grid" class="grid">
+        <section id="suggestions" class="card right">
+          <div class="ch">
+            <span class="step">3</span>
+            <h2>What you can clean</h2>
+            <span class="r" id="rail-count"></span
+            ><button class="link" id="review-cleanup">Show all</button>
+          </div>
+          <div class="gain">
+            <div class="k">You could get back</div>
+            <div class="v num" id="reclaim-total">—</div>
+            <div class="ba">
+              <div class="l">
+                <span>Free now <b class="num" id="free-now">—</b></span
+                ><span>After cleanup <b class="num" id="free-after">—</b></span>
+              </div>
+              <div class="babar">
+                <i class="now" id="bar-now"></i
+                ><i class="add" id="bar-after"></i>
+              </div>
+            </div>
+          </div>
+          <div id="results-agent-slot"></div>
+          <div class="tools">
+            <div class="seg" aria-label="Suggestion sort">
+              <button data-suggest-sort="score" class="active">Best</button
+              ><button data-suggest-sort="size" class="">Largest</button
+              ><button data-suggest-sort="stale" class="">
+                Unused longest
+              </button>
+            </div>
+            <span class="cnt" id="sort-hint"
+              >Safest first; personal files in Largest</span
+            >
+          </div>
+          <div class="suggestion-controls" id="cleanup-filters" hidden>
+            <label
+              >Category
+              <select id="suggest-category">
+                <option value="">All categories</option>
+              </select></label
+            ><label
+              >Safety
+              <select id="suggest-safety">
+                <option value="">All safety levels</option>
+              </select></label
+            >
+          </div>
+          <div class="lh">
+            <span></span><span></span><span>Item</span><span>Safety</span
+            ><span class="rt">Score</span><span class="rt">Size</span>
+          </div>
+          <div class="list" id="suggestion-list"></div>
+          <div id="selection-bar" class="selbar" hidden>
+            <div class="t">
+              <b class="num" id="selection-total"></b
+              ><span>Restorable from the Trash</span>
+            </div>
+            <div class="sp"></div>
+            <button id="clear-selection" class="btn ghost">Deselect</button
+            ><button id="trash-selected" class="btn dan">
+              <svg class="i" aria-hidden="true"><use href="#fill-trash" /></svg
+              >Move to Trash
+            </button>
+          </div>
+          <div id="trash-results" role="status"></div>
+        </section>
         <div id="overview-panel" class="overview-left">
           <section class="card">
             <div class="ch">
@@ -659,71 +683,6 @@
           </div>
         </section>
 
-        <section id="suggestions" class="card right">
-          <div class="ch">
-            <span class="step">3</span>
-            <h2>What you can clean</h2>
-            <span class="r" id="rail-count"></span
-            ><button class="link" id="review-cleanup">Show all</button>
-          </div>
-          <div class="gain">
-            <div class="k">You could get back</div>
-            <div class="v num" id="reclaim-total">—</div>
-            <div class="ba">
-              <div class="l">
-                <span>Free now <b class="num" id="free-now">—</b></span
-                ><span>After cleanup <b class="num" id="free-after">—</b></span>
-              </div>
-              <div class="babar">
-                <i class="now" id="bar-now"></i
-                ><i class="add" id="bar-after"></i>
-              </div>
-            </div>
-          </div>
-          <div class="tools">
-            <div class="seg" aria-label="Suggestion sort">
-              <button data-suggest-sort="score" class="active">Best</button
-              ><button data-suggest-sort="size" class="">Largest</button
-              ><button data-suggest-sort="stale" class="">
-                Unused longest
-              </button>
-            </div>
-            <span class="cnt" id="sort-hint"
-              >Safest first; personal files in Largest</span
-            >
-          </div>
-          <div class="suggestion-controls" id="cleanup-filters" hidden>
-            <label
-              >Category
-              <select id="suggest-category">
-                <option value="">All categories</option>
-              </select></label
-            ><label
-              >Safety
-              <select id="suggest-safety">
-                <option value="">All safety levels</option>
-              </select></label
-            >
-          </div>
-          <div class="lh">
-            <span></span><span></span><span>Item</span><span>Safety</span
-            ><span class="rt">Score</span><span class="rt">Size</span>
-          </div>
-          <div class="list" id="suggestion-list"></div>
-          <div id="selection-bar" class="selbar" hidden>
-            <div class="t">
-              <b class="num" id="selection-total"></b
-              ><span>Restorable from the Trash</span>
-            </div>
-            <div class="sp"></div>
-            <button id="clear-selection" class="btn ghost">Deselect</button
-            ><button id="trash-selected" class="btn dan">
-              <svg class="i" aria-hidden="true"><use href="#fill-trash" /></svg
-              >Move to Trash
-            </button>
-          </div>
-          <p id="trash-results" role="status"></p>
-        </section>
       </div>
       <section id="volume" hidden>
         <span id="hud-used"></span><span id="hud-free"></span

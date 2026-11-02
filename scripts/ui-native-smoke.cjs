@@ -14,6 +14,7 @@ const wait = async (fn) => {
   throw Error("Timed out: " + fn);
 };
 (async () => {
+  const registry = await (await fetch(new URL("/api/agents", url), { headers: { Cookie: "omd=" + token } })).json();
   const errors = [],
     calls = [];
   const vc = new VirtualConsole();
@@ -60,10 +61,7 @@ const wait = async (fn) => {
         main: {
           App: {
             State: async () => ({ ...state }),
-            Agents: async () => [
-              { name: "claude", path: "/mock/claude" },
-              { name: "codex", path: "/mock/codex" },
-            ],
+            Agents: async () => registry.map(d => ({ ...d, path: "/mock/" + d.name })),
             PickFolder: async () => pickedFolder,
             Scan: async (root) => {
               calls.push(["scan", root]);
@@ -104,7 +102,9 @@ const wait = async (fn) => {
       $(id).click();
       assert.equal($(id).getAttribute("aria-current"), "page");
       assert.equal($("content-grid").hidden, true);
+      assert.equal($("ask-agent").hidden, true);
     }
+    assert.equal($("ask-agent").hidden, true);
     $("options-toggle").click();
     assert.equal($("scan-options").hidden, false);
     $("units-binary").click();
@@ -174,11 +174,14 @@ const wait = async (fn) => {
     return;
   }
   await wait(() => !$("open-last").hidden);
+  assert.equal($("ask-agent").hidden, true);
   assert.equal($("web-scan").hidden, true);
   assert.equal($("desktop").hidden, false);
   $("folders").click(); // Safe before a snapshot has been opened.
   await $("open-last").onclick();
   await wait(() => d.querySelector("#overview-folders .fr"));
+  assert.equal($("ask-agent").hidden, false);
+  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
   assert.equal($("scan-root").value, "home");
   assert.equal($("overview-panel").hidden, true);
   assert.equal($("explorer").hidden, false);

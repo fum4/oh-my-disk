@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"github.com/fum4/oh-my-disk/internal/agents"
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/rules"
 	"github.com/fum4/oh-my-disk/internal/scanner"
@@ -19,6 +20,10 @@ func param(r *http.Request, name string, def, min, max int) (int, bool) {
 	return v, e == nil && v >= min && v <= max
 }
 func installAPI(mux *http.ServeMux, s *report.Snapshot) {
+	mux.HandleFunc("/api/agents", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(agents.Registry())
+	})
 	t := s.Scan.Tree
 	if t == nil {
 		t = scanner.Compact(s.Scan.Root)

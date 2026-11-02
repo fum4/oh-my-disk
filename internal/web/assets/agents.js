@@ -1,7 +1,9 @@
 "use strict";
 (() => {
   const app = window.go?.main?.App;
-  const names = { claude: "Claude", codex: "Codex" };
+  const names = {};
+  let definitions = [], choice = "", showNudge = false, detected = false, optionState = "";
+  try { choice = localStorage.getItem("omd-agent-choice") || ""; } catch {}
   let installed = {},
     state = {},
     pending = "",
@@ -20,46 +22,82 @@
     }
   };
   const error = (e) => showFeedback(String(e));
-  function render() {
-    for (const [n, label] of Object.entries(names)) {
-      const found = !!installed[n];
-      $("ask-" + n).disabled =
-        !app || !found || !state.hasScan || state.busy || opening;
-      $("ask-" + n).title = app
-        ? found
-          ? "Chat about the displayed scan"
-          : "Install " + label + " and check again"
-        : "Available in the desktop app";
-      const b = $("scan-" + n);
-      b.disabled = !app || !found || state.busy || opening;
-      b.textContent = !app
-        ? "Desktop app required"
-        : found
-          ? "Scan with " + label
-          : "Install " + label;
-      $("install-" + n).hidden = !app || found;
-      $("tip-install-" + n).hidden = !app || found;
-    }
-    $("plain-scan").disabled = !!state.busy;
-    $("agent-check").hidden = !app;
-    $("agent-tip-text").textContent = !app
-      ? "Available in the desktop app"
-      : "Install Claude Code or Codex CLI to chat about your disk right in the app. Install either CLI, then Check again.";
-    $("agent-tip").hidden =
-      dismissed() || (app && installed.claude && installed.codex);
+  function select(name) {
+    choice = name;
+    try { localStorage.setItem("omd-agent-choice", name); } catch {}
+    $("agent-picker").open = false;
+    render();
+    $("agent-picker").querySelector("summary").focus();
   }
-  async function detect() {
-    if (app) {
-      $("agent-check").disabled = true;
-      try {
-        installed = Object.fromEntries(
-          (await app.Agents()).map((c) => [c.name, c.path]),
-        );
-      } finally {
-        $("agent-check").disabled = false;
+  function render() {
+    const busy = !!state.busy || document.body.classList.contains("is-scanning");
+    const ready = !!snapshot;
+    const available = definitions.some(d => installed[d.name]);
+    if (busy) $("agent-picker").open = false;
+    const selected = installed[choice] ? choice : "";
+    const slot = !ready ? "scan-agent-slot" : ["overview", "cleanup-tab"].includes(mode) ? "results-agent-slot" : "toolbar-agent-slot";
+    const control = $("agent-control");
+    if (control.parentElement !== $(slot)) $(slot).append(control);
+    control.hidden = busy;
+    $("ask-agent").hidden = !ready;
+    $("ask-agent").disabled = !app || opening;
+    $("ask-agent").title = app ? "Chat about these results" : "Available in the desktop app";
+    $("agent-choice").textContent = names[selected] || "None";
+    $("agent-picker").querySelector("summary").title = app ? "" : "Agents run in the desktop app";
+    const signature = JSON.stringify([definitions, installed, selected]);
+    const options = $("agent-options");
+    if (signature !== optionState) {
+      optionState = signature;
+      options.replaceChildren();
+      const add = (name, label, glyph = "") => {
+        const b = dom("button", "agent-option");
+        const text = dom("span", "agent-option-label", label);
+        if (glyph) text.prepend(icon(glyph));
+        b.append(text);
+        b.type = "button";
+        b.setAttribute("aria-pressed", String(selected === name));
+        b.onclick = () => select(name);
+        options.append(b);
+      };
+      add("", "None");
+      for (const d of definitions) {
+        if (app && installed[d.name]) add(d.name, d.label, d.icon);
+        else {
+          const row = dom("div", "agent-option unavailable");
+          const label = dom("span", "agent-option-label", d.label);
+          label.prepend(icon(d.icon));
+          row.append(label);
+          const link = dom("a", "", "Install ↗");
+          link.href = d.installURL;
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.setAttribute("aria-label", "Install " + d.label);
+          if (app) link.onclick = e => { e.preventDefault(); window.runtime.BrowserOpenURL(link.href); };
+          row.append(link);
+          options.append(row);
+        }
       }
     }
-    render();
+    $("agent-check").hidden = !app;
+    $("plain-scan").disabled = busy || opening;
+    $("agent-tip").hidden = !app || ready || busy || available || !showNudge || !definitions.length;
+  }
+  async function detect() {
+    $("agent-check").disabled = true;
+    try {
+      // The same Go registry supplies desktop and browser presentation.
+      definitions = app ? await app.Agents() : await (await fetch("/api/agents")).json();
+      for (const d of definitions) names[d.name] = d.label;
+      if (app) installed = Object.fromEntries(definitions.map(c => [c.name, c.path]));
+      if (!detected) {
+        showNudge = !!app && !definitions.some(d => installed[d.name]) && !dismissed();
+        detected = true;
+      }
+      render();
+      if (!$("agent-tip").hidden) {
+        try { localStorage.setItem(tipKey, "1"); } catch {}
+      }
+    } finally { $("agent-check").disabled = false; }
   }
   function theme() {
     const c = getComputedStyle(document.documentElement);
@@ -76,7 +114,7 @@
     app.ResizeAgent(term.cols, term.rows).catch(error);
   }
   async function launch(n, prompt = "") {
-    if (opening) return;
+    if (opening || !snapshot || state.busy || !installed[n]) return;
     opening = true;
     render();
     try {
@@ -163,16 +201,19 @@
     term = null;
     $("terminal-screen").replaceChildren();
     $("agent-terminal").hidden = true;
-    if (restore) $("ask-claude").focus();
+    if (restore) $("ask-agent").focus();
   }
-  for (const n of Object.keys(names)) {
-    $("ask-" + n).onclick = () => launch(n);
-    $("scan-" + n).onclick = async () => {
-      pending = n;
-      scanStarted = false;
-      await $("start-scan").onclick();
-    };
-  }
+  $("ask-agent").onclick = () => {
+    if (installed[choice]) return launch(choice);
+    else { $("agent-picker").open = true; $("agent-options").querySelector("button")?.focus(); }
+  };
+  window.agentViewChanged = render;
+  const scan = $("hub-scan").onclick;
+  $("hub-scan").onclick = async () => {
+    pending = installed[choice] ? choice : "";
+    scanStarted = false;
+    await scan();
+  };
   window.agentScanStarted = () => {
     scanStarted = true;
   };
@@ -194,12 +235,19 @@
       window.agentScanCancelled();
     render();
   };
-  $("plain-scan").onclick = () => {
-    pending = "";
-    $("hub-scan").click();
-  };
+  $("plain-scan").onclick = () => $("hub-scan").onclick();
+  document.addEventListener("click", e => {
+    if (!$("agent-picker").contains(e.target)) $("agent-picker").open = false;
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && $("agent-picker").open) {
+      $("agent-picker").open = false;
+      $("agent-picker").querySelector("summary").focus();
+    }
+  });
   $("agent-check").onclick = () => detect().catch(error);
   $("agent-dismiss").onclick = () => {
+    showNudge = false;
     try {
       localStorage.setItem(tipKey, "1");
     } catch {}
@@ -243,12 +291,5 @@
     .addEventListener("change", () => {
       if (term) term.options.theme = theme();
     });
-  if (app)
-    for (const n of Object.keys(names))
-      for (const prefix of ["install-", "tip-install-"])
-        $(prefix + n).onclick = (e) => {
-          e.preventDefault();
-          window.runtime.BrowserOpenURL(e.currentTarget.href);
-        };
   detect().catch(error);
 })();

@@ -536,12 +536,13 @@ function showMode(next) {
     $("empty-title").textContent = copy[0];
     $("empty-description").textContent =
       copy[1] + " Scan " + target + " to begin.";
-    $("launch-cards").hidden = mode !== "overview";
-    document.querySelector(".agent-disclosure").hidden = mode !== "overview";
-    $("empty-scan").hidden = mode === "overview";
+    $("launch-cards").hidden = false;
+    $("empty-scan").hidden = true;
+    window.agentViewChanged?.();
     document.querySelector(".view-switch").hidden = true;
     return;
   }
+  window.agentViewChanged?.();
   $("overview-panel").hidden = mode !== "overview";
   $("explorer").hidden = mode === "cleanup-tab" || mode === "overview";
   $("suggestions").hidden = !["cleanup-tab", "overview"].includes(mode);
@@ -976,6 +977,7 @@ $("cancel-trash").onclick = () => $("trash-confirm").close();
 $("confirm-trash").onclick = async () => {
   const b = $("confirm-trash");
   b.disabled = true;
+  const sizes = new Map(selected);
   try {
     const result = await action("/api/trash", { paths: [...selected.keys()] });
     $("trash-confirm").close();
@@ -993,11 +995,16 @@ $("confirm-trash").onclick = async () => {
       (result.scan_error
         ? "\nTotals could not refresh: " + result.scan_error
         : "");
-    $("trash-results").textContent = message;
-    $("selection-bar").hidden = false;
+    const moved = (result.results || []).filter(r => r.trashed);
+    const bytes = moved.reduce((sum, r) => sum + (sizes.get(r.path) || 0), 0);
+    const details = dom("details", "trash-details");
+    details.append(dom("summary", "", "Details"), dom("pre", "", message));
+    $("trash-results").replaceChildren(
+      dom("span", "", moved.length ? `${fmt(bytes)} moved to Trash. Review more items or scan again.` : "No items moved. Review details and try again."), details);
+    $("selection-bar").hidden = true;
   } catch (e) {
     $("trash-results").textContent = String(e);
-    $("selection-bar").hidden = false;
+    $("selection-bar").hidden = selected.size === 0;
     $("trash-confirm").close();
   } finally {
     b.disabled = false;
@@ -1254,6 +1261,7 @@ function scanState(busy, message = "Scanning…") {
   if (!busy) $("hub-scan").append(dom("span", "kbd", "⌘R"));
   $("scan-strip").hidden = !busy;
   $("empty-scan").disabled = busy;
+  window.agentViewChanged?.();
   if (busy) $("progress").textContent = message;
   else showFeedback("");
 }

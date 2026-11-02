@@ -12,8 +12,10 @@ const wait = async (fn) => {
   throw Error("Timed out: " + fn);
 };
 (async () => {
-  let available = false,
+  const registry = await (await fetch(new URL("/api/agents", url), { headers: { Cookie: "omd=" + token } })).json();
+  let available = process.argv.includes("--remembered"),
     launched = [],
+    trashCalls = 0,
     closed = 0;
   const errors = [],
     state = {
@@ -39,11 +41,22 @@ const wait = async (fn) => {
       pretendToBeVisual: true,
       virtualConsole: vc,
       beforeParse(w) {
-        w.fetch = (path, options = {}) =>
-          fetch(new URL(path, url), {
+        if (process.argv.includes("--remembered") || process.argv.includes("--missing-remembered")) {
+          w.localStorage.setItem("omd-agent-choice", "claude");
+          w.localStorage.setItem("omd-agent-tip-dismissed", "1");
+        }
+        w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+        w.HTMLDialogElement.prototype.close = function () { this.open = false; };
+        w.fetch = (path, options = {}) => {
+          if (path === "/api/trash") {
+            trashCalls++;
+            return Promise.resolve(new Response(JSON.stringify({results: JSON.parse(options.body).paths.map(path => ({path, trashed: true}))}), {headers: {"Content-Type": "application/json"}}));
+          }
+          return fetch(new URL(path, url), {
             ...options,
             headers: { ...options.headers, Cookie: "omd=" + token },
           });
+        };
         w.Path2D = class {
           arc() {}
           roundRect() {}
@@ -82,10 +95,7 @@ const wait = async (fn) => {
           main: {
             App: {
               State: async () => ({ ...state }),
-              Agents: async () => [
-                { name: "claude", path: available ? "/mock/claude" : "" },
-                { name: "codex", path: "" },
-              ],
+              Agents: async () => registry.map(d => ({ ...d, path: d.name === "claude" && available ? "/mock/claude" : "" })),
               Scan: async () => {
                 state.busy = true;
                 state.phase = "walking";
@@ -116,18 +126,43 @@ const wait = async (fn) => {
       .map((file) => fs.readFileSync("internal/web/assets/" + file, "utf8"))
       .join("\n"),
   );
-  await wait(() => $("scan-claude").textContent === "Install Claude");
-  assert.equal($("scan-claude").disabled, true);
-  assert.equal($("install-claude").hidden, false);
-  assert.equal($("tip-install-codex").hidden, false);
+  const option = name => [...$("agent-options").querySelectorAll("button")].find(b => b.textContent.includes(name));
+  await wait(() => $("agent-options").textContent.includes("Claude"));
+  assert.equal($("ask-agent").hidden, true);
+  assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
+  for (const id of ["folders", "categories", "cleanup-tab", "overview"]) {
+    $(id).click();
+    assert.equal($("ask-agent").hidden, true);
+    assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
+    assert.equal($("launch-cards").hidden, false);
+  }
+  if (process.argv.includes("--remembered") || process.argv.includes("--missing-remembered")) {
+    assert.equal($("agent-choice").textContent, available ? "Claude" : "None");
+    assert.equal($("agent-tip").hidden, true);
+    assert.equal(w.localStorage.getItem("omd-agent-choice"), "claude");
+    w.close();
+    console.log("PASS: remembered choice, unavailable fallback, once-only nudge, pre-scan visibility on every page.");
+    return;
+  }
+  assert.equal($("agent-choice").textContent, "None");
+
+  assert.equal(w.document.querySelectorAll(".launch-card").length, 1);
+  assert.equal(option("Claude"), undefined);
+  assert.ok($("agent-options").querySelector('a[aria-label="Install Claude"]'));
+  assert.equal($("agent-tip").hidden, false);
   $("agent-dismiss").click();
   assert.equal(w.localStorage.getItem("omd-agent-tip-dismissed"), "1");
   available = true;
   await $("agent-check").onclick();
-  assert.equal($("scan-claude").disabled, false);
-  assert.equal($("scan-codex").disabled, true);
-  await $("scan-claude").onclick();
+  assert.ok(option("Claude"));
+  assert.equal(option("Claude").querySelector("use").getAttribute("href"), "#regular-magnifying-glass");
+  assert.equal(option("Codex"), undefined);
+  option("Claude").click();
+  assert.equal(w.document.activeElement, $("agent-picker").querySelector("summary"));
+  assert.equal(w.localStorage.getItem("omd-agent-choice"), "claude");
+  await $("plain-scan").onclick();
   await wait(() => $("plain-scan").disabled);
+  assert.equal($("agent-control").hidden, true);
   assert.equal(launched.length, 0);
   state.busy = false;
   state.hasScan = true;
@@ -139,17 +174,44 @@ const wait = async (fn) => {
   await wait(() => $("terminal-status").textContent === "Session ended");
   await $("terminal-close").onclick();
   assert.equal($("agent-terminal").hidden, true);
-  await $("ask-claude").onclick();
+  assert.equal($("ask-agent").hidden, false);
+  assert.equal($("agent-control").parentElement.id, "results-agent-slot");
+  $("folders").click();
+  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
+  $("cleanup-tab").click();
+  assert.equal($("agent-control").parentElement.id, "results-agent-slot");
+  await $("ask-agent").onclick();
   assert.equal(launched.length, 2);
   await $("terminal-close").onclick();
   // A cancelled scan cannot hand off to an agent.
-  await $("scan-claude").onclick();
+  await $("plain-scan").onclick();
   $("cancel-scan").onclick();
   state.phase = "Complete";
   state.revision = 2;
   await new Promise((r) => setTimeout(r, 900));
   assert.equal(launched.length, 2);
   assert.ok(closed >= 2);
+  // None scans without launching, even when a CLI is installed.
+  option("None").click();
+  await $("hub-scan").onclick();
+  await wait(() => $("plain-scan").disabled);
+  state.busy = false;
+  state.phase = "Complete";
+  state.revision = 3;
+  await wait(() => !$("plain-scan").disabled);
+  await new Promise(r => setTimeout(r, 500));
+  assert.equal(launched.length, 2);
+  assert.equal($("agent-choice").textContent, "None");
+  // Confirm a mocked response only: no real Trash request is sent.
+  const box = w.document.querySelector(".suggestion-card input:not(:disabled)");
+  assert.ok(box);
+  box.click();
+  $("trash-selected").click();
+  await $("confirm-trash").onclick();
+  assert.equal(trashCalls, 1);
+  assert.match($("trash-results").textContent, /moved to Trash. Review more items or scan again/);
+  assert.ok($("trash-results").querySelector("details"));
+  assert.equal($("selection-bar").hidden, true);
   assert.deepEqual(errors, []);
   w.close();
   console.log(

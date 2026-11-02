@@ -88,3 +88,36 @@ See [POLISH_REPORT.md](POLISH_REPORT.md) for all thirteen feedback items, extra 
 - `go vet ./...`, `go test ./...`, `make app`, deep/strict codesign verification, and `go test -race ./app ./internal/agents`: passed (see `.build/agents-*.log`). Desktop bundle includes the CLI MCP helper.
 - Rendered QA remains blocked: Chrome/Playwright aborts during startup under this sandbox; the computer-use in-app browser reports “browser access host is unavailable.” Light/dark pixel rendering, actual WebKit terminal interactions, and authenticated agent conversations were not verified. The automated PTY test uses `/bin/sh` without calling a provider; no account/auth settings are changed.
 - Side git branch `agents` is stored in `.build/agents-git` with bundle `.build/agents.bundle`, based on the original v1 HEAD. No icon changes are included; `make app` regenerates the build icon.
+
+## Round 4: merged scan and agent controls (2026-11-02)
+
+This supersedes the three welcome cards and separate Ask buttons described above. One **Scan my disk** card contains **Scan** and an **Analyze with** dropdown. None is the initial choice; installed agents are selectable, missing agents are install links. The choice persists locally and falls back to None if that CLI is unavailable. The missing-agent nudge appears only on the first eligible visit, remains stable during that visit, and can be dismissed. Check again lives inside the picker.
+
+The same control moves beside the cleanup results on Overview/Cleanup, and into the toolbar on Folders/Categories. **Ask agent** is hidden until a snapshot has actually loaded: a native `hasScan` flag alone does not reveal it. With None selected, Ask opens the picker; choosing an installed agent and pressing Ask starts the conversation. Scan-only works without any agent. Cancelled/failed scans never hand off. Agent options are not rebuilt during native status polling, preserving keyboard focus.
+
+### Action hierarchy by state
+
+| State / page | Focus and next step | Secondary / hidden controls |
+| --- | --- | --- |
+| Before any scan, every page | One merged Scan card; Scan is the only filled button. | Analyze with is optional; Choose Folder is a quiet link and Options holds details. Ask agent and result statistics are hidden. |
+| Saved scan available, unopened | Same Scan card until a valid snapshot is opened. | Open last scan lives in Options. No Ask action based solely on cache availability. |
+| Scanning / opening saved scan | Progress and current phase; Cancel when cancellable. | Results, Scan card, toolbar actions, terminal and footer are hidden; sidebar is quiet. No competing filled button. |
+| Overview after scan | “You could get back X” and top cleanup candidates lead in both DOM and visual order. Select candidates, then Move to Trash. | Disk/folder panels follow. Ask agent sits just below the opportunity; rescan is secondary. Overview hides sorting tools, redundant before/after figures and sidebar counts. |
+| Cleanup after scan | Review/filter candidates and select items. Move to Trash is the sole filled action once selected. | Ask agent stays near the cleanup opportunity; filters and sorting serve review. Explanation/path/commands expand on demand. |
+| Folders / Categories after scan | Explore the map/table and select items. Move to Trash is the sole filled action once selected. | Ask agent and rescan are secondary toolbar controls; metadata/actions retain hover/expand behavior. |
+| Trash confirmation | Confirm Move to Trash in the modal. | Cancel is secondary; the background is modal. |
+| After Trash | Concise amount moved, then review more or scan again. Per-path results expand under Details. | Empty selection bar is hidden. A failed action retains the selection action if items are still selected. Rescan remains secondary. |
+| Cancel / scan failure | Restore the prior results, or the one Scan card if no snapshot exists. | A concise error explains recovery; no agent handoff. |
+| Agent conversation | Terminal conversation and Close. | No new filled action; existing cleanup controls remain secondary to the active conversation. |
+
+Trash confirmation reports allocated bytes **moved to Trash**, not a claim that disk space was freed: recoverable files may still occupy disk space. Selection is cleared after refreshing the snapshot. No tests move real fixture files to Trash.
+
+### Registry and verification
+
+`internal/agents/agents.go` is the only agent registration point: name, label, icon, install URL, detection command/fallback, and launch argv builder. Native Agents returns those definitions with detection paths; `/api/agents` exposes presentation metadata for the browser, without paths or command arguments. A new agent requires one definition, with no frontend card, detection allowlist, or launch switch to update. Go tests cover registry completeness/uniqueness, copy isolation, presentation JSON, detection/launch dispatch, unknown names, and an additional synthetic entry with a distinct executable name.
+
+- `make check` (`go vet ./...`, `go test ./...`), `make cli`, `make app`, and strict/deep signature verification pass.
+- Web, native saved-scan, native empty-start, agent-flow, remembered-choice and missing-remembered-choice smoke checks pass. They cover pre-scan visibility on every page, a single card, installed/missing options, persistence/fallback, once-only nudge, post-scan placement, scan-only, successful handoff, cancellation, terminal close/reopen, and a mocked Trash response with collapsed details and cleared selection. Provider CLIs and native bridge/terminal are mocked; fixture read/rescan APIs are real. The Trash response is intercepted before any network mutation.
+- Rendered verification remains blocked: Chrome aborts before page load with crashpad/bootstrap sandbox permission errors; the computer-use in-app browser reports “browser access host is unavailable.” Actual light/dark pixels, responsive geometry and native WebKit terminal behavior remain unverified. The DOM checks do not establish visual fidelity.
+- Logs: `.build/round4-{check,cli,app,codesign,web-smoke,native-smoke,empty-smoke,agents-smoke,remembered-smoke,missing-smoke,capture}.log`.
+- Delivery: branch `round4`, based on v1 HEAD `3fc76b5`, in `.build/round4-git`; bundle `.build/round4.bundle`. Primary `.git` is not written; generated icon artifacts are excluded from the commit.
