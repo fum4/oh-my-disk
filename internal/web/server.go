@@ -2,12 +2,10 @@
 package web
 
 import (
-	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"embed"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -33,22 +31,7 @@ type Options struct {
 
 func handler(s *report.Snapshot, host, token string) http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/scan", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.Header.Get("Accept-Encoding") != "" { // gzip is negotiated explicitly below
-			for _, v := range []string{"gzip", "gzip, deflate", "gzip, deflate, br"} {
-				if r.Header.Get("Accept-Encoding") == v {
-					w.Header().Set("Content-Encoding", "gzip")
-					w.Header().Set("Vary", "Accept-Encoding")
-					z := gzip.NewWriter(w)
-					defer z.Close()
-					json.NewEncoder(z).Encode(s)
-					return
-				}
-			}
-		}
-		json.NewEncoder(w).Encode(s)
-	})
+	installAPI(mux, s)
 	sub, _ := fs.Sub(assets, "assets")
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -199,7 +199,7 @@ a:focus-visible {
   justify-content: center;
   flex: 1;
 }
-#chart svg {
+#chart svg, #chart canvas {
   width: 100%;
   height: auto;
   max-height: 540px;

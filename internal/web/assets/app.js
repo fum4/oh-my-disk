@@ -1,6 +1,5 @@
 "use strict";
-const $ = (id) => document.getElementById(id),
-  ns = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
 let snapshot,
   root,
   current,
@@ -34,12 +33,6 @@ const fmt = (b) => {
   } while (b >= 1024 && i < 4);
   return b.toFixed(1) + " " + ["KiB", "MiB", "GiB", "TiB", "PiB"][i];
 };
-const el = (tag, attrs = {}, text) => {
-  const n = document.createElementNS(ns, tag);
-  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
-  if (text !== undefined) n.textContent = text;
-  return n;
-};
 const dom = (tag, cls, text) => {
   const n = document.createElement(tag);
   if (cls) n.className = cls;
@@ -63,28 +56,27 @@ function tooltip(e, n) {
   t.style.left = Math.max(8, Math.min(e.clientX + 15, innerWidth - 395)) + "px";
   t.style.top = Math.max(8, Math.min(e.clientY + 15, innerHeight - 100)) + "px";
 }
-function bind(node, n) {
-  node.addEventListener("pointermove", (e) => tooltip(e, n));
-  node.addEventListener("pointerleave", () => ($("tooltip").hidden = true));
-  node.addEventListener("click", () => navigate(n));
-  node.setAttribute("tabindex", "0");
-  node.setAttribute("role", "button");
-  node.setAttribute("aria-label", n.name + ", " + fmt(n.bytes));
-  node.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      navigate(n);
-    }
-  });
+let navigationVersion=0;
+async function loadChildren(n,offset=0) {
+  if(n.synthetic && !n.category_name) return;
+  const url=n.category_name ? `/api/category?name=${encodeURIComponent(n.category_name)}&offset=${offset}&sort=${sortKey}&asc=${Number(sortAsc)}` : `/api/node?id=${n.id}&depth=3&offset=${offset}&sort=${sortKey}&asc=${Number(sortAsc)}`;
+  const r=await fetch(url);if(!r.ok)throw Error("Unable to load folder: "+r.status);
+  const data=await r.json();
+  if(offset) {n.children=[...(n.children||[]),...(data.children||[])];n.child_count=data.child_count;}
+  else Object.assign(n,data);
+  index(n,parents.get(n),colors.get(n));n.loaded=true;
 }
-function navigate(n) {
-  if (!(n.children || []).length && n.kind !== "directory" && !n.synthetic)
-    return;
-  current = n;
-  shown = 200;
-  $("tooltip").hidden = true;
-  render();
+async function navigate(n) {
+  if(n.more_parent) {try{const p=n.more_parent;await loadChildren(p,(p.children||[]).length);current=p;shown+=200;render();}catch(e){$("scan-info").textContent=e.message;}return;}
+  if(n.kind!=="directory" && !n.synthetic) return;
+  const version=++navigationVersion;
+  try {
+    if(!n.synthetic || n.category_name) await loadChildren(n);
+    if(version!==navigationVersion) return;
+    current=n;shown=200;$("tooltip").hidden=true;render();
+  }catch(e){$("scan-info").textContent=e.message;}
 }
+
 function ordered(n) {
   return [...(n.children || [])].sort(
     (a, b) => b.bytes - a.bytes || a.name.localeCompare(b.name),
@@ -99,110 +91,53 @@ function arc(r1, r2, a, b) {
     big = b - a > Math.PI ? 1 : 0;
   return `M${p} A${r2},${r2} 0 ${big} 1 ${q} L${s} A${r1},${r1} 0 ${big} 0 ${t} Z`;
 }
+function canvasChart(w, h) {
+  const canvas = dom("canvas");
+  const scale = devicePixelRatio || 1;
+  canvas.width = w * scale; canvas.height = h * scale;
+  canvas.style.width = "100%"; canvas.style.maxWidth = Math.min(w, 540*w/h) + "px";
+  canvas.style.aspectRatio = `${w} / ${h}`;
+  canvas.setAttribute("aria-label", "Space map. Use the folder table to navigate with a keyboard.");
+  const ctx = canvas.getContext("2d"); ctx.scale(scale, scale);
+  const regions = [];
+  const hit = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const x = (e.clientX-r.left)*w/r.width, y = (e.clientY-r.top)*h/r.height;
+    return [...regions].reverse().find(z => ctx.isPointInPath(z.path, x*scale, y*scale));
+  };
+  canvas.onpointermove = e => { const z = hit(e); canvas.style.cursor = z ? "pointer" : "default"; if(z) tooltip(e,z.node); else $("tooltip").hidden=true; };
+  canvas.onpointerleave = () => $("tooltip").hidden=true;
+  canvas.onclick = e => { const z=hit(e); if(z) navigate(z.node); };
+  return {canvas, ctx, regions};
+}
 function sunburst() {
-  const svg = el("svg", { viewBox: "0 0 600 600" });
-  const maxDepth = 5,
-    inner = 86,
-    width = 39;
-  let segments = 0;
-  function ring(n, start, end, depth, base) {
-    if (depth > maxDepth || n.bytes <= 0) return;
-    let angle = start;
-    for (const [i, c] of ordered(n).entries()) {
-      const span = ((end - start) * c.bytes) / n.bytes;
-      const next = angle + span;
-      const color = base || palette[i % palette.length];
-      if (span > 0.004 && segments < 5000) {
-        const a = angle + 0.0018,
-          b = Math.min(next - 0.0018, angle + 2 * Math.PI - 0.0001);
-        if (b > a) {
-          const p = el("path", {
-            d: arc(
-              inner + (depth - 1) * width,
-              inner + depth * width - 2,
-              a,
-              b,
-            ),
-            fill: color,
-            "fill-opacity": 1 - (depth - 1) * 0.105,
-            class: "segment",
-          });
-          bind(p, c);
-          svg.append(p);
-          segments++;
-          ring(c, angle, next, depth + 1, color);
+  const {canvas, ctx, regions} = canvasChart(600,600);
+  let segments=0;
+  function ring(n,start,end,depth,base) {
+    if(depth>5 || n.bytes<=0) return;
+    let angle=start;
+    for(const [i,c] of ordered(n).entries()) {
+      const next=angle+(end-start)*c.bytes/n.bytes;
+      const color=base || palette[i%palette.length];
+      if(next-angle>0.004 && segments<1200) {
+        const a=angle+0.0018,b=Math.min(next-0.0018,angle+2*Math.PI-0.0001);
+        if(b>a) {
+          const path=new Path2D(arc(86+(depth-1)*39,86+depth*39-2,a,b));
+          ctx.fillStyle=color; ctx.globalAlpha=1-(depth-1)*0.105; ctx.fill(path);
+          regions.push({path,node:c}); segments++;ring(c,angle,next,depth+1,color);
         }
       }
-      angle = next;
+      angle=next;
     }
   }
-  ring(current, 0, Math.PI * 2, 1, null);
-  const center = el("g", {
-    class: "center",
-    tabindex: 0,
-    role: "button",
-    "aria-label": "Go to parent folder",
-  });
-  center.append(
-    el("circle", {
-      cx: 300,
-      cy: 300,
-      r: 81,
-      fill: "#191f2e",
-      stroke: "#30384d",
-    }),
-  );
-  center.append(
-    el(
-      "text",
-      {
-        x: 300,
-        y: 287,
-        "text-anchor": "middle",
-        fill: "#f0ecff",
-        "font-size": 25,
-        "font-weight": 500,
-      },
-      fmt(current.bytes),
-    ),
-  );
-  let label = current.name || "/";
-  if (label.length > 21) label = label.slice(0, 19) + "…";
-  center.append(
-    el(
-      "text",
-      {
-        x: 300,
-        y: 311,
-        "text-anchor": "middle",
-        fill: "#8e9ab0",
-        "font-size": 11,
-      },
-      label,
-    ),
-  );
-  center.append(
-    el(
-      "text",
-      {
-        x: 300,
-        y: 334,
-        "text-anchor": "middle",
-        fill: "#65738d",
-        "font-size": 9,
-      },
-      parents.has(current) ? "↑ PARENT FOLDER" : "ALLOCATED ON DISK",
-    ),
-  );
-  const up = () => {
-    if (parents.has(current)) navigate(parents.get(current));
-  };
-  center.addEventListener("click", up);
-  center.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") up();
-  });
-  svg.append(center);
-  return svg;
+  ring(current,0,Math.PI*2,1,null);ctx.globalAlpha=1;
+  const center=new Path2D();center.arc(300,300,81,0,Math.PI*2);
+  ctx.fillStyle="#191f2e";ctx.fill(center);ctx.strokeStyle="#30384d";ctx.stroke(center);
+  regions.push({path:center,node:parents.get(current)||current});
+  ctx.textAlign="center";ctx.fillStyle="#f0ecff";ctx.font="500 25px system-ui";ctx.fillText(fmt(current.bytes),300,287);
+  const label=current.name||"/";ctx.fillStyle="#8e9ab0";ctx.font="11px system-ui";ctx.fillText(label.length>21?label.slice(0,19)+"…":label,300,311);
+  ctx.fillStyle="#65738d";ctx.font="9px system-ui";ctx.fillText(parents.has(current)?"↑ PARENT FOLDER":"ALLOCATED ON DISK",300,334);
+  return canvas;
 }
 // Squarified treemap: pack short rows to keep aspect ratios close to one.
 function squarify(items, x, y, w, h) {
@@ -260,80 +195,23 @@ function squarify(items, x, y, w, h) {
   return out;
 }
 function treemap() {
-  const svg = el("svg", { viewBox: "0 0 680 500" });
-  let items = ordered(current).filter((n) => n.bytes > 0);
-  if (items.length > 200) {
-    const rest = items.slice(199),
-      other = {
-        name: "Other entries (" + rest.length + ")",
-        path: current.path + " / Other entries",
-        kind: "directory",
-        synthetic: true,
-        bytes: rest.reduce((s, n) => s + n.bytes, 0),
-        children: rest,
-      };
-    parents.set(other, current);
-    items = [...items.slice(0, 199), other];
-  }
-  for (const [i, r] of squarify(items, 3, 3, 674, 494).entries()) {
-    if (r.w < 1 || r.h < 1) continue;
-    const group = el("g"),
-      color = palette[i % palette.length];
-    const rect = el("rect", {
-      x: r.x + 2,
-      y: r.y + 2,
-      width: Math.max(0, r.w - 4),
-      height: Math.max(0, r.h - 4),
-      rx: 5,
-      fill: color,
-      "fill-opacity": 0.85,
-      class: "segment",
-    });
-    bind(rect, r.n);
-    group.append(rect);
-    if (r.w > 65 && r.h > 44) {
-      let name = r.n.name;
-      const max = Math.floor(r.w / 7) - 2;
-      if (name.length > max) name = name.slice(0, Math.max(1, max - 1)) + "…";
-      group.append(
-        el(
-          "text",
-          {
-            x: r.x + 12,
-            y: r.y + 23,
-            fill: "#101522",
-            "font-size": 12,
-            "font-weight": 600,
-          },
-          name,
-        ),
-      );
-      group.append(
-        el(
-          "text",
-          { x: r.x + 12, y: r.y + 42, fill: "#20283c", "font-size": 11 },
-          fmt(r.n.bytes),
-        ),
-      );
+  const {canvas,ctx,regions}=canvasChart(680,500);
+  const items=ordered(current).filter(n=>n.bytes>0).slice(0,199);
+  const missing=current.bytes-(current.own_bytes||0)-items.reduce((sum,n)=>sum+n.bytes,0);
+  if(missing>0) items.push({name:"Other entries",path:current.path+" / Other entries",bytes:missing,kind:"directory",synthetic:true,more_parent:current});
+  for(const [i,r] of squarify(items,3,3,674,494).entries()) {
+    if(r.w<1 || r.h<1) continue;
+    const path=new Path2D();path.roundRect(r.x+2,r.y+2,Math.max(0,r.w-4),Math.max(0,r.h-4),5);
+    ctx.fillStyle=palette[i%palette.length];ctx.globalAlpha=.85;ctx.fill(path);ctx.globalAlpha=1;regions.push({path,node:r.n});
+    if(r.w>65 && r.h>44) {
+      const max=Math.floor(r.w/7)-2;const name=r.n.name.length>max?r.n.name.slice(0,Math.max(1,max-1))+"…":r.n.name;
+      ctx.fillStyle="#101522";ctx.font="600 12px system-ui";ctx.fillText(name,r.x+12,r.y+23);
+      ctx.fillStyle="#20283c";ctx.font="11px system-ui";ctx.fillText(fmt(r.n.bytes),r.x+12,r.y+42);
     }
-    svg.append(group);
   }
-  if (!items.length)
-    svg.append(
-      el(
-        "text",
-        {
-          x: 340,
-          y: 250,
-          "text-anchor": "middle",
-          fill: "#8e9ab0",
-          "font-size": 16,
-        },
-        "No child entries in this folder",
-      ),
-    );
-  return svg;
+  return canvas;
 }
+
 function render() {
   if (mode === "contenders") return;
   ordered(current).forEach((n, i) =>
@@ -424,14 +302,15 @@ function renderTable() {
     );
     body.append(tr);
   }
-  if (children.length > shown) {
+  if (children.length > shown || (current.child_count||0)>children.length) {
     const tr = dom("tr"),
       td = dom("td"),
-      b = dom("button", "", `Show more (${children.length - shown} remaining)`);
+      b = dom("button", "", `Show more (${Math.max(children.length,current.child_count||0) - shown} remaining)`);
     td.colSpan = 4;
-    b.addEventListener("click", () => {
-      shown += 200;
-      renderTable();
+    b.addEventListener("click", async () => {
+      b.disabled=true;
+      try {if(shown>=children.length) await loadChildren(current,children.length);shown+=200;render();}
+      catch(e){b.textContent=e.message;b.disabled=false;}
     });
     td.append(b);
     tr.append(td);
@@ -450,38 +329,11 @@ function renderTable() {
   }
 }
 function categoryTree() {
-  const r = {
-    name: "All categories",
-    path: "Categories",
-    bytes: snapshot.scan.root.bytes,
-    kind: "directory",
-    synthetic: true,
-    children: [],
-  };
-  const buckets = {};
-  for (const [name, bytes] of Object.entries(snapshot.categories)) {
-    const n = {
-      name,
-      path: name,
-      bytes,
-      kind: "directory",
-      synthetic: true,
-      children: [],
-    };
-    buckets[name] = n;
-    r.children.push(n);
-  }
-  const visit = (n) => {
-    if (n.own_bytes > 0) {
-      const c = { ...n, bytes: n.own_bytes, children: [], synthetic: false };
-      (buckets[n.category] || buckets.unknown).children.push(c);
-    }
-    for (const c of n.children || []) visit(c);
-  };
-  visit(snapshot.scan.root);
-  index(r);
-  return r;
+  const r={name:"All categories",path:"Categories",bytes:snapshot.scan.root.bytes,kind:"directory",synthetic:true,children:[]};
+  for(const [name,bytes] of Object.entries(snapshot.categories)) r.children.push({name,path:name,bytes,kind:"directory",synthetic:true,category_name:name,children:[]});
+  index(r);return r;
 }
+
 function showMode(next) {
   mode = next;
   ["folders", "categories", "contenders"].forEach((id) =>
@@ -546,11 +398,11 @@ $("treemap").onclick = () => {
 );
 document.querySelectorAll("[data-sort]").forEach(
   (b) =>
-    (b.onclick = () => {
+    (b.onclick = async () => {
       sortAsc =
         sortKey === b.dataset.sort ? !sortAsc : b.dataset.sort === "name";
       sortKey = b.dataset.sort;
-      renderTable();
+      try{await loadChildren(current);shown=200;render();}catch(e){$("scan-info").textContent=e.message;}
     }),
 );
 $("details-toggle").onclick = () => ($("notes").hidden = !$("notes").hidden);
@@ -570,8 +422,8 @@ fetch("/api/scan")
       " files · " +
       new Date(s.scan.finished).toLocaleString();
     $("accounting").textContent = s.note;
-    $("scan-status").textContent = s.scan.skipped.length
-      ? `${s.scan.skipped.length} skipped paths · partial totals · local only`
+    $("scan-status").textContent = (s.skipped_count || s.scan.skipped.length)
+      ? `${s.skipped_count || s.scan.skipped.length} skipped paths · partial totals · local only`
       : "Local scan · no data leaves this device";
     if (s.scan.skipped.length)
       $("skipped").append(dom("h3", "", "Skipped paths"));
