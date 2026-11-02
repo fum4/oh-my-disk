@@ -6,7 +6,10 @@ function itemActions(path, command) {
     const b = dom("button", "", label);
     b.onclick = () =>
       fn().catch((e) => {
-        $("desktop-error").textContent = String(e);
+        $("desktop-error").textContent = /older cache format/i.test(String(e))
+          ? "This saved scan uses an older format. Scan again to update it."
+          : String(e);
+        showFeedback(String(e));
       });
     group.append(b);
   };
@@ -23,19 +26,15 @@ if (nativeApp) {
     loading = false,
     opened = false;
   const reportError = (e) => {
-    $("desktop-error").textContent = String(e);
+    $("desktop-error").textContent = /older cache format/i.test(String(e))
+      ? "This saved scan uses an older format. Scan again to update it."
+      : String(e);
+    showFeedback(String(e));
   };
   function showResults(show) {
-    for (const selector of [
-      ".intro",
-      "#explorer",
-      "#overview-panel",
-      ".view-switch",
-      "#suggestions",
-      "footer",
-      "#volume",
-    ])
-      document.querySelector(selector).hidden = !show;
+    $("content-grid").hidden = !show;
+    $("welcome").hidden = show;
+    document.querySelector(".view-switch").hidden = true;
     if (show && snapshot) showMode(mode);
   }
   showResults(false);
@@ -72,6 +71,7 @@ if (nativeApp) {
     await loadSnapshot();
     opened = true;
     showResults(true);
+    document.querySelector(".scan-options").open = false;
   };
   $("full-disk-access").onclick = () =>
     nativeApp.FullDiskAccess().catch(reportError);
@@ -95,7 +95,18 @@ if (nativeApp) {
       $("hub-scan").disabled = s.busy;
       $("choose-folder").disabled = s.busy;
       $("scan-root").disabled = s.busy;
-      $("start-scan").textContent = s.hasScan ? "Rescan" : "Scan";
+      $("start-scan").textContent = s.hasScan ? "Scan Again" : "Scan";
+      if (document.body.classList.contains("is-scanning") !== s.busy)
+        scanState(s.busy);
+      if (s.busy) {
+        $("scan-feedback").hidden = false;
+        $("scan-feedback").textContent =
+          `${s.phase}, ${s.entries.toLocaleString()} entries, ${s.directories.toLocaleString()} folders`;
+        document.querySelector(".scan-options").open = true;
+      }
+      $("toolbar-choose").disabled = s.busy;
+      if (!opened && s.hasScan && !s.busy)
+        document.querySelector(".scan-options").open = true;
       $("cancel-scan").hidden =
         !s.busy || s.phase === "Opening last cached scan";
       $("scan-spinner").hidden = !s.busy;
@@ -117,6 +128,7 @@ if (nativeApp) {
             revision = s.revision;
             opened = true;
             showResults(true);
+            document.querySelector(".scan-options").open = false;
           } finally {
             loading = false;
           }

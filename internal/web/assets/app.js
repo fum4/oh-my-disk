@@ -11,9 +11,9 @@ let snapshot,
 const parents = new WeakMap(),
   colors = new WeakMap();
 const palette = [
-  "#e8ebef",
-  "#aab2c0",
-  "#7d899d",
+  "#3b6fe0",
+  "#6d94e7",
+  "#8eaceb",
   "#5b687c",
   "#c8cdd6",
   "#919cab",
@@ -185,23 +185,24 @@ function sunburst() {
   ctx.globalAlpha = 1;
   const center = new Path2D();
   center.arc(300, 300, 81, 0, Math.PI * 2);
-  ctx.fillStyle = "#0c0f14";
+  const theme = getComputedStyle(document.documentElement);
+  ctx.fillStyle = theme.getPropertyValue("--card").trim() || "#fff";
   ctx.fill(center);
   ctx.strokeStyle = "#ffffff18";
   ctx.stroke(center);
   regions.push({ path: center, node: parents.get(current) || current });
   ctx.textAlign = "center";
-  ctx.fillStyle = "#f0f1f3";
+  ctx.fillStyle = theme.getPropertyValue("--label").trim() || "#1d1d1f";
   ctx.font = "300 25px Inter";
   ctx.fillText(fmt(current.bytes), 300, 287);
   const label = current.name || "/";
   ctx.fillStyle = "#a5aebb";
-  ctx.font = "11px JetBrains Mono";
+  ctx.font = "12px Inter";
   ctx.fillText(label.length > 21 ? label.slice(0, 19) + "…" : label, 300, 311);
   ctx.fillStyle = "#8a93a0";
-  ctx.font = "9px JetBrains Mono";
+  ctx.font = "12px Inter";
   ctx.fillText(
-    parents.has(current) ? "↑ PARENT FOLDER" : "ALLOCATED ON DISK",
+    parents.has(current) ? "↑ Parent folder" : "Allocated on disk",
     300,
     334,
   );
@@ -307,7 +308,7 @@ function treemap() {
       ctx.font = "600 12px system-ui";
       ctx.fillText(name, r.x + 12, r.y + 23);
       ctx.fillStyle = lightTile ? "#151a22" : "#e5e9f0";
-      ctx.font = "11px JetBrains Mono";
+      ctx.font = "12px Inter";
       ctx.fillText(fmt(r.n.bytes), r.x + 12, r.y + 42);
     }
   }
@@ -342,7 +343,7 @@ function render() {
   if (window.go?.main?.App && !current.synthetic)
     $("folder-actions").append(itemActions(current.path));
   $("map-label").textContent =
-    mode === "categories" ? "CATEGORY MAP" : "SPACE MAP";
+    mode === "categories" ? "Category map" : "Space map";
   $("chart").replaceChildren(view === "sunburst" ? sunburst() : treemap());
   $("legend").replaceChildren();
   ordered(current)
@@ -376,7 +377,12 @@ function renderTable() {
     dot.style.background =
       colors.get(n) || palette[children.indexOf(n) % palette.length];
     b.append(
-      dot,
+      icon(
+        "fill-" +
+          (n.kind === "directory" || n.synthetic
+            ? itemIcon(n.name)
+            : "file-text"),
+      ),
       dom("span", "filename", n.name + (n.kind === "symlink" ? " ↗" : "")),
     );
     b.title = n.path;
@@ -392,6 +398,11 @@ function renderTable() {
     if (window.go?.main?.App) name.append(itemActions(n.path));
     tr.append(
       name,
+      dom(
+        "td",
+        "",
+        ((n.bytes / Math.max(1, current.bytes)) * 100).toFixed(1) + "%",
+      ),
       dom("td", "", fmt(n.bytes)),
       dom("td", "", Number(n.files || 0).toLocaleString()),
       dom(
@@ -416,7 +427,7 @@ function renderTable() {
         "",
         `Show more (${Math.max(children.length, current.child_count || 0) - shown} remaining)`,
       );
-    td.colSpan = 4;
+    td.colSpan = 5;
     b.addEventListener("click", async () => {
       b.disabled = true;
       try {
@@ -440,7 +451,7 @@ function renderTable() {
         "empty",
         "No child entries. Folder metadata may still use allocated blocks.",
       );
-    td.colSpan = 4;
+    td.colSpan = 5;
     tr.append(td);
     body.append(tr);
   }
@@ -477,62 +488,154 @@ function showMode(next) {
     else $(id).removeAttribute("aria-current");
   });
   $("view-title").textContent = {
-    overview: "Disk overview.",
-    folders: "Folder explorer.",
-    categories: "By category.",
-    "cleanup-tab": "Cleanup review.",
+    overview: "Overview",
+    folders: "Folders",
+    categories: "Categories",
+    "cleanup-tab": "Cleanup",
   }[mode];
   $("overview-panel").hidden = mode !== "overview";
   $("explorer").hidden = mode === "cleanup-tab" || mode === "overview";
-  $("suggestions").hidden = mode !== "cleanup-tab";
+  $("suggestions").hidden = !["cleanup-tab", "overview"].includes(mode);
+  $("content-grid").classList.toggle("full-view", mode !== "overview");
+  $("cleanup-filters").hidden = mode !== "cleanup-tab";
+  $("review-cleanup").hidden = mode !== "overview";
+  renderSuggestions();
   document.querySelector(".view-switch").hidden =
     mode === "cleanup-tab" || mode === "overview";
+  if (
+    mode === "overview" &&
+    ($("suggest-category").value || $("suggest-safety").value)
+  ) {
+    $("suggest-category").value = "";
+    $("suggest-safety").value = "";
+    refreshSuggestions();
+  }
   if (mode === "cleanup-tab" || mode === "overview") return;
   root = mode === "categories" ? categoryTree() : snapshot.scan.root;
   current = root;
   shown = 200;
   render();
 }
+function icon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "i");
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(svg.namespaceURI, "use");
+  use.setAttribute("href", "#" + name);
+  svg.append(use);
+  return svg;
+}
+function itemIcon(name) {
+  const n = name.toLowerCase();
+  return /library/.test(n)
+    ? "books"
+    : /cache|gradle|poetry/.test(n)
+      ? "stack"
+      : /docker|container/.test(n)
+        ? "archive"
+        : /simulator|android/.test(n)
+          ? "device-mobile"
+          : /build|derived/.test(n)
+            ? "hammer"
+            : /node_modules/.test(n)
+              ? "cube"
+              : /download/.test(n)
+                ? "download-simple"
+                : /desktop/.test(n)
+                  ? "desktop"
+                  : /document/.test(n)
+                    ? "file-text"
+                    : /work|project/.test(n)
+                      ? "briefcase"
+                      : "folder";
+}
+let suggestionsShown = 100;
 function renderSuggestions() {
   const list = $("suggestion-list");
   list.replaceChildren();
-  suggestionItems.forEach((s, i) => {
-    const card = dom("tr", "suggestion-card"),
-      body = dom("td"),
-      badges = dom("div", "badges");
-    body.append(selectionBox(s), dom("h3", "", s.path));
-    badges.append(
-      dom("span", "badge " + s.safety, s.safety.toUpperCase()),
-      dom("span", "badge", s.category),
-      dom("span", "badge", s.badge),
+  const overview = mode === "overview";
+  const items = suggestionItems.slice(0, overview ? 7 : suggestionsShown);
+  for (const s of items) {
+    const card = dom("div", "it suggestion-card");
+    const tile = dom("span", "tile");
+    tile.append(icon("fill-" + itemIcon(s.path + s.category)));
+    const title = dom("div", "item-title");
+    const name = dom(
+      "button",
+      "n item-name",
+      s.path.split("/").filter(Boolean).pop() || s.path,
     );
+    name.title = s.path + "\n" + s.explanation;
+    const details = dom("div", "suggestion-details");
+    details.hidden = true;
+    const id = "suggest-detail-" + list.childElementCount;
+    details.id = id;
+    name.setAttribute("aria-expanded", "false");
+    name.setAttribute("aria-controls", id);
+    name.onclick = () => {
+      details.hidden = !details.hidden;
+      name.setAttribute("aria-expanded", String(!details.hidden));
+    };
+    details.append(dom("p", "", s.path), dom("p", "", s.explanation));
     if (s.incomplete)
-      badges.append(dom("span", "badge user-data", "PARTIAL SCAN"));
-    body.append(badges, dom("p", "", s.explanation));
+      details.append(dom("p", "", "Partial scan: review before cleaning."));
     if (s.project_path)
-      body.append(dom("p", "", "Project activity: " + s.project_path));
-    if (s.suggested_command) body.append(dom("code", "", s.suggested_command));
+      details.append(dom("p", "", "Project activity: " + s.project_path));
+    if (s.suggested_command)
+      details.append(dom("code", "", s.suggested_command));
     if (window.go?.main?.App)
-      body.append(itemActions(s.path, s.suggested_command));
-    card.append(
-      body,
-      dom("td", "suggestion-score", Math.round(s.score) + "/100"),
-      dom("td", "suggestion-size", fmt(s.bytes)),
-      dom("td", "suggestion-stale", s.stale_days + " days"),
+      details.append(itemActions(s.path, s.suggested_command));
+    title.append(
+      name,
+      dom("div", "d", `${s.category}, ${s.stale_days} days unused`),
     );
-    list.append(card);
-  });
-  if (!suggestionItems.length) {
-    const row = dom("tr"),
-      cell = dom(
-        "td",
-        "empty",
-        "No cleanup suggestions match these filters above the scan threshold.",
-      );
-    cell.colSpan = 4;
-    row.append(cell);
-    list.append(row);
+    const safe = !s.incomplete && ["cache", "reinstallable"].includes(s.safety);
+    const badge = dom("span", "badge " + (safe ? "safe" : "rev"));
+    badge.append(
+      icon(safe ? "fill-shield-check" : "fill-eye"),
+      document.createTextNode(safe ? "Safe" : "Review"),
+    );
+    badge.title = s.safety + (s.badge ? ": " + s.badge : "");
+    const score = dom("span", "sc num suggestion-score", Math.round(s.score));
+    score.setAttribute(
+      "aria-label",
+      `Cleanup score ${Math.round(s.score)} out of 100`,
+    );
+    card.append(
+      selectionBox(s),
+      tile,
+      title,
+      badge,
+      score,
+      dom("span", "s num suggestion-size", fmt(s.bytes)),
+    );
+    list.append(card, details);
   }
+  if (!items.length)
+    list.append(
+      dom(
+        "p",
+        "empty",
+        "No cleanup suggestions match these filters. Try another filter or scan again.",
+      ),
+    );
+  if (!overview && suggestionItems.length > suggestionsShown) {
+    const more = dom("button", "btn sec", "Show More Suggestions");
+    more.onclick = () => {
+      suggestionsShown += 100;
+      renderSuggestions();
+    };
+    list.append(more);
+  }
+  if (!overview && suggestionItems.length === 500)
+    list.append(
+      dom(
+        "p",
+        "hint",
+        "Showing the first 500 matches. Filter by category or safety to narrow the list.",
+      ),
+    );
+  updateSelection();
 }
 $("sunburst").onclick = () => {
   view = "sunburst";
@@ -575,7 +678,7 @@ function loadSnapshot() {
       if (!r.ok) throw Error("Unable to load scan: " + r.status);
       return r.json();
     })
-    .then((s) => {
+    .then(async (s) => {
       snapshot = s;
       $("skipped").replaceChildren();
       renderVolume();
@@ -583,10 +686,12 @@ function loadSnapshot() {
       $("total").textContent = fmt(s.scan.root.bytes);
       $("scan-info").textContent =
         s.scan.root.path +
-        " · " +
-        Number(s.scan.root.files).toLocaleString() +
-        " files · " +
+        ", last scan " +
         new Date(s.scan.finished).toLocaleString();
+      $("scan-info").title = $("scan-info").textContent;
+      $("web-root").value = s.scan.root.path;
+      $("welcome").hidden = true;
+      $("content-grid").hidden = false;
       $("accounting").textContent = s.note;
       $("scan-status").textContent =
         s.skipped_count || s.scan.skipped.length
@@ -608,12 +713,16 @@ function loadSnapshot() {
         for (const v of values) select.add(new Option(v, v));
         select.value = value;
       }
-      refreshSuggestions();
+      await refreshSuggestions();
       renderOverview();
       showMode(mode);
     })
     .catch((e) => {
-      $("scan-info").textContent = e.message;
+      $("scan-info").textContent =
+        "No scan is open. Choose a folder or scan again.";
+      $("content-grid").hidden = true;
+      $("welcome").hidden = false;
+      showFeedback(e.message);
     });
 }
 
@@ -665,7 +774,8 @@ async function refreshSuggestions() {
     if (!r.ok) throw Error(await r.text());
     const items = await r.json();
     if (version !== suggestionVersion) return;
-    suggestionItems = items;
+    suggestionItems = items || [];
+    suggestionsShown = 100;
     renderSuggestions();
   } catch (e) {
     $("scan-info").textContent = e.message;
@@ -678,7 +788,12 @@ for (const b of document.querySelectorAll("[data-suggest-sort]"))
     suggestionSort = b.dataset.suggestSort;
     for (const c of document.querySelectorAll("[data-suggest-sort]"))
       c.classList.toggle("active", c.dataset.suggestSort === suggestionSort);
-    refreshSuggestions();
+    $("sort-hint").textContent = {
+      score: "Safest and biggest at the top",
+      size: "Largest items at the top",
+      stale: "Longest unused at the top",
+    }[suggestionSort];
+    return refreshSuggestions();
   };
 $("suggest-category").onchange = $("suggest-safety").onchange = () =>
   refreshSuggestions();
@@ -712,8 +827,14 @@ function updateSelection() {
   for (const box of document.querySelectorAll("[data-selection-path]"))
     box.checked = selected.has(box.dataset.selectionPath);
   $("selection-bar").hidden = selected.size === 0;
+  // Keep the shared selection action available in folder and category views.
+  const destination = ["folders", "categories"].includes(mode)
+    ? $("explorer")
+    : $("suggestions");
+  destination.append($("selection-bar"), $("trash-results"));
+  $("trash-selected").disabled = selected.size === 0;
   $("selection-total").textContent =
-    `${selected.size} selected · ${fmt([...selected.values()].reduce((a, b) => a + b, 0))}`;
+    `${selected.size} ${selected.size === 1 ? "item" : "items"} selected, ${fmt([...selected.values()].reduce((a, b) => a + b, 0))}`;
 }
 async function action(path, data) {
   const r = await fetch(path, {
@@ -772,121 +893,306 @@ if (!window.go?.main?.App) {
     const b = $("web-start-scan");
     b.disabled = true;
     $("web-scan-status").textContent = "Scanning…";
+    scanState(true);
     try {
       const result = await action("/api/rescan", { root: $("web-root").value });
       if (result.scan_error) throw Error(result.scan_error);
       await loadSnapshot();
       $("web-scan-status").textContent = "Complete";
+      scanState(false);
     } catch (e) {
       $("web-scan-status").textContent = String(e);
+      scanState(false);
+      showFeedback(String(e));
     } finally {
       b.disabled = false;
     }
   };
 }
 
+const gb = (bytes) => (bytes / 1e9).toFixed(1) + " GB";
 function renderOverview() {
   if (!snapshot) return;
+  const scan = snapshot.scan.root,
+    v = snapshot.volume;
   const suggestions = snapshot.suggestions || [];
-  const clusters = $("category-clusters");
-  clusters.replaceChildren();
-  const categories = Object.entries(snapshot.categories).sort(
-    (a, b) => b[1] - a[1],
+  const reclaim = suggestions.reduce((sum, s) => sum + s.bytes, 0);
+  const lowerBound = suggestions.length === 100;
+  const capacity = v?.capacity || 0,
+    free = v?.available || 0;
+  const clean = Math.min(reclaim, scan.bytes, v?.used ?? scan.bytes);
+  const files = Math.max(
+    0,
+    Math.min(scan.bytes, v?.used ?? scan.bytes) - clean,
   );
-  const displayed = categories.slice(0, 5);
-  if (categories.length > 5)
-    displayed.push([
-      "Other categories",
-      categories.slice(5).reduce((sum, c) => sum + c[1], 0),
-    ]);
-  for (const [name, bytes] of displayed) {
-    const candidateBytes = suggestions
-      .filter((s) =>
-        name === "Other categories"
-          ? categories.slice(5).some((c) => c[0] === s.category)
-          : s.category === name,
-      )
-      .reduce((sum, s) => sum + s.bytes, 0);
-    const fraction = bytes ? Math.min(1, candidateBytes / bytes) : 0;
-    const b = dom("button", "category-cluster");
-    const tiles = dom("span", "tile-grid");
-    tiles.setAttribute("aria-hidden", "true");
-    for (let i = 0; i < 24; i++)
-      tiles.append(
-        dom("i", i < Math.round(fraction * 24) ? "reclaimable" : ""),
+  const outside = Math.max(0, (v?.used || scan.bytes) - files - clean);
+  $("disk-capacity").textContent = v
+    ? "Macintosh HD, " + gb(capacity)
+    : "Disk capacity unavailable";
+  $("disk-free").textContent = v ? gb(free) : "—";
+  const percent = capacity ? Math.round((1 - free / capacity) * 100) : 0;
+  $("disk-full").className = "pill" + (percent >= 90 ? " warn" : "");
+  $("disk-full").replaceChildren(
+    icon(percent >= 90 ? "fill-warning-circle" : "fill-hard-drive"),
+    document.createTextNode(v ? percent + "% full" : "Unavailable"),
+  );
+  const segments = [
+    [files, "files"],
+    [clean, "clean"],
+    [outside, "sys"],
+  ];
+  const C = 2 * Math.PI * 88;
+  let offset = 0;
+  const svg = $("ringsvg");
+  svg.replaceChildren();
+  function circle(value, color, start, base = false) {
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    for (const [k, val] of Object.entries({
+      cx: 100,
+      cy: 100,
+      r: 88,
+      fill: "none",
+      stroke: `var(--c-${color})`,
+      "stroke-width": 20,
+    }))
+      c.setAttribute(k, val);
+    if (!base) {
+      c.setAttribute(
+        "stroke-dasharray",
+        `${Math.max(0, (value / capacity) * C - 2.5)} ${C}`,
       );
-    b.append(
-      tiles,
-      dom("span", "cluster-name", name),
-      dom("span", "cluster-size", fmt(bytes)),
+      c.setAttribute("stroke-dashoffset", -start);
+      c.setAttribute("transform", "rotate(-90 100 100)");
+    }
+    svg.append(c);
+  }
+  circle(1, "free", 0, true);
+  if (capacity)
+    for (const [value, color] of segments) {
+      if (value) circle(value, color, offset);
+      offset += (value / capacity) * C;
+    }
+  svg.setAttribute(
+    "aria-label",
+    v
+      ? `${gb(free)} free, ${percent}% full of ${gb(capacity)}`
+      : "Disk capacity unavailable",
+  );
+  const legend = $("disk-legend");
+  legend.replaceChildren();
+  for (const [label, desc, value, color] of [
+    ["Your files", "Kept in the scanned folder", files, "files"],
+    ["Can be cleaned", "Caches, build output, old data", clean, "clean"],
+    [
+      "System and apps",
+      "Everything outside the scanned folder",
+      outside,
+      "sys",
+    ],
+    ["Free", "", free, "free"],
+  ]) {
+    const row = dom("div", "li"),
+      sw = dom("span", "sw"),
+      text = dom("div");
+    sw.style.background = `var(--c-${color})`;
+    text.append(dom("div", "n", label));
+    if (desc) text.append(dom("div", "d", desc));
+    row.append(sw, text, dom("span", "v num", v ? gb(value) : "—"));
+    legend.append(row);
+  }
+  $("disk-bar").replaceChildren();
+  if (capacity)
+    for (const [value, color] of segments) {
+      const bar = dom("i");
+      bar.style.width = (value / capacity) * 100 + "%";
+      bar.style.background = `var(--c-${color})`;
+      $("disk-bar").append(bar);
+    }
+  $("disk-caption").textContent = v
+    ? `${gb(free)} free of ${gb(capacity)}`
+    : "Disk capacity unavailable";
+  $("home-name").textContent = scan.name || "Selected folder";
+  $("home-name").title = scan.path;
+  $("nav-folders").textContent = fmt(scan.bytes);
+  $("nav-categories").textContent = Object.keys(snapshot.categories).length;
+  $("nav-cleanup-tab").textContent = (lowerBound ? "≥ " : "") + fmt(reclaim);
+  $("home-total").textContent = scan.name + ", " + fmt(scan.bytes);
+  $("reclaim-total").replaceChildren(
+    document.createTextNode(
+      (lowerBound ? "≥ " : "") + (reclaim / 1e9).toFixed(1),
+    ),
+    dom("small", "", "GB"),
+  );
+  $("reclaim-total").title = lowerBound
+    ? "At least this much among the top 100 suggestions; actual reclaimed space can differ."
+    : "Allocated bytes in disjoint suggestions; actual reclaimed space can differ.";
+  $("rail-count").textContent =
+    suggestions.length + (lowerBound ? "+" : "") + " suggestions";
+  $("free-now").textContent = v ? gb(free) : "—";
+  $("free-after").textContent = v
+    ? (lowerBound ? "≥ " : "") + gb(Math.min(capacity, free + clean))
+    : "—";
+  $("bar-now").style.width = (capacity ? (free / capacity) * 100 : 0) + "%";
+  $("bar-after").style.left = $("bar-now").style.width;
+  $("bar-after").style.width = (capacity ? (clean / capacity) * 100 : 0) + "%";
+  const folders = ordered(scan),
+    list = $("overview-folders");
+  list.replaceChildren();
+  const displayed = folders.slice(0, 7);
+  const rest = scan.bytes - displayed.reduce((sum, n) => sum + n.bytes, 0);
+  if (rest > 0)
+    displayed.push({ name: "Everything else", bytes: rest, other: true });
+  for (const n of displayed) {
+    const row = dom("button", "fr" + (n.other ? " muted" : ""));
+    const tile = dom("span", "tile"),
+      track = dom("span", "track"),
+      fill = dom("i");
+    tile.append(
+      icon("fill-" + (n.other ? "dots-three-circle" : itemIcon(n.name))),
+    );
+    fill.style.width =
+      Math.min(
+        100,
+        (n.bytes / Math.max(1, folders[0]?.bytes || scan.bytes)) * 100,
+      ) + "%";
+    track.append(fill);
+    row.append(
+      tile,
+      dom("span", "n", n.name),
+      track,
       dom(
         "span",
-        "cluster-fraction",
-        Math.round(fraction * 100) + "% candidate",
+        "p num",
+        ((n.bytes / Math.max(1, scan.bytes)) * 100).toFixed(1) + "%",
       ),
+      dom("span", "s num", fmt(n.bytes)),
     );
-    b.setAttribute(
-      "aria-label",
-      `${name}: ${fmt(bytes)}, ${Math.round(fraction * 100)}% cleanup candidates`,
-    );
-    b.onclick = () => {
-      showMode("categories");
-      const n = root.children.find((c) => c.name === name);
-      if (n) navigate(n);
+    row.title = n.other ? "Explore all folders" : n.path;
+    row.onclick = () => {
+      showMode("folders");
+      if (!n.other) navigate(n);
     };
-    clusters.append(b);
+    list.append(row);
   }
-  if (!categories.length)
-    clusters.append(
-      dom("p", "empty", "No categorized allocations in this scan."),
-    );
-  const candidateTotal = suggestions.reduce((sum, s) => sum + s.bytes, 0);
-  $("reclaim-total").textContent =
-    (suggestions.length === 100 ? "≥ " : "") + fmt(candidateTotal);
-  $("reclaim-total").title =
-    suggestions.length === 100
-      ? "Sum of the top 100 suggestions; more may be available in Cleanup."
-      : "Sum of disjoint cleanup suggestions. Not guaranteed reclaimable.";
-  const rail = $("rail-list");
-  rail.replaceChildren();
-  $("rail-count").textContent =
-    String(suggestions.length).padStart(2, "0") +
-    (suggestions.length === 100 ? "+" : "");
-  for (const s of [...suggestions]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4)) {
-    const card = dom("button", "rail-card");
-    card.append(
-      dom(
-        "div",
-        "rail-meta",
-        `${s.category} · ${s.safety} · stale ${s.stale_days}d`,
-      ),
-      dom("h3", "", s.path.split("/").filter(Boolean).pop() || s.path),
-    );
-    card.title = s.path;
-    const size = dom("div", "rail-size", fmt(s.bytes));
-    size.append(dom("small", "", Math.round(s.score) + " / 100"));
-    const score = dom("div", "rail-score"),
-      fill = dom("i");
-    fill.style.width = Math.max(0, Math.min(100, s.score)) + "%";
-    score.append(fill);
-    card.append(size, score);
-    card.onclick = () => {
-      showMode("cleanup-tab");
-      $("suggest-category").value = s.category;
-      refreshSuggestions();
-    };
-    rail.append(card);
-  }
-  if (!suggestions.length)
-    rail.append(
-      dom("p", "empty", "No cleanup candidates above the scan threshold."),
-    );
+  if (!displayed.length)
+    list.append(dom("p", "empty", "No folders in this scan."));
 }
-$("review-cleanup").onclick = () => showMode("cleanup-tab");
-$("hub-scan").onclick = () => {
-  const native = !!window.go?.main?.App;
-  const target = $(native ? "start-scan" : "web-start-scan");
-  if (!target.disabled) target.click();
+function showFeedback(message) {
+  const oldFormat = /format|version|refresh|cache.*(old|incompat)/i.test(
+    message,
+  );
+  $("scan-feedback").hidden = !message;
+  $("scan-feedback").replaceChildren(
+    dom(
+      "span",
+      "",
+      oldFormat
+        ? "This saved scan uses an older format. Scan again to update it."
+        : message,
+    ),
+  );
+  if (message) {
+    const retry = dom("button", "btn sec", "Scan Again");
+    retry.onclick = () => $("hub-scan").click();
+    $("scan-feedback").append(retry);
+  }
+}
+function scanState(busy, message = "Scanning…") {
+  document.body.classList.toggle("is-scanning", busy);
+  $("hub-scan").disabled = busy;
+  $("hub-scan").replaceChildren(
+    icon("regular-arrow-clockwise"),
+    document.createTextNode(
+      busy ? "Scanning…" : snapshot ? "Scan Again" : "Scan",
+    ),
+  );
+  if (!busy) $("hub-scan").append(dom("span", "kbd", "⌘R"));
+  if (busy) {
+    $("scan-feedback").hidden = false;
+    $("scan-feedback").textContent = message;
+  } else showFeedback("");
+}
+$("review-cleanup").onclick = () => {
+  $("suggest-category").value = "";
+  $("suggest-safety").value = "";
+  showMode("cleanup-tab");
+  refreshSuggestions();
 };
+$("show-folders").onclick = () => showMode("folders");
+$("hub-scan").onclick = () => {
+  const target = $(window.go?.main?.App ? "start-scan" : "web-start-scan");
+  if (!target.disabled) return target.onclick();
+};
+$("toolbar-choose").onclick = () => {
+  document.querySelector(".scan-options").open = true;
+  if (window.go?.main?.App) return $("choose-folder").onclick();
+  $("web-root").focus();
+  $("web-root").select();
+};
+$("scan-another").onclick = $("welcome-scan").onclick = () =>
+  $("toolbar-choose").click();
+for (const [id, value] of [
+  ["location-home", "home"],
+  ["location-disk", "/"],
+])
+  $(id).onclick = () => {
+    document.querySelector(".scan-options").open = true;
+    if (window.go?.main?.App) {
+      $("scan-root").value = value;
+      $("scan-root").onchange();
+    } else {
+      $("web-root").value =
+        value === "home" ? snapshot?.scan.root.path || "" : "/";
+      $("web-root").focus();
+    }
+  };
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {
+    e.preventDefault();
+    if (!$("hub-scan").disabled) $("hub-scan").click();
+  }
+});
+if (window.matchMedia)
+  window
+    .matchMedia("(prefers-color-scheme: dark)")
+    .addEventListener("change", () => {
+      if (snapshot) render();
+    });
+
+// Arrow keys move between adjacent rows; Tab still reaches every action.
+document.addEventListener("keydown", (e) => {
+  if (
+    !["ArrowDown", "ArrowUp", "Home", "End"].includes(e.key) ||
+    e.altKey ||
+    e.metaKey ||
+    e.ctrlKey
+  )
+    return;
+  const control = e.target;
+  const list = control.closest(
+    "#suggestion-list, #overview-folders, #children",
+  );
+  if (!list || !control.matches("button, input[type=checkbox]")) return;
+  const rows = [...list.querySelectorAll(".it, .fr, tr")];
+  const row = control.closest(".it, .fr, tr");
+  let i = rows.indexOf(row);
+  if (i < 0) return;
+  i =
+    e.key === "Home"
+      ? 0
+      : e.key === "End"
+        ? rows.length - 1
+        : Math.max(
+            0,
+            Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)),
+          );
+  const target = rows[i].matches("button")
+    ? rows[i]
+    : rows[i].querySelector(
+        control.matches("input") ? "input:not(:disabled)" : "button",
+      );
+  if (target) {
+    e.preventDefault();
+    target.focus();
+  }
+});
