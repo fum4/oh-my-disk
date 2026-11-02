@@ -2,6 +2,8 @@ package report
 
 import "golang.org/x/sys/unix"
 
+const VolumeNote = "Live filesystem capacity = used + available. Outside scanned folder includes System, Applications, other users, inaccessible files, snapshots and filesystem overhead. APFS shares container space; purgeable space may be counted as available by About This Mac but as used by statfs. Categories and reclaimable totals cannot exactly reproduce About This Mac. Scanned allocation may overlap shared blocks or include cloud placeholders."
+
 // Volume is a live filesystem reading; Outside also includes inaccessible data,
 // snapshots and filesystem overhead. Excess records clone/placeholder overcounts.
 type Volume struct {

@@ -21,14 +21,16 @@ import (
 	"github.com/fum4/oh-my-disk/internal/web"
 )
 
-const usage = `oh-my-disk — read-only disk space analysis
+const usage = `oh-my-disk — disk space analysis and explicit Move to Trash
 
-Usage: oh-my-disk <scan|top|suggest|explain|ui> [path] [options]
+Usage: oh-my-disk <scan|top|suggest|explain|ui|mcp|trash> [path] [options]
 
   scan [root]     Scan root (default: home), cache results and show totals
   top             Largest entries in the latest scan (sizes may overlap)
-  suggest         Ranked, disjoint free-space contenders; never executes commands
+  suggest         Ranked, disjoint cleanup suggestions; never executes commands
   explain <path>  Explain a path from the latest scan
+  mcp             Read-only MCP server over stdio
+  trash <paths>   Move scanned items to Trash (--yes or interactive confirmation)
   ui              Serve the latest scan in a local browser
 
 Common options:
@@ -36,6 +38,9 @@ Common options:
   --refresh         Rescan before top/suggest/explain/ui
   --json [FILE]     JSON to stdout (-) or a NEW file; never overwrite
   --summary FILE    Compact LLM-friendly JSON (- for stdout); --limit controls size
+  --sort KEY        Suggestion order: score (default), size, stale
+  --category NAME   Filter cleanup suggestions by category
+  --safety NAME     Filter cleanup suggestions by safety
   --limit N         Top results (default 20)
   --depth N         Export tree depth (-1 = full, 0 = root only)
   --min-size SIZE   Export/suggestion threshold (e.g. 16MiB; default 1MiB)
@@ -50,8 +55,8 @@ Common options:
   --no-open         Do not open a browser
   --help            Show this help
 
-All scans are read-only. Only application state and explicitly requested new
-reports are written. Cache/output paths are excluded from scans.
+Scanning is read-only. Trash requires explicit user confirmation; no permanent
+deletion. MCP tools are read-only. Cache/output paths are excluded from scans.
 `
 
 func main() {
@@ -100,6 +105,12 @@ func run(args []string) error {
 		return nil
 	}
 	cmd := args[0]
+	if cmd == "trash" {
+		return runTrash(args[1:])
+	}
+	if cmd == "mcp" {
+		return runMCP()
+	}
 	switch cmd {
 	case "scan", "top", "suggest", "explain", "ui":
 	default:
@@ -114,6 +125,9 @@ func run(args []string) error {
 	refresh := fs.Bool("refresh", false, "rescan")
 	jsonPath := fs.String("json", "", "JSON output")
 	summary := fs.String("summary", "", "summary output")
+	sortBy := fs.String("sort", "score", "suggestion sort: score|size|stale")
+	category := fs.String("category", "", "filter suggestion category")
+	safety := fs.String("safety", "", "filter suggestion safety")
 	limit := fs.Int("limit", 20, "limit")
 	depth := fs.Int("depth", -1, "export depth")
 	minSize := fs.String("min-size", "1MiB", "minimum bytes")
@@ -241,7 +255,10 @@ func run(args []string) error {
 	case "top":
 		output = report.Top(s.Scan.Root, *limit)
 	case "suggest":
-		v := s.Suggestions
+		v, e := rules.Select(s.Suggestions, *sortBy, *category, *safety, *limit)
+		if e != nil {
+			return e
+		}
 		if len(v) > *limit {
 			v = v[:*limit]
 		}
@@ -282,6 +299,7 @@ func humanUnits(w io.Writer, cmd string, s *report.Snapshot, output any, limit i
 	if v, err := report.VolumeFor(s.Scan.Root.Path, s.Scan.Root.Bytes); err == nil {
 		fmt.Fprintf(w, "Volume: %s capacity · %s used · %s available · %s outside scanned folder\n", size(v.Capacity), size(v.Used), size(v.Available), size(v.Outside))
 	}
+	fmt.Fprintln(w, report.VolumeNote)
 	fmt.Fprintf(w, "%s  %s allocated · %d files · scanned %s\n", s.Scan.Root.Path, size(s.Scan.Root.Bytes), s.Scan.Root.Files, s.Scan.Finished.Format(time.RFC3339))
 	switch cmd {
 	case "scan":
@@ -295,14 +313,14 @@ func humanUnits(w io.Writer, cmd string, s *report.Snapshot, output any, limit i
 		}
 	case "suggest":
 		for i, v := range output.([]rules.Suggestion) {
-			fmt.Fprintf(w, "%2d. %10s  %-14s  %s\n    %s · %d days since activity · score %.0f\n    %s\n", i+1, size(v.Bytes), v.Safety, v.Path, v.Category, v.StaleDays, v.Score, v.Explanation)
+			fmt.Fprintf(w, "%2d. %10s  %-14s  %s\n    %s · stale %dd · cleanup score %.0f/100\n    %s\n", i+1, size(v.Bytes), v.Safety, v.Path, v.Category, v.StaleDays, rules.CleanupScore(v.Score), v.Explanation)
 			if v.Command != "" {
 				fmt.Fprintf(w, "    Human-only suggestion: %s\n", v.Command)
 			}
 		}
 	case "explain":
 		v := output.(*rules.Suggestion)
-		fmt.Fprintf(w, "%s\n%s · %s · %s\n%s\nLast activity: %s (%d days); score %.0f\n", v.Path, size(v.Bytes), v.Category, v.Safety, v.Explanation, v.LastActivity.Format(time.RFC3339), v.StaleDays, v.Score)
+		fmt.Fprintf(w, "%s\n%s · %s · %s\n%s\nLast activity: %s (%d days); cleanup score %.0f/100\n", v.Path, size(v.Bytes), v.Category, v.Safety, v.Explanation, v.LastActivity.Format(time.RFC3339), v.StaleDays, rules.CleanupScore(v.Score))
 		if v.ProjectPath != "" {
 			fmt.Fprintln(w, "Project activity:", v.ProjectPath)
 		}
