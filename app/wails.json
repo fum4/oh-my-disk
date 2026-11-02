@@ -1,0 +1,23 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "oh-my-disk",
+  "outputfilename": "oh-my-disk",
+  "assetdir": "../internal/web/assets",
+  "wailsjsdir": "../.build/bindings",
+  "build:dir": "../build",
+  "author": {
+    "name": "fum4",
+    "email": "52106389+fum4@users.noreply.github.com"
+  },
+  "info": {
+    "companyName": "fum4",
+    "productName": "oh-my-disk",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright \u00a9 2026 fum4",
+    "comments": "Read-only disk space explorer"
+  },
+  "frontend:dir": "../internal/web/assets",
+  "postBuildHooks": {
+    "darwin/*": "../../scripts/package-icon.sh"
+  }
+}

@@ -2,3 +2,5 @@
 /.build/
 /.fixtures/
 *.test
+/build/bin/
+/app/frontend/

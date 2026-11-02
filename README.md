@@ -1,12 +1,12 @@
 # oh-my-disk
 
-A local, read-only disk-space analyzer for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a DaisyDisk-inspired web explorer embedded in one binary.
+A local, read-only disk-space analyzer for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a native Wails macOS desktop app and a DaisyDisk-inspired explorer shared with the CLI.
 
-**It never deletes, moves, or edits scanned content.** There is no cleanup subcommand, execution hook, cleanup API, or generated cleanup script. Suggested commands are plain text for a human to review. The only executable launched is the platform browser opener when starting the UI.
+**It never deletes, moves, or edits scanned content.** There is no cleanup subcommand, execution hook, cleanup API, or generated cleanup script. Suggested commands are plain text for a human to review. The desktop app only invokes macOS `open` for Reveal in Finder and Full Disk Access settings. The CLI browser UI invokes the platform browser opener. Suggested cleanup commands are never run.
 
 ## Install
 
-Requires Go 1.23.3 or newer. No Node, frontend build, CDN, database or runtime dependencies are needed.
+Requires Go 1.26 or newer (the current Wails v2.17.1 requirement). Go can download the toolchain automatically. The CLI needs no Node, frontend build, CDN or database.
 
 ```sh
 git clone https://github.com/fum4/oh-my-disk.git
@@ -21,6 +21,88 @@ Or install with `go install github.com/fum4/oh-my-disk@latest` after this versio
 GOOS=darwin GOARCH=arm64 go build -o oh-my-disk-macos .
 GOOS=linux GOARCH=amd64 go build -o oh-my-disk-linux .
 ```
+
+## Native macOS desktop app
+
+```sh
+make app                         # pinned Wails v2.17.1, arm64 .app
+open build/bin/oh-my-disk.app     # or double-click in Finder
+make app-universal               # Intel + Apple Silicon, same output path
+make check                       # go vet ./... and go test ./...
+make cli                         # CLI remains ./oh-my-disk
+```
+
+The app is a real Cocoa/WKWebView window with a Dock icon and standard Quit
+behavior. It does not open a browser tab or expose a TCP listener. `app/main.go`
+is a separate desktop entry point within the same Go module; the root `main.go`
+remains the CLI. Both use `internal/scanner`, `internal/rules` and
+`internal/report`. `internal/web/assets` supplies the same canvas charts and
+lazy `/api/node` and `/api/category` endpoints inside Wails' embedded asset
+server. Only native dialogs, clipboard, progress and scan lifecycle use bindings.
+No token or browser session is needed inside the app. The CLI `ui` command
+retains its private, token-protected browser mode.
+
+On the welcome screen choose **Home**, **Whole disk (/)** or a folder from the
+native picker, then **Scan**. Progress shows the phase, entries, folders, average
+entries per second and current path. **Cancel** stops the walk; classification
+and cache serialization finish their current phase before cancellation takes
+effect. The displayed scan stays available. **Rescan** uses the current folder
+selection. A previous compact CLI/app cache loads without rescanning and is
+available through **Open last cached scan**. Cache timestamps remain visible;
+volume totals are read live when the result is opened.
+
+Every real item (including the current folder and contenders) has **Reveal in
+Finder** and **Copy path** actions. Suggested commands can be copied as text.
+**Export JSON** writes the full tree; **Export LLM summary** writes a bounded
+summary with up to 50 top entries and 50 contenders. Both use native save dialogs and refuse to overwrite an
+existing file, even if the save dialog offers Replace. Choose a new filename.
+No deletion or Trash operations are implemented.
+
+The app probes protected `~/Library` folders. If macOS denies access, a banner
+links to **System Settings → Privacy & Security → Full Disk Access**. Enable the
+built `.app`, quit and reopen it, then rescan. This is a best-effort permission
+probe, not a guarantee that every folder is readable. The app never changes
+permissions. The CLI's Terminal permission is separate from the app's permission.
+
+Sizes default to decimal **MB/GB**, matching Finder (1 GB = 1,000,000,000 bytes).
+The UI's persistent **Binary units (GiB)** setting and CLI `--binary` flag opt
+into powers of 1024. JSON always contains integer bytes; input suffixes such as
+`--min-size 1MiB` keep their explicit meaning.
+
+The **Whole disk · containing volume** panel and CLI header use `statfs`:
+capacity = blocks × block size, available = available blocks × block size,
+used = capacity − available, and outside scanned folder = max(0, used − scanned
+allocation). This residual includes unreadable paths, unscanned folders,
+snapshots and filesystem overhead. It is an accounting remainder rather than
+an inventory of those files. APFS shared containers, purgeable space, clones
+and cloud placeholders can differ from About This Mac; when allocation exceeds
+used, the UI reports the excess rather than showing a negative remainder.
+Whole-disk scans retain the engine's Data/firmlink deduplication and do not cross
+unrelated mounted volumes by default.
+
+Build prerequisites: macOS, Xcode command-line tools, Go 1.26+, and Node/npm for
+Wails tooling (there is no npm install or frontend compilation for this app).
+`make` installs the pinned Wails CLI and keeps Go caches/tools under `.build/`.
+After installing Wails yourself, the direct equivalent is:
+
+```sh
+make icon
+cd app
+../.build/bin/wails build -platform darwin/arm64
+```
+
+The Make wrapper falls back to public `sw_vers` OS-version values if a build
+sandbox blocks Wails' two `sysctl` version probes. The original icon is generated
+by `scripts/icon.go` at 1024×1024, resized with `sips`, and packaged with
+`iconutil`. On hosts where `iconutil` rejects the iconset, a standard PNG-based
+ICNS packer is used. A Wails post-build hook installs that ICNS and renews the
+ad-hoc signature. No network artwork is used. The macOS plist uses the stable
+bundle ID `com.fum4.oh-my-disk`. **TODO before distribution:** Developer ID
+signing, hardened runtime/entitlements review, notarization and stapling.
+Local builds are ad-hoc signed, without a Developer ID.
+
+See [desktop verification notes](app/VERIFICATION.md) for the checks and host
+limitations recorded during implementation.
 
 ## Start here
 
