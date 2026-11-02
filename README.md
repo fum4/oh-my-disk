@@ -290,24 +290,28 @@ python3 scripts/synthetic.py .fixtures/large --large
 
 ### Chat about a scan in the desktop app
 
-The welcome screen has one command bar: **Folder** (Home by default, sidebar Locations or Choose Folder…), **Analyze with**, and **Scan ⌘R**. Selecting a folder only changes the target; Scan starts the scan. The agent picker offers: **None** (default), **Claude**, or **Codex**. The choice is remembered locally. Agent scans open a resizable terminal after successful completion; cancelling or failing a scan never launches an agent. After a scan is completed or a saved scan is opened, **Ask agent** uses the same picker beside cleanup results (in the toolbar on Folders/Categories). Close ends its process group and removes the app's private session workspace. One session is supported at a time. Drag the drawer handle (or focus it and use arrow keys) to resize; selection, Copy/Paste, terminal colors, scrollback and HTTP(S) links are supported. Terminal assets are bundled locally, including xterm.js 5.5.0, fit 0.10.0 and web-links 0.11.0 (MIT).
+The welcome screen has one command bar: **Folder**, **Analyze with** (None, Claude or Codex), and **Scan ⌘R**. The folder and agent choices are remembered locally. A successful scan with an agent selected opens the dedicated **Agent** page; cancelled or failed scans never launch an agent. After scanning, Overview offers one quiet **Ask <agent> about this scan →** link. Results use decimal units and one toolbar row, with location and exports on the left and **Rescan** on the right.
 
-Install [Claude Code](https://code.claude.com/docs/en/setup) or [Codex CLI](https://developers.openai.com/codex/cli), sign in using the CLI, then use **Check Again**. Missing agents appear as install links instead of selectable choices. Install hints appear only inside the picker. Browser UI offers install links; agent sessions run in the desktop app, with no PTY HTTP/WebSocket endpoint.
+**Agent** is always reachable below Cleanup. It contains a full-height xterm.js terminal, an agent picker, session status, **Restart session**, and **Stop**. One session runs at a time and persists across page navigation. Switching agents or restarting a running conversation asks first. The sidebar dot indicates a running session. Before a scan, the page offers the shared scan command bar and **Start without a scan**. Stop ends the process group and removes the private session workspace. Selection, desktop copy/paste shortcuts, terminal colors, scrollback and HTTP(S) links are supported. Terminal assets are bundled locally, including xterm.js 5.5.0, fit 0.10.0 and web-links 0.11.0 (MIT).
+
+Install [Claude Code](https://code.claude.com/docs/en/setup) or [Codex CLI](https://developers.openai.com/codex/cli), sign in using the CLI, then reopen the picker to detect it. Missing agents appear as install links. Browser UI offers install links; agent sessions run in the desktop app, with no PTY HTTP/WebSocket endpoint.
+
+Agent model defaults live as constants in `internal/agents/agents.go`: Codex uses `-m gpt-6.1-sol -c model_reasoning_effort=medium`; Claude uses `--model opus` (the latest Opus alias). Override them with `OMD_CODEX_MODEL` or `OMD_CLAUDE_MODEL` in the app’s environment. The app never edits `~/.codex` or `~/.claude` configuration.
 
 Detection checks executable files on PATH, `~/.local/bin`, Homebrew, `/usr/local/bin`, common npm global locations, mise shims, and Codex inside `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`. A bounded `$SHELL -lc 'command -v claude'` / `command -v codex` lookup also resolves installations exposed by login-shell PATH setup. The terminal environment adds the resolved CLI directory and standard binary paths for GUI launches.
 
 To add an agent, add one `Definition` in `internal/agents/agents.go` with its name, label, icon, install URL, executable command, optional fallback path, and argv builder. Detection, both pickers, and launch dispatch use this registry.
 
-`make app` bundles `oh-my-disk-cli` alongside the desktop executable. Each launch creates a private temporary workspace containing a copy of the displayed scan, MCP JSON, and AGENTS.md / CLAUDE.md context. MCP receives `OMD_SESSION_SCAN` pointing to that copy, so it does not accidentally analyze another window's cached scan. No user MCP configuration is edited. The reusable advisor context lives at `internal/agents/context.md`; it can later be packaged as a skill. Session working directory is deliberately the private workspace, avoiding scanned-folder instructions and hooks. Agent authentication and normal conversation persistence remain managed by the installed CLI.
+`make app` bundles `oh-my-disk-cli` alongside the desktop executable. Each launch creates a private temporary workspace containing a copy of the displayed scan (when available), MCP JSON, and AGENTS.md / CLAUDE.md context. MCP receives `OMD_SESSION_SCAN` pointing to that copy, so it does not accidentally analyze another window's cached scan. No user MCP configuration is edited. The reusable advisor context lives at `internal/agents/context.md`; it can later be packaged as a skill. Session working directory is deliberately the private workspace, avoiding scanned-folder instructions and hooks. Agent authentication and normal conversation persistence remain managed by the installed CLI.
 
 Launch argv (paths below are placeholders; these are arguments passed directly, without a shell):
 
 ```sh
-claude --mcp-config <session>/mcp.json --strict-mcp-config --tools '' \
+claude --model opus --mcp-config <session>/mcp.json --strict-mcp-config --tools '' \
   --append-system-prompt '<contents of internal/agents/context.md>' -- \
   "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
 
-codex --no-daemon --sandbox read-only -c 'mcp_servers={}' \
+codex -m gpt-6.1-sol -c model_reasoning_effort=medium --no-daemon --sandbox read-only -c 'mcp_servers={}' \
   -c 'mcp_servers.oh-my-disk.command="<app>/Contents/MacOS/oh-my-disk-cli"' \
   -c 'mcp_servers.oh-my-disk.args=["mcp"]' \
   -c 'mcp_servers.oh-my-disk.env.OMD_SESSION_SCAN="<session>/scan.bin"' \

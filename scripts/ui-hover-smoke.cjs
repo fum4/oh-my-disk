@@ -83,7 +83,7 @@ require("node:fs").mkdirSync(".build/screens", { recursive: true });
       const svg = await page.locator("#ringsvg").boundingBox();
       const center = await page.locator(".rc .t").boundingBox();
       assert.deepEqual(center, svg, "Ring overlay shares the SVG coordinate box");
-      for (const id of ["agent-picker", "rescan-picker"]) {
+      for (const id of ["rescan-picker"]) {
         await page.locator(`#${id} summary`).click();
         const menu = page.locator(`#${id}-menu`);
         await menu.waitFor({ state: "visible" });

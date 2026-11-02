@@ -173,3 +173,36 @@ func TestSingleEntryAgent(t *testing.T) {
 		t.Fatal(string(data), err)
 	}
 }
+
+func TestExplicitModelsAndOverrides(t *testing.T) {
+	for _, tc := range []struct{ name, env, flag, fallback string }{
+		{"codex", "OMD_CODEX_MODEL", "-m", DefaultCodexModel},
+		{"claude", "OMD_CLAUDE_MODEL", "--model", DefaultClaudeModel},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, value := range []string{"", "custom-model"} {
+				t.Setenv(tc.env, value)
+				args, err := Args(tc.name, "/binary", "/session", "prompt")
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := value
+				if want == "" {
+					want = tc.fallback
+				}
+				found := false
+				for i := 0; i+1 < len(args); i++ {
+					if args[i] == tc.flag && args[i+1] == want {
+						found = true
+					}
+				}
+				if !found {
+					t.Fatalf("missing explicit model %q: %v", want, args)
+				}
+				if tc.name == "codex" && !strings.Contains(strings.Join(args, "\n"), "model_reasoning_effort=medium") {
+					t.Fatal(args)
+				}
+			}
+		})
+	}
+}

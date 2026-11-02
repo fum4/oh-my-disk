@@ -66,7 +66,8 @@
         dom("span", "location-name", label(path)),
       );
       b.title = path === "home" ? "Scan Home" : "Scan " + path;
-      b.onclick = async () => {
+      b.onclick = async (e) => {
+        e?.stopPropagation();
         if ($("hub-scan").disabled) return;
         if (window.selectScanTarget) window.selectScanTarget(path);
         else
@@ -81,7 +82,8 @@
         "aria-label",
         "Remove " + label(path) + " from Locations",
       );
-      remove.onclick = () => {
+      remove.onclick = (e) => {
+        e?.stopPropagation();
         removed = { path, index: locations.indexOf(path) };
         locations = locations.filter((p) => p !== path);
         save();
@@ -94,6 +96,7 @@
         }, 6500);
         $("undo-location").focus();
       };
+      row.onclick = () => b.click();
       row.append(b, remove);
       $("locations").append(row);
     }

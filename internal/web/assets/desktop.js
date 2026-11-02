@@ -23,7 +23,8 @@ function itemActions(path, command) {
     b.title = label;
     b.setAttribute("aria-label", label);
     if (glyph) b.append(icon(glyph));
-    b.onclick = async () => {
+    b.onclick = async (e) => {
+      e?.stopPropagation();
       try {
         await fn();
         if (label.startsWith("Copy")) {
@@ -144,7 +145,7 @@ if (nativeApp) {
       try {
         const path = await nativeApp.Export(summary);
         if (path) {
-          $("desktop-error").textContent = "Exported to " + path;
+          showFeedback("Exported to " + path, "success");
         }
       } catch (e) {
         reportError(e);
@@ -169,7 +170,7 @@ if (nativeApp) {
       document
         .querySelectorAll(".location-open")
         .forEach((b) => (b.disabled = presentingScan));
-      $("start-scan").textContent = s.hasScan ? "Scan again" : "Scan";
+      $("start-scan").textContent = s.hasScan ? "Rescan" : "Scan";
       if (document.body.classList.contains("is-scanning") !== presentingScan)
         scanState(presentingScan);
       $("scan-strip").hidden = !presentingScan;
@@ -180,7 +181,7 @@ if (nativeApp) {
       $("export-summary").disabled = !s.hasScan;
       updateScanProgress(s);
       if (s.error) reportError(s.error);
-      else if (!s.busy && /Cancel[le]+d/i.test(s.phase)) showFeedback("Scan cancelled. Choose a folder when you’re ready.");
+      else if (!s.busy && /Cancel[le]+d/i.test(s.phase)) showFeedback("Scan cancelled. Choose a folder when you’re ready.", "info");
       $("access-banner").hidden = accessDismissed || !s.protected.length;
       if (s.revision !== revision && !loading) {
         if (opened || s.phase === "Complete") {

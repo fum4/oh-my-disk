@@ -26,15 +26,9 @@ const palette = [
   "#8490a1",
   "#718096",
 ];
-let binaryUnits = false;
-try {
-  binaryUnits = localStorage.getItem("binaryUnits") === "true";
-} catch {}
 const fmt = (b) => {
-  const base = binaryUnits ? 1024 : 1000;
-  const units = binaryUnits
-    ? ["KiB", "MiB", "GiB", "TiB", "PiB", "EiB"]
-    : ["kB", "MB", "GB", "TB", "PB", "EB"];
+  const base = 1000;
+  const units = ["kB", "MB", "GB", "TB", "PB", "EB"];
   if (b < base) return b + " B";
   let i = -1;
   do {
@@ -356,7 +350,7 @@ function render() {
       n === root ? (mode === "categories" ? "Categories" : n.path) : displayName(n),
     );
     if (i === chain.length - 1) b.setAttribute("aria-current", "location");
-    b.addEventListener("click", () => navigate(n));
+    b.addEventListener("click", e => { e.stopPropagation(); navigate(n); });
     $("breadcrumbs").append(b);
   });
   $("folder-name").textContent = displayName(current) || "/";
@@ -409,7 +403,9 @@ function renderTable() {
       dom("span", "filename", displayName(n) + (n.kind === "symlink" ? " ↗" : "")),
     );
     b.title = n.category_name ? categoryLabel(n.category_name) : n.path;
-    b.addEventListener("click", () => navigate(n));
+    b.addEventListener("click", e => { e.stopPropagation(); navigate(n); });
+    tr.classList.add("clickable-row");
+    tr.onclick = () => navigate(n);
     name.append(selectionBox(n), b);
     const bar = dom("div", "size-bar"),
       fill = dom("i");
@@ -543,9 +539,18 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     $("content-grid").scrollTop = 0;
   }
   mode = next;
+  if (!document.body.classList.contains("is-scanning")) $("hub-scan").replaceChildren(
+    icon("regular-arrow-clockwise"), document.createTextNode(snapshot ? "Rescan" : "Scan"), dom("span", "kbd", "⌘R"));
   $("scan-options").hidden = !snapshot;
+  const agentPage = mode === "agent";
+  document.body.classList.toggle("agent-page-active", agentPage);
+  $("agent-page").hidden = !agentPage;
+  $("scan-agent-link").hidden = !snapshot || mode !== "overview";
+  const launch = $("launch-cards");
+  const launchSlot = !snapshot && agentPage ? $("agent-scan-slot") : $("welcome");
+  if (launch.parentElement !== launchSlot) launchSlot.append(launch);
   $("rescan-picker").open = false;
-  ["overview", "folders", "categories", "cleanup-tab"].forEach((id) => {
+  ["overview", "folders", "categories", "cleanup-tab", "agent"].forEach((id) => {
     $(id).classList.toggle("active", id === mode);
     if (id === mode) $(id).setAttribute("aria-current", "page");
     else $(id).removeAttribute("aria-current");
@@ -555,7 +560,15 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     folders: "Folders",
     categories: "Categories",
     "cleanup-tab": "Cleanup",
+    agent: "Agent",
   }[mode];
+  if (agentPage) {
+    $("welcome").hidden = true;
+    $("content-grid").hidden = true;
+    window.agentViewChanged?.();
+    return;
+  }
+
   if (!snapshot) {
     $("content-grid").hidden = true;
     $("welcome").hidden = false;
@@ -592,6 +605,8 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     document.querySelector(".view-switch").hidden = true;
     return;
   }
+  $("welcome").hidden = true;
+  $("content-grid").hidden = false;
   $("scan-info").textContent = document.body.classList.contains("is-scanning")
     ? "Scanning " + scanTarget + "…"
     : {overview: lastScanSubtitle, folders: "Explore your folders by size.", categories: "See your space grouped by kind.", "cleanup-tab": "Review what you can safely clear."}[mode];
@@ -675,7 +690,7 @@ function renderSuggestions() {
     details.id = id;
     name.setAttribute("aria-expanded", "false");
     name.setAttribute("aria-controls", id);
-    name.onclick = () => {
+    card.onclick = () => {
       details.hidden = !details.hidden;
       name.setAttribute("aria-expanded", String(!details.hidden));
     };
@@ -728,6 +743,7 @@ function renderSuggestions() {
       score,
       dom("span", "s num suggestion-size", fmt(s.bytes)),
     );
+    name.onclick = e => { e.stopPropagation(); card.click(); };
     list.append(card, details);
   }
   if (!items.length)
@@ -776,7 +792,7 @@ $("treemap").onclick = () => {
   $("treemap").setAttribute("aria-pressed", "true");
   render();
 };
-["overview", "folders", "categories", "cleanup-tab"].forEach(
+["overview", "folders", "categories", "cleanup-tab", "agent"].forEach(
   (m) => ($(m).onclick = () => showMode(m)),
 );
 document.querySelectorAll("[data-sort]").forEach(
@@ -925,35 +941,6 @@ function renderVolume() {
     $(id).textContent = (bytes / 1e9).toFixed(2) + " GB";
   }
 }
-$("binary-units").checked = binaryUnits;
-for (const [id, on] of [
-  ["units-decimal", !binaryUnits],
-  ["units-binary", binaryUnits],
-]) {
-  $(id).classList.toggle("active", on);
-  $(id).setAttribute("aria-pressed", String(on));
-}
-$("binary-units").onchange = (e) => {
-  binaryUnits = e.target.checked;
-  try {
-    localStorage.setItem("binaryUnits", String(binaryUnits));
-  } catch {}
-  for (const [id, on] of [
-    ["units-decimal", !binaryUnits],
-    ["units-binary", binaryUnits],
-  ]) {
-    $(id).classList.toggle("active", on);
-    $(id).setAttribute("aria-pressed", String(on));
-  }
-  if (snapshot) {
-    $("total").textContent = fmt(snapshot.scan.root.bytes);
-    renderVolume();
-    renderCounting();
-    renderOverview();
-    renderSuggestions();
-    render();
-  }
-};
 if (!window.go?.main?.App) loadSnapshot();
 
 let suggestionSort = "score",
@@ -1022,6 +1009,7 @@ function selectionBox(n) {
     !!n.synthetic ||
     n.kind === "symlink" ||
     n.path === snapshot?.scan.root.path;
+  box.onclick = e => e.stopPropagation();
   box.onchange = () => {
     if (box.checked) {
       for (const p of selected.keys())
@@ -1096,10 +1084,12 @@ $("confirm-trash").onclick = async () => {
     const bytes = moved.reduce((sum, r) => sum + (sizes.get(r.path) || 0), 0);
     const details = dom("details", "trash-details");
     details.append(dom("summary", "", "Details"), dom("pre", "", message));
+    $("trash-results").className = "banner " + (moved.length === (result.results || []).length && !result.scan_error ? "banner-success" : "banner-warning");
     $("trash-results").replaceChildren(
       dom("span", "", moved.length ? `${fmt(bytes)} moved to Trash. Review more items or scan again.` : "No items moved. Review details and try again."), details);
     $("selection-bar").hidden = true;
   } catch (e) {
+    $("trash-results").className = "banner banner-error";
     $("trash-results").textContent = String(e);
     $("selection-bar").hidden = selected.size === 0;
     $("trash-confirm").close();
@@ -1347,13 +1337,14 @@ function renderOverview() {
   if (!displayed.length)
     list.append(dom("p", "empty", "No folders in this scan."));
 }
-function showFeedback(message) {
+function showFeedback(message, kind = "error") {
   // Cache compatibility is an app concern, never a user-facing recovery flow.
   if (/older cache format|older format|rescan with --refresh/i.test(message))
     message = "";
+  $("scan-feedback").className = "banner banner-" + kind;
   $("scan-feedback").hidden = !message;
   $("scan-feedback").replaceChildren(
-    icon("fill-warning-circle"),
+    icon(kind === "info" ? "fill-info" : kind === "success" ? "fill-shield-check" : "fill-warning-circle"),
     dom("span", "", message),
   );
 }
@@ -1397,7 +1388,7 @@ function scanState(busy) {
   $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"),
     document.createTextNode(
-      busy ? "Scanning…" : snapshot ? "Scan Again" : "Scan",
+      busy ? "Scanning…" : snapshot ? "Rescan" : "Scan",
     ),
   );
   if (!busy) $("hub-scan").append(dom("span", "kbd", "⌘R"));
@@ -1447,7 +1438,7 @@ function floatingMenu(picker, onOpen = () => {}) {
   anchor.setAttribute("aria-haspopup", "true");
   function position() {
     if (!picker.open) return;
-    const target = picker.id === "agent-picker" && snapshot ? $("agent-control")
+    const target = picker.id === "agent-picker" ? $("agent-control")
       : picker.id === "rescan-picker" ? picker.parentElement : anchor;
     const r = target.getBoundingClientRect(), gap = 8, edge = 12;
     menu.style.maxHeight = Math.max(80, innerHeight - edge * 2) + "px";
@@ -1463,7 +1454,7 @@ function floatingMenu(picker, onOpen = () => {}) {
   picker.addEventListener("toggle", () => {
     anchor.setAttribute("aria-expanded", String(picker.open));
     if (picker.open) {
-      for (const other of document.querySelectorAll("#folder-picker, #rescan-picker, #agent-picker")) if (other !== picker) other.open = false;
+      for (const other of document.querySelectorAll("#folder-picker, #rescan-picker, #agent-picker, #session-picker")) if (other !== picker) other.open = false;
       menu.classList.add("floating-menu");
       document.body.append(menu);
       menu.hidden = false;
@@ -1490,22 +1481,6 @@ function floatingMenu(picker, onOpen = () => {}) {
 }
 floatingMenu($("folder-picker"));
 floatingMenu($("rescan-picker"));
-for (const [id, binary] of [
-  ["units-decimal", false],
-  ["units-binary", true],
-]) {
-  $(id).onclick = () => {
-    $("binary-units").checked = binary;
-    $("binary-units").dispatchEvent(new Event("change"));
-    for (const [other, on] of [
-      ["units-decimal", !binary],
-      ["units-binary", binary],
-    ]) {
-      $(other).classList.toggle("active", on);
-      $(other).setAttribute("aria-pressed", String(on));
-    }
-  };
-}
 document.addEventListener("keydown", (e) => {
   if (e.target.closest?.("#terminal-screen")) return;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {

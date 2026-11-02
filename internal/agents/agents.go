@@ -18,6 +18,16 @@ import (
 var Context string
 
 const InitialPrompt = "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
+const DefaultCodexModel = "gpt-6.1-sol"
+const DefaultClaudeModel = "opus"
+
+func model(env, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(env)); value != "" {
+		return value
+	}
+	return fallback
+}
+
 const BundledCodex = "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"
 
 // Definition is the single registration point for detection, presentation and launch.
@@ -34,11 +44,11 @@ type Definition struct {
 
 var registry = []Definition{
 	{Name: "claude", Label: "Claude", Icon: "agent-claude", InstallURL: "https://code.claude.com/docs/en/setup", Command: "claude", Launch: func(binary, dir, prompt string) []string {
-		return []string{"--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config", "--tools", "", "--append-system-prompt", Context, "--", prompt}
+		return []string{"--model", model("OMD_CLAUDE_MODEL", DefaultClaudeModel), "--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config", "--tools", "", "--append-system-prompt", Context, "--", prompt}
 	}},
 	{Name: "codex", Label: "Codex", Icon: "agent-codex", InstallURL: "https://developers.openai.com/codex/cli", Command: "codex", Fallback: BundledCodex, Launch: func(binary, dir, prompt string) []string {
 		q := func(s string) string { b, _ := json.Marshal(s); return string(b) }
-		return []string{"--no-daemon", "--sandbox", "read-only", "-c", "mcp_servers={}", "-c", "mcp_servers.oh-my-disk.command=" + q(binary), "-c", `mcp_servers.oh-my-disk.args=["mcp"]`, "-c", "mcp_servers.oh-my-disk.env.OMD_SESSION_SCAN=" + q(filepath.Join(dir, "scan.bin")), "-c", "developer_instructions=" + q(Context), "--", prompt}
+		return []string{"-m", model("OMD_CODEX_MODEL", DefaultCodexModel), "-c", "model_reasoning_effort=medium", "--no-daemon", "--sandbox", "read-only", "-c", "mcp_servers={}", "-c", "mcp_servers.oh-my-disk.command=" + q(binary), "-c", `mcp_servers.oh-my-disk.args=["mcp"]`, "-c", "mcp_servers.oh-my-disk.env.OMD_SESSION_SCAN=" + q(filepath.Join(dir, "scan.bin")), "-c", "developer_instructions=" + q(Context), "--", prompt}
 	}},
 }
 

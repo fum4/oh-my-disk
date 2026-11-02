@@ -2,7 +2,7 @@
 (() => {
   const app = window.go?.main?.App;
   const names = {};
-  let definitions = [], choice = "", optionState = "";
+  let definitions = [], choice = "";
   try { choice = localStorage.getItem("omd-agent-choice") || ""; } catch {}
   let installed = {},
     state = {},
@@ -14,10 +14,10 @@
     opening = false,
     generation = 0,
     sessionRunning = false,
-    collapsed = false,
-    expandedHeight = "",
-    dragged = false;
-  const error = (e) => showFeedback(String(e));
+    sessionChoice = "",
+    activeAgent = "",
+    contextRevision = null;
+  const error = (e) => { showFeedback(String(e)); if (mode === "agent") $("terminal-status").textContent = String(e); };
   function select(name) {
     choice = name;
     try { localStorage.setItem("omd-agent-choice", name); } catch {}
@@ -25,69 +25,92 @@
     render();
     $("agent-picker").querySelector("summary").focus();
   }
+  function renderOptions(picker, options, selected, allowNone, choose) {
+    const signature = JSON.stringify([definitions, installed, selected]);
+    if (options.dataset.state === signature) return;
+    options.dataset.state = signature;
+    options.replaceChildren();
+    const add = (name, label, glyph) => {
+      const b = dom("button", "agent-option");
+      const text = dom("span", "agent-option-label", label);
+      if (glyph) text.prepend(icon(glyph));
+      b.append(text);
+      b.type = "button";
+      b.setAttribute("aria-pressed", String(selected === name));
+      b.onclick = () => choose(name);
+      options.append(b);
+    };
+    if (allowNone) add("", "None");
+    for (const d of definitions) {
+      if (app && installed[d.name]) add(d.name, d.label, d.icon);
+      else {
+        const row = dom("div", "agent-option unavailable");
+        const label = dom("span", "agent-option-label", d.label);
+        label.prepend(icon(d.icon));
+        const link = dom("a", "", "Install ↗");
+        link.href = d.installURL; link.target = "_blank"; link.rel = "noopener";
+        link.setAttribute("aria-label", "Install " + d.label);
+        if (app) link.onclick = e => { e.preventDefault(); window.runtime.BrowserOpenURL(link.href); };
+        row.append(label, link); options.append(row);
+      }
+    }
+  }
+  function mark(id, name) {
+    $(id).replaceChildren();
+    const d = definitions.find(d => d.name === name);
+    if (d) $(id).append(icon(d.icon));
+  }
   function render() {
     const busy = !!state.busy || document.body.classList.contains("is-scanning");
     const ready = !!snapshot;
     if (busy) $("agent-picker").open = false;
+    if (opening) $("session-picker").open = false;
+    $("session-picker").querySelector("summary").setAttribute("aria-disabled", String(opening));
     const selected = installed[choice] ? choice : "";
-    const slot = !ready ? "scan-agent-slot" : "toolbar-agent-slot";
     const control = $("agent-control");
-    if (control.parentElement !== $(slot)) $(slot).append(control);
+    if (control.parentElement !== $("scan-agent-slot")) $("scan-agent-slot").append(control);
     control.hidden = busy;
-    $("ask-agent").hidden = !ready;
-    $("ask-agent").disabled = !app || opening;
-    $("ask-agent").title = app ? "Chat about these results" : "Available in the desktop app";
     $("agent-choice").textContent = names[selected] || "None";
-    $("agent-ask-label").textContent = "Ask agent";
-    $("agent-selection").hidden = ready && !selected;
-    const summary = $("agent-picker").querySelector("summary");
-    $("agent-analyze").hidden = ready;
-    control.classList.toggle("has-results", ready);
-    if (ready) $("ask-agent").append($("agent-selection"));
-    else summary.insertBefore($("agent-selection"), summary.querySelector(".agent-chevron"));
-    $("agent-mark").replaceChildren();
-    const definition = definitions.find(d => d.name === selected);
-    if (definition) $("agent-mark").append(icon(definition.icon));
-    summary.setAttribute("aria-label", "Choose agent, current: " + (names[selected] || "None"));
-    $("ask-agent").setAttribute("aria-label", selected ? "Ask " + names[selected] : "Choose an agent to ask");
-    $("agent-picker").querySelector("summary").title = app ? "" : "Agents run in the desktop app";
-    const signature = JSON.stringify([definitions, installed, selected]);
-    const options = $("agent-options");
-    if (signature !== optionState) {
-      optionState = signature;
-      const hadFocus = options.contains(document.activeElement);
-      options.replaceChildren();
-      const add = (name, label, glyph = "") => {
-        const b = dom("button", "agent-option");
-        const text = dom("span", "agent-option-label", label);
-        if (glyph) text.prepend(icon(glyph));
-        b.append(text);
-        b.type = "button";
-        b.setAttribute("aria-pressed", String(selected === name));
-        b.onclick = () => select(name);
-        options.append(b);
-      };
-      add("", "None");
-      for (const d of definitions) {
-        if (app && installed[d.name]) add(d.name, d.label, d.icon);
-        else {
-          const row = dom("div", "agent-option unavailable");
-          const label = dom("span", "agent-option-label", d.label);
-          label.prepend(icon(d.icon));
-          row.append(label);
-          const link = dom("a", "", "Install ↗");
-          link.href = d.installURL;
-          link.target = "_blank";
-          link.rel = "noopener";
-          link.setAttribute("aria-label", "Install " + d.label);
-          if (app) link.onclick = e => { e.preventDefault(); window.runtime.BrowserOpenURL(link.href); };
-          row.append(link);
-          options.append(row);
-        }
-      }
-      if (hadFocus) options.querySelector('button[aria-pressed="true"]')?.focus({ preventScroll: true });
-    }
+    mark("agent-mark", selected);
+    $("agent-picker").querySelector("summary").setAttribute("aria-label", "Choose agent, current: " + (names[selected] || "None"));
+    renderOptions($("agent-picker"), $("agent-options"), selected, true, select);
+    renderOptions($("session-picker"), $("session-options"), sessionChoice, false, async name => {
+      if (opening) return;
+      if (name === sessionChoice) { $("session-picker").open = false; return; }
+      if (name !== sessionChoice && sessionRunning && !await confirmEnd("Switching agents ends the current conversation.")) return;
+      const hadSession = !!term;
+      if (name !== sessionChoice && hadSession) await close(false);
+      sessionChoice = name;
+      $("session-picker").open = false;
+      render();
+      $("session-picker").querySelector("summary").focus();
+      if (hadSession) launch(name);
+    });
+    $("session-choice").textContent = names[sessionChoice] || "Choose agent";
+    mark("session-mark", sessionChoice);
+    $("agent-running-dot").hidden = !sessionRunning;
+    $("terminal-close").disabled = !sessionRunning || opening;
+    $("terminal-restart").disabled = !app || !installed[sessionChoice] || opening;
+    $("terminal-restart").hidden = !term;
+    $("agent-empty").hidden = !!term;
+    $("agent-nudge").textContent = ready ? "Your scan is ready. Ask what’s taking space or where to start." : "Scan first to give your agent a clear picture of your disk.";
+    $("agent-start").textContent = ready ? "Start session" : "Start without a scan";
+    $("agent-start").disabled = !app || !installed[sessionChoice] || opening;
+    $("agent-desktop-hint").hidden = !!app;
+    $("scan-agent-link").textContent = "Ask " + (names[sessionChoice || selected] || "agent") + " about this scan →";
     $("plain-scan").disabled = busy || opening;
+    if (mode === "agent") requestAnimationFrame(resize);
+  }
+  function confirmEnd(message) {
+    $("agent-confirm-message").textContent = message;
+    return new Promise(resolve => {
+      const dialog = $("agent-confirm");
+      const done = value => { dialog.close(); resolve(value); };
+      $("agent-keep").onclick = () => done(false);
+      $("agent-replace").onclick = () => done(true);
+      dialog.oncancel = e => { e.preventDefault(); done(false); };
+      dialog.showModal();
+    });
   }
   let detection = 0;
   async function detect() {
@@ -104,10 +127,18 @@
         choice = "";
         try { localStorage.setItem("omd-agent-choice", ""); } catch {}
       }
+      if (!sessionChoice || !installed[sessionChoice]) sessionChoice = choice || definitions.find(d => installed[d.name])?.name || "";
       render();
     } catch (e) { if (request === detection) error(e); }
   }
   function theme() {
+    if (!window.matchMedia?.("(prefers-color-scheme: dark)").matches) return {
+      background: "#fafbfc", foreground: "#262d38", cursor: "#262d38", cursorAccent: "#fafbfc",
+      selectionBackground: "#adc8ec80", black: "#262d38", red: "#b53032", green: "#267a43",
+      yellow: "#8b6300", blue: "#245cb5", magenta: "#80529a", cyan: "#227b86", white: "#d3d8e0",
+      brightBlack: "#697586", brightRed: "#c83c3e", brightGreen: "#247c42", brightYellow: "#926d13",
+      brightBlue: "#2868c9", brightMagenta: "#8b54aa", brightCyan: "#25818b", brightWhite: "#f3f5f8",
+    };
     return {
       background: "#15181e", foreground: "#e4e7ed", cursor: "#e4e7ed",
       cursorAccent: "#15181e", selectionBackground: "#637da666",
@@ -119,31 +150,29 @@
     };
   }
   function resize() {
-    if (!term || $("agent-terminal").hidden || collapsed) return;
+    if (!term || mode !== "agent" || $("agent-terminal").hidden) return;
     fit.fit();
   }
-  function setCollapsed(value) {
-    if (value === collapsed) return;
-    if (value) expandedHeight = $("agent-terminal").getBoundingClientRect().height + "px";
-    collapsed = value;
-    const panel = $("agent-terminal"), handle = $("terminal-resize");
-    panel.classList.toggle("collapsed", value);
-    panel.style.height = value ? "28px" : expandedHeight;
-    handle.setAttribute("aria-expanded", String(!value));
-    handle.setAttribute("aria-label", value ? "Expand terminal" : "Collapse terminal");
-    handle.title = value ? "Expand terminal" : "Collapse terminal · drag to resize";
-    if (!value) { resize(); term?.focus(); }
+  async function openScanAgent(n) {
+    showMode("agent");
+    if (!installed[n]) { $("session-picker").open = true; return; }
+    const revision = snapshot?.scan?.started || state.revision;
+    if (term && activeAgent === n && contextRevision === revision) { resize(); term.focus(); return; }
+    if (sessionRunning && !await confirmEnd("Load this scan in a new session? The running conversation will end.")) return;
+    sessionChoice = n;
+    await launch(n);
   }
   async function launch(n, prompt = "") {
-    if (opening || !snapshot || state.busy || !installed[n]) return;
+    if (opening || !app || !installed[n]) return;
     opening = true;
     render();
     try {
       await close(false);
       const gen = ++generation;
-      setCollapsed(false);
+      showMode("agent");
+      activeAgent = sessionChoice = n;
+      contextRevision = snapshot?.scan?.started || state.revision;
       $("agent-terminal").hidden = false;
-      $("terminal-title").textContent = names[n];
       $("terminal-status").textContent = "Starting…";
       term = new Terminal({
         fontFamily: '"SF Mono", Menlo, Monaco, "JetBrains Mono", monospace',
@@ -206,7 +235,7 @@
       sessionRunning = true;
       term.onData((data) => app.WriteAgent(data).catch(error));
       document.fonts?.ready.then(() => { if (gen === generation) resize(); });
-      $("terminal-status").textContent = "Read-only disk advisor";
+      $("terminal-status").textContent = "Running";
       term.focus();
       async function poll() {
         try {
@@ -216,7 +245,8 @@
             term.write(Uint8Array.from(atob(out.data), (c) => c.charCodeAt(0)));
           if (out.exited) {
             sessionRunning = false;
-            $("terminal-status").textContent = "Session ended";
+            $("terminal-status").textContent = "Exited";
+            render();
             return;
           }
           timer = setTimeout(poll, 40);
@@ -242,16 +272,21 @@
     term = null;
     $("terminal-screen").replaceChildren();
     $("agent-terminal").hidden = true;
-    if (restore) $("ask-agent").focus();
+    $("terminal-status").textContent = "Stopped";
+    render();
+    if (restore) $("agent-start").focus();
   }
-  $("ask-agent").onclick = () => {
-    if (installed[choice]) return launch(choice);
-    else $("agent-picker").open = true;
+  $("scan-agent-link").onclick = () => openScanAgent(sessionChoice || choice).catch(error);
+  $("agent-start").onclick = () => launch(sessionChoice);
+  $("terminal-restart").onclick = async () => {
+    if (sessionRunning && !await confirmEnd("Restarting ends the current conversation and loads your latest scan.")) return;
+    await launch(sessionChoice);
   };
   window.agentViewChanged = render;
   const scan = $("hub-scan").onclick;
   $("hub-scan").onclick = async () => {
-    pending = installed[choice] ? choice : "";
+    if (mode === "agent") showMode("overview");
+    pending = !snapshot && installed[choice] ? choice : "";
     scanStarted = false;
     await scan();
   };
@@ -267,7 +302,7 @@
       const n = pending;
       pending = "";
       scanStarted = false;
-      launch(n);
+      openScanAgent(n).catch(error);
     }
   };
   window.agentStateChanged = (s) => {
@@ -278,6 +313,8 @@
   };
   $("plain-scan").onclick = () => $("hub-scan").onclick();
   floatingMenu($("agent-picker"), () => detect());
+  floatingMenu($("session-picker"), () => detect());
+  $("session-picker").querySelector("summary").onclick = e => { if (opening) e.preventDefault(); };
   $("terminal-close").onclick = () => close().catch(error);
   $("terminal-copy").onclick = () =>
     app.Copy(term?.getSelection() || "").catch(error);
@@ -291,35 +328,8 @@
       error(e);
     }
   };
-  const handle = $("terminal-resize"),
-    panel = $("agent-terminal");
-  function setHeight(h) {
-    if (collapsed) setCollapsed(false);
-    panel.style.height = Math.max(180, Math.min(innerHeight * .65, h)) + "px";
-    resize();
-  }
-  handle.onclick = () => { if (!dragged) setCollapsed(!collapsed); };
-  handle.onpointerdown = (e) => {
-    if (e.button !== 0) return;
-    dragged = false;
-    const start = e.clientY, height = panel.getBoundingClientRect().height;
-    handle.setPointerCapture(e.pointerId);
-    handle.onpointermove = (ev) => {
-      if (Math.abs(ev.clientY - start) > 4) dragged = true;
-      if (dragged) setHeight(height + start - ev.clientY);
-    };
-    handle.onpointerup = handle.onpointercancel = () => {
-      handle.onpointermove = null;
-    };
-  };
-  handle.onkeydown = (e) => {
-    dragged = false;
-    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-      e.preventDefault();
-      setHeight(panel.offsetHeight + (e.key === "ArrowUp" ? 24 : -24));
-    }
-  };
   if (window.ResizeObserver)
     new ResizeObserver(resize).observe($("terminal-screen"));
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => { if (term) term.options.theme = theme(); });
   detect().catch(error);
 })();

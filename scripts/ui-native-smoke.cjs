@@ -114,14 +114,12 @@ const wait = async (fn) => {
       assert.equal($("agent-control"), sharedAgent);
       assert.equal($("launch-cards").hidden, false);
       assert.equal($("empty-actions"), null);
-      assert.equal($("ask-agent").hidden, true);
+      assert.equal($("ask-agent"), null);
     }
-    assert.equal($("ask-agent").hidden, true);
+    assert.equal($("ask-agent"), null);
     assert.equal($("scan-options").hidden, true); // Minimal landing.
-    $("units-binary").click();
-    assert.equal($("binary-units").checked, true);
-    assert.equal($("units-binary").getAttribute("aria-pressed"), "true");
-    assert.equal($("scan-options").hidden, true);
+    assert.equal($("units-binary"), null);
+    assert.equal($("binary-units"), null);
     const locationCount = $("locations").childElementCount;
     $("locations").querySelector(".location-remove").click();
     assert.equal($("locations").childElementCount, locationCount - 1);
@@ -178,13 +176,13 @@ const wait = async (fn) => {
     assert(!$("scan-feedback").textContent.includes("--refresh"));
     assert.equal(errors.length, 0, errors.join("\n"));
     console.log(
-      "PASS: native empty welcome, navigation before scan, split scan picker, inline settings, units, favorites removal/Undo/persistence, scan progress/cancel, silent old-cache handling.",
+      "PASS: native empty welcome, navigation before scan, split scan picker, inline settings, decimal units, favorites removal/Undo/persistence, scan progress/cancel, silent old-cache handling.",
     );
     w.close();
     return;
   }
   await wait(() => !$("open-last").hidden);
-  assert.equal($("ask-agent").hidden, true);
+  assert.equal($("ask-agent"), null);
   assert.equal($("web-scan").hidden, true);
   assert.equal($("desktop").hidden, false);
   assert.equal($("choose-folder").hidden, false);
@@ -192,8 +190,9 @@ const wait = async (fn) => {
   $("folders").click(); // Safe before a snapshot has been opened.
   await $("open-last").onclick();
   await wait(() => d.querySelector("#overview-folders .fr"));
-  assert.equal($("ask-agent").hidden, false);
-  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
+  assert.equal($("ask-agent"), null);
+  assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
+  assert.match($("hub-scan").textContent, /^Rescan/);
   assert.equal($("scan-root").value, "home");
   assert.equal($("overview-panel").hidden, true);
   assert.equal($("explorer").hidden, false);
@@ -251,6 +250,8 @@ const wait = async (fn) => {
   assert.ok(copy.querySelector("svg use"));
   await $("export-json").onclick();
   await $("export-summary").onclick();
+  assert.equal($("scan-feedback").classList.contains("banner-success"), true);
+  assert.match($("scan-feedback").textContent, /Exported to/);
   assert.deepEqual(
     calls.filter((c) => c[0] === "export"),
     [

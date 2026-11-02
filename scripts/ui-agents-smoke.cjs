@@ -111,7 +111,7 @@ const wait = async (fn) => {
           main: {
             App: {
               State: async () => ({ ...state }),
-              Agents: async () => registry.map(d => ({ ...d, path: d.name === "claude" && available ? "/mock/claude" : "" })),
+              Agents: async () => registry.map(d => ({ ...d, path: (d.name === "claude" || (d.name === "codex" && process.argv.includes("--both"))) && available ? "/mock/claude" : "" })),
               Scan: async target => {
                 scanned.push(target);
                 state.busy = true;
@@ -155,11 +155,11 @@ const wait = async (fn) => {
   };
   const option = name => [...$("agent-options").querySelectorAll("button")].find(b => b.textContent.includes(name));
   await wait(() => $("agent-options").textContent.includes("Claude"));
-  assert.equal($("ask-agent").hidden, true);
+  assert.equal($("ask-agent"), null);
   assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
   for (const id of ["folders", "categories", "cleanup-tab", "overview"]) {
     $(id).click();
-    assert.equal($("ask-agent").hidden, true);
+    assert.equal($("ask-agent"), null);
     assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
     assert.equal($("launch-cards").hidden, false);
     assert.equal($("empty-actions"), null);
@@ -194,6 +194,30 @@ const wait = async (fn) => {
     return;
   }
 
+  if (process.argv.includes("--before-scan")) {
+    available = true;
+    await refreshAgents();
+    $("agent").click();
+    assert.equal($("agent-page").hidden, false);
+    assert.equal($("launch-cards").parentElement.id, "agent-scan-slot");
+    assert.match($("agent-nudge").textContent, /Scan first/);
+    await $("agent-start").onclick();
+    assert.equal(launched.length, 1);
+    assert.equal(state.hasScan, false);
+    assert.equal($("agent-running-dot").hidden, false);
+    $("overview").click(); $("agent").click();
+    assert.equal(launched.length, 1);
+    const restarting = $("terminal-restart").onclick();
+    assert.equal($("agent-confirm").open, true);
+    $("agent-replace").click(); await restarting;
+    assert.equal(launched.length, 2);
+    await $("terminal-close").onclick();
+    assert.equal($("agent-running-dot").hidden, true);
+    assert.deepEqual(errors, []);
+    w.close();
+    console.log("PASS: start before scan, shared command bar, navigation persistence, confirmed restart and stop.");
+    return;
+  }
   assert.equal(w.document.querySelectorAll(".launch-card").length, 1);
   assert.equal(option("Claude"), undefined);
   assert.ok($("agent-options").querySelector('a[aria-label="Install Claude"]'));
@@ -237,7 +261,7 @@ const wait = async (fn) => {
   assert.equal(option("Claude"), unchanged); // No redraw when detection is unchanged.
   assert.ok(option("Claude"));
   assert.equal(option("Claude").querySelector("use").getAttribute("href"), "#agent-claude");
-  assert.equal(option("Codex"), undefined);
+  assert.equal(!!option("Codex"), process.argv.includes("--both"));
   option("Claude").click();
   assert.equal(w.document.activeElement, $("agent-picker").querySelector("summary"));
   assert.equal(w.localStorage.getItem("omd-agent-choice"), "claude");
@@ -253,31 +277,49 @@ const wait = async (fn) => {
   await wait(() => launched.length === 1);
   assert.equal(launched[0][0], "claude");
   assert.equal($("agent-terminal").hidden, false);
-  await wait(() => $("terminal-status").textContent === "Read-only disk advisor");
+  await wait(() => $("terminal-status").textContent === "Running");
   assert.match(terminal.options.fontFamily, /SF Mono.*Menlo/);
-  assert.equal(terminal.options.theme.background, "#15181e");
+  assert.equal(terminal.options.theme.background, "#fafbfc");
   assert.equal(terminal.options.cursorBlink, true);
   assert.equal(terminal.options.macOptionIsMeta, true);
   assert.equal(terminal.unicode.activeVersion, "11");
   assert.match(Buffer.from(terminal.output).toString(), /╭─ Advisor ─╮/);
-  assert.ok($("ask-agent").contains($("agent-choice")));
-  assert.equal($("agent-picker").querySelector("summary").textContent.trim(), "Analyze with"); // hidden label, visible chevron only
+  assert.equal($("agent").getAttribute("aria-current"), "page");
+  assert.equal($("agent-page").hidden, false);
+  assert.equal($("agent-running-dot").hidden, false);
   terminal.resized({ cols: 112, rows: 35 });
   assert.deepEqual(resized.at(-1), [112, 35]);
-  // Collapse keeps the same terminal, PTY, and polling loop alive; restore remembers height.
-  const panel = $("agent-terminal"), handle = $("terminal-resize");
-  panel.getBoundingClientRect = () => ({ height: 340 });
   const closes = closed, instance = terminal, beforeReads = reads;
-  handle.click();
-  assert.equal(handle.getAttribute("aria-expanded"), "false");
-  assert.equal(panel.classList.contains("collapsed"), true);
+  $("overview").click();
+  await $("scan-agent-link").onclick();
+  assert.equal(launched.length, 1);
+  const selectedSession = [...$("session-options").querySelectorAll("button")].find(b => b.getAttribute("aria-pressed") === "true");
+  selectedSession.click();
+  assert.equal(launched.length, 1);
+  for (const page of ["folders", "categories", "cleanup-tab", "overview", "agent"]) $(page).click();
   await wait(() => reads > beforeReads);
   assert.equal(closed, closes);
   assert.equal(terminal, instance);
-  handle.click();
-  assert.equal(handle.getAttribute("aria-expanded"), "true");
-  assert.equal(panel.style.height, "340px");
   assert.equal(launched.length, 1);
+  if (process.argv.includes("--both")) {
+    const codex = [...$("session-options").querySelectorAll("button")].find(b => b.textContent.includes("Codex"));
+    codex.click();
+    assert.equal($("agent-confirm").open, true);
+    $("agent-keep").click();
+    await new Promise(r => setTimeout(r, 10));
+    assert.equal(closed, closes);
+    assert.equal($("session-choice").textContent, "Claude");
+    codex.click();
+    $("agent-replace").click();
+    await wait(() => launched.length === 2);
+    assert.equal(launched.at(-1)[0], "codex");
+    assert.equal($("session-choice").textContent, "Codex");
+    await $("terminal-close").onclick();
+    assert.deepEqual(errors, []);
+    w.close();
+    console.log("PASS: running agent switch requires confirmation; cancel preserves session, accept replaces it once.");
+    return;
+  }
   // Preserve terminal control keys; only desktop copy/paste shortcuts are intercepted.
   for (const e of [
     { key: "c", ctrlKey: true }, { key: "v", ctrlKey: true },
@@ -308,16 +350,13 @@ const wait = async (fn) => {
     assert.equal(closed, closes);
   }
   sessionEnded = true;
-  await wait(() => $("terminal-status").textContent === "Session ended");
+  await wait(() => $("terminal-status").textContent === "Exited");
   await $("terminal-close").onclick();
   assert.equal($("agent-terminal").hidden, true);
-  assert.equal($("ask-agent").hidden, false);
-  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
-  $("folders").click();
-  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
-  $("cleanup-tab").click();
-  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
-  await $("ask-agent").onclick();
+  assert.equal($("agent-running-dot").hidden, true);
+  assert.equal($("agent-page").hidden, false);
+  $("overview").click();
+  await $("scan-agent-link").onclick();
   assert.equal(launched.length, 2);
   await $("terminal-close").onclick();
   // A cancelled scan cannot hand off to an agent.
@@ -343,7 +382,11 @@ const wait = async (fn) => {
   // Confirm a mocked response only: no real Trash request is sent.
   const box = w.document.querySelector(".suggestion-card input:not(:disabled)");
   assert.ok(box);
+  const row = box.closest(".suggestion-card"), details = row.nextElementSibling;
+  row.click();
+  assert.equal(details.hidden, false);
   box.click();
+  assert.equal(details.hidden, false);
   $("trash-selected").click();
   await $("confirm-trash").onclick();
   assert.equal(trashCalls, 1);
@@ -353,7 +396,7 @@ const wait = async (fn) => {
   assert.deepEqual(errors, []);
   w.close();
   console.log(
-    "PASS: install states, detect on open, command-bar folder selection, scan-to-agent handoff, terminal collapse/restore keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, close/reopen, cancelled scan never launches. Native terminal mocked.",
+    "PASS: install states, detect on open, command-bar folder selection, scan-to-agent handoff, Agent page navigation keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, stop/reopen, cancelled scan never launches. Native terminal mocked.",
   );
 })().catch((e) => {
   console.error(e);

@@ -209,8 +209,8 @@ const wait = async (fn) => {
   );
   $("suggest-category").value = "";
   await $("suggest-category").onchange();
-  $("binary-units").click();
-  assert.match($("total").textContent, /MiB|GiB/);
+  assert.equal($("binary-units"), null);
+  assert.match($("total").textContent, /MB|GB/);
   assert.match($("hud-scanned").textContent, /GB/);
   $("clear-selection").click();
   assert.equal($("selection-bar").hidden, true);

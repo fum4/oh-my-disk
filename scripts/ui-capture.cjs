@@ -53,13 +53,14 @@ fs.mkdirSync(".build/screens", { recursive: true });
             if (style.userSelect !== "none" && style.webkitUserSelect !== "none")
               throw Error("Selectable UI chrome: " + node.tagName);
           }
-          const control = document.querySelector("#agent-control");
-          if (!control.hidden && control.classList.contains("has-results")) {
-            const ask = document.querySelector("#ask-agent").getBoundingClientRect();
-            const picker = document.querySelector("#agent-picker summary").getBoundingClientRect();
-            if (Math.abs(ask.height - picker.height) > 1 || Math.abs(ask.y - picker.y) > 1)
-              throw Error("Uneven agent control segments");
-          }
+          const toolbar = document.querySelector("#scan-options");
+          const target = toolbar.querySelector("#desktop[hidden] + #web-scan:not([hidden]), #desktop:not([hidden])");
+          const exports = toolbar.querySelector(".export-cards").getBoundingClientRect();
+          const scan = toolbar.querySelector(".scan-split").getBoundingClientRect();
+          if (Math.abs(exports.y + exports.height / 2 - scan.y - scan.height / 2) > 1 || exports.right > scan.left)
+            throw Error("Results actions must share one row, with exports before Rescan");
+          if (target && target.getBoundingClientRect().right > exports.left) throw Error("Overlapping results actions");
+          if (document.querySelector("#units-binary, #ask-agent, #terminal-resize")) throw Error("Removed drawer/unit controls returned");
           for (const node of document.querySelectorAll(
             "button:not(:disabled), summary, select:not(:disabled), input[type=checkbox]:not(:disabled)",
           )) {
@@ -84,6 +85,13 @@ fs.mkdirSync(".build/screens", { recursive: true });
           n.scrollTop = 0;
         });
       }
+      await page.locator("#agent").click();
+      await page.evaluate(() => {
+        const main = document.querySelector("main"), agent = document.querySelector("#agent-page");
+        if (main.scrollHeight > main.clientHeight + 1 || agent.getBoundingClientRect().bottom > innerHeight) throw Error("Agent page exceeds the main panel");
+        if (getComputedStyle(document.querySelector("#scan-options")).display !== "none") throw Error("Results toolbar visible on Agent");
+      });
+      await shot(`${prefix}-agent`);
       await page.locator("#folders").click();
       await page.locator("#treemap").click();
       await shot(`${prefix}-treemap`);

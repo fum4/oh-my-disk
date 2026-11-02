@@ -48,11 +48,7 @@ func (a *App) StartAgent(name, prompt string, cols, rows uint16) error {
 	}
 	a.mu.RLock()
 	s := a.snapshot
-	busy := a.status.Busy
 	a.mu.RUnlock()
-	if busy || s == nil {
-		return fmt.Errorf("finish a scan first")
-	}
 	dir, err := os.MkdirTemp("", "oh-my-disk-agent-")
 	if err != nil {
 		return err
@@ -63,8 +59,12 @@ func (a *App) StartAgent(name, prompt string, cols, rows uint16) error {
 			os.RemoveAll(dir)
 		}
 	}()
-	if err = report.SaveCache(filepath.Join(dir, "scan.bin"), s); err != nil {
-		return err
+	if s != nil {
+		if err = report.SaveCache(filepath.Join(dir, "scan.bin"), s); err != nil {
+			return err
+		}
+	} else if prompt == "" {
+		prompt = "No scan has been loaded yet. Help me understand disk cleanup; suggest scanning in oh-my-disk for context before making specific recommendations."
 	}
 	exe, err := os.Executable()
 	if err != nil {
