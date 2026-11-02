@@ -44,7 +44,7 @@ type Suggestion struct {
 	Command      string    `json:"suggested_command,omitempty"`
 	LastActivity time.Time `json:"last_activity"`
 	StaleDays    int       `json:"stale_days"`
-	Score        float64   `json:"score"`
+	Score        float64   `json:"raw_score"`
 	ProjectPath  string    `json:"project_path,omitempty"`
 	Incomplete   bool      `json:"incomplete,omitempty"`
 }
