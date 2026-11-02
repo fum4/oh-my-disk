@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -40,7 +41,7 @@ Common options:
   --min-size SIZE   Export/suggestion threshold (e.g. 16MiB; default 1MiB)
   --config FILE     Additional YAML rules (custom rules take precedence)
   --home PATH       Home path used for ~/ rule patterns (default: current home)
-  --workers N       Scanner concurrency (default CPU count, max 64)
+  --workers N       Scanner concurrency (default 2× CPU count, max 64)
   --cross-mounts    Include other filesystem devices
   --cache FILE      Application scan cache (default: private OS temp directory)
   --no-cache        Do not read/write a scan cache
@@ -53,6 +54,10 @@ reports are written. Cache/output paths are excluded from scans.
 `
 
 func main() {
+	// Bound default Go heap growth on multi-million-entry homes; honor user tuning.
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(704 << 20)
+	}
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "oh-my-disk:", err)
 		os.Exit(1)
@@ -168,9 +173,12 @@ func run(args []string) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	display := startProgress(os.Stderr)
+	defer display.close()
 	var s *report.Snapshot
 	doScan := cmd == "scan" || *refresh || *noCache
 	if !doScan {
+		display.phase("reading cache")
 		s, err = report.LoadCache(*cache)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -201,26 +209,24 @@ func run(args []string) error {
 		if *cache != report.CachePath() {
 			excludes[0] = *cache
 		}
-		var last time.Time
-		scan, e := scanner.Scan(ctx, *root, scanner.Options{Workers: *workers, CrossMounts: *cross, Exclude: excludes, Progress: func(p scanner.Progress) {
-			if time.Since(last) > 150*time.Millisecond {
-				fmt.Fprintf(os.Stderr, "\rScanning: %d entries · %d folders · %d pending", p.Entries, p.Directories, p.Pending)
-				last = time.Now()
-			}
-		}})
-		fmt.Fprintln(os.Stderr)
+		display.phase("walking")
+		scan, e := scanner.Scan(ctx, *root, scanner.Options{Workers: *workers, CrossMounts: *cross, Exclude: excludes, Progress: display.update})
 		if e != nil {
 			return e
 		}
+		display.phase("classifying")
 		s = report.New(scan, eng, min)
 		if !*noCache {
+			display.phase("writing cache")
 			if err = report.SaveCache(*cache, s); err != nil {
 				return fmt.Errorf("save application cache: %w", err)
 			}
 		}
 	} else {
+		display.phase("classifying")
 		s = report.New(s.Scan, eng, min)
 	}
+	display.phase("preparing output")
 	if *summary != "" {
 		if err = report.WriteJSON(*summary, report.Summary(s, *limit)); err != nil {
 			return err
@@ -243,14 +249,21 @@ func run(args []string) error {
 		if e != nil {
 			return e
 		}
-		output, err = eng.Explain(s.Scan.Root, p, time.Now())
+		if s.Scan.Tree != nil {
+			output, err = eng.ExplainTree(s.Scan.Tree, p, time.Now())
+		} else {
+			output, err = eng.Explain(s.Scan.Root, p, time.Now())
+		}
 		if err != nil {
 			return err
 		}
 	case "ui":
+		display.phase("starting UI")
+		display.close()
 		return web.Serve(ctx, s, web.Options{Port: *port, Open: !*noOpen, JSON: *jsonPath})
 	}
 	if *jsonPath != "" {
+		display.phase("exporting JSON")
 		return report.WriteJSON(*jsonPath, output)
 	}
 	if *summary == "-" {

@@ -132,6 +132,9 @@ func (e *Engine) Match(path string, project bool) *Rule {
 		}
 		name = path[i+1:]
 	}
+	if path == "/" {
+		name = "/"
+	}
 	idx := e.matchName(name, project, e.parentMatch(parent, project), func() string { return path })
 	if idx < 0 {
 		return nil

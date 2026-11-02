@@ -115,6 +115,7 @@ func TestOriginalLargeCacheEquivalent(t *testing.T) {
 		return nil
 	}
 	d.Token()
+	var baselineNow time.Time
 	var baselineSuggestions []rules.Suggestion
 	var baselineCategories map[string]int64
 	for d.More() {
@@ -126,6 +127,10 @@ func TestOriginalLargeCacheEquivalent(t *testing.T) {
 				k, _ := d.Token()
 				if k == "root" {
 					if e = compare(0); e != nil {
+						t.Fatal(e)
+					}
+				} else if k == "finished" {
+					if e = d.Decode(&baselineNow); e != nil {
 						t.Fatal(e)
 					}
 				} else {
@@ -150,6 +155,9 @@ func TestOriginalLargeCacheEquivalent(t *testing.T) {
 		}
 	}
 	d.Token()
+	if !baselineNow.IsZero() {
+		snap.Suggestions, snap.Categories = eng.AnalyzeTree(scan.Tree, baselineNow, 1)
+	}
 	for i := range baselineSuggestions {
 		baselineSuggestions[i].LastActivity = baselineSuggestions[i].LastActivity.UTC()
 	}

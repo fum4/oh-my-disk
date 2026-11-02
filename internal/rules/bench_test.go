@@ -11,7 +11,7 @@ func benchmarkTree() *scanner.Node {
 	root := &scanner.Node{Path: "/h", Name: "h", Kind: "directory"}
 	for i := 0; i < 1000; i++ {
 		path := fmt.Sprintf("/h/app-%d", i)
-		project := &scanner.Node{Path: path, Kind: "directory", Children: []*scanner.Node{{Name: "package.json", Path: path + "/package.json", Kind: "file"}}}
+		project := &scanner.Node{Name: fmt.Sprintf("app-%d", i), Path: path, Kind: "directory", Children: []*scanner.Node{{Name: "package.json", Path: path + "/package.json", Kind: "file"}}}
 		dir := &scanner.Node{Name: "node_modules", Path: path + "/node_modules", Kind: "directory"}
 		for j := 0; j < 100; j++ {
 			dir.Children = append(dir.Children, &scanner.Node{Name: fmt.Sprintf("f%d.js", j), Path: fmt.Sprintf("%s/f%d.js", dir.Path, j), Kind: "file", OwnBytes: 4096, Bytes: 4096, Files: 1})

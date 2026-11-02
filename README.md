@@ -106,12 +106,12 @@ Patterns are anchored, case-sensitive paths: `~/` expands using the current home
 
 ## Read-only behavior, privacy and accounting
 
-- Scanner operations are metadata reads (`Lstat`, directory reads); it never opens regular file contents. Symlinks are recorded but not traversed, including loop/broken links. A symlink root is rejected. Directory opens use `O_NOFOLLOW` and verify inode identity; changing trees can still produce partial, non-atomic snapshots.
-- Sizes use `st_blocks × 512`, including directory metadata, rather than logical file length. Sparse files therefore reflect allocated storage. Hardlinks are deduplicated by `(device, inode)` and charged to the first lexical path, deterministically after the parallel walk. A category can inherit those blocks even when another hardlink appears elsewhere.
+- Scanner operations are metadata reads (macOS bulk attributes, or directory reads plus descriptor-relative `fstatat`); it never opens regular file contents. Symlinks are recorded but not traversed, including loop/broken links. A symlink root is rejected. Directory opens are pinned to the root descriptor, reject symlinks in every relative path component, and verify inode identity; changing trees can still produce partial, non-atomic snapshots.
+- Sizes use allocated blocks (`st_blocks × 512` or equivalent bulk attributes), including directory metadata. Dataless iCloud/File Provider placeholders are counted by logical file length and flagged `dataless`; their contents are never opened. Dataless directories are left unenumerated and marked incomplete to avoid hydration. Sparse files therefore reflect allocated storage. Hardlinks are deduplicated by `(device, inode)` and charged to the first lexical path, deterministically during the parallel walk. A category can inherit those blocks even when another hardlink appears elsewhere.
 - Other devices are skipped by default. For macOS `/`, both the sealed System device and firmlinked Data device are included through the normal namespace, while `/System/Volumes/Data` is omitted. Repeated directory identities are skipped to prevent alias loops. `--cross-mounts` does not re-enable the duplicate Data subtree.
 - APFS clones, snapshots, compression, purgeable storage and filesystem accounting can make these totals differ from Finder or actual reclaimable space. APFS clone-aware accounting is not implemented. A scan never represents a transactionally consistent snapshot.
 - atime may be disabled, coarse, or updated by directory reads; it is only a conservative activity hint. Directory atimes are recorded but excluded from subtree activity for ranking, so scanning does not make an old cache look newly used. File metadata and mtime are not changed by the tool. OS-managed access-time updates can occur from reading directories.
-- The private scan cache defaults to `$TMPDIR/oh-my-disk-<uid>/latest.json` (via Go’s OS temp directory), outside the usual home scan. It survives normal command runs but may be cleared by OS temp housekeeping. `--cache /private/path/state/latest.json` selects a different cache; its directory must have mode `0700`. Only valid application caches may be replaced. Use a dedicated state directory. `--no-cache` performs a fresh scan without loading or saving state.
+- The private scan cache defaults to `$TMPDIR/oh-my-disk-<uid>/latest.bin` (via Go’s OS temp directory), outside the usual home scan. It survives normal command runs but may be cleared by OS temp housekeeping. `--cache /private/path/state/latest.bin` selects a different cache; its directory must have mode `0700`. The cache is a versioned binary stream with a checksum; legacy JSON caches remain readable when selected explicitly with `--cache`. Only valid application caches may be replaced. Use a dedicated state directory. `--no-cache` performs a fresh scan without loading or saving state.
 - The application’s cache path/directory and requested export files are excluded before scanning. New reports are created with mode `0600`; an existing report is never replaced. The cache writer uses a private temporary report and atomic rename. It removes only its own temporary report on completion.
 - The server listens on `127.0.0.1`, uses a random per-launch token and SameSite HTTP-only cookie, validates Host, accepts GET/HEAD only, and serves no external assets. No analytics or remote calls. The token URL and JSON reports expose private filenames; share them deliberately.
 
@@ -131,13 +131,13 @@ Create and scan a realistic synthetic developer home without touching real user 
 ```sh
 python3 scripts/synthetic.py .fixtures/home
 ./oh-my-disk scan .fixtures/home --home "$PWD/.fixtures/home" \
-  --cache "$PWD/.fixtures/state/latest.json" --min-size 0 \
+  --cache "$PWD/.fixtures/state/latest.bin" --min-size 0 \
   --json .fixtures/scan.json --summary .fixtures/summary.json --limit 8
 ./oh-my-disk ui --home "$PWD/.fixtures/home" \
-  --cache "$PWD/.fixtures/state/latest.json"
+  --cache "$PWD/.fixtures/state/latest.bin"
 ```
 
-The fixture generator refuses to reuse an existing directory. It creates approximately 103 MiB of nonzero cache/model/tool data, 300 package folders, hardlinks, symlink loops and a 2 GiB logical sparse image. `.fixtures/` and build artifacts are gitignored. All development scans use fixtures or test temp directories.
+The fixture generator refuses to reuse an existing directory. It creates approximately 103 MiB of nonzero cache/model/tool data, 300 package folders, hardlinks, symlink loops and a 2 GiB logical sparse image. `.fixtures/` and build artifacts are gitignored. Automated filesystem tests use fixtures or test temp directories. The performance work also measured a metadata-only real home scan.
 
 ## v2
 
@@ -146,4 +146,20 @@ The fixture generator refuses to reuse an existing directory. It creates approxi
 - APFS clone-aware accounting
 - Generated cleanup scripts (explicit human review; the analyzer stays read-only)
 
-Other v1 limits: the full tree is held in memory and the browser loads the full cached snapshot; millions of tiny files can use substantial RAM. Charts cap very small segments and treemap entries for responsiveness, while the folder table provides all children. There is one latest cached scan, no live rescan endpoint and no filesystem watcher.
+The scanner keeps every entry in a compact indexed tree; it does not collapse file detail. The browser fetches bounded pages through `/api/node?id=…&depth=2` and draws charts on canvas. The folder table loads additional children on demand. JSON exports stream nodes without a second tree or whole-tree JSON buffer. There is one latest cached scan, no live rescan endpoint and no filesystem watcher.
+
+
+Performance measurements and reproduction commands are in [PERF.md](PERF.md).
+The default walk concurrency is twice the CPU count (maximum 64); use `--workers`
+to tune for the filesystem. Progress on stderr refreshes about five times per
+second through walking, aggregation, classification, cache writing and UI startup.
+The CLI sets a 704 MiB Go soft memory limit unless `GOMEMLIMIT` is already set;
+this controls heap growth, not a hard RSS ceiling. Every file remains available
+in full exports and the explorer.
+
+Generate a metadata-scale fixture separately from the realistic small fixture:
+
+```sh
+python3 scripts/synthetic.py .fixtures/large --large
+# roughly two million entries: add --projects 2000
+```

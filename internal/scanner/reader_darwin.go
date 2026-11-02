@@ -99,7 +99,7 @@ func parseBulk(r []byte) (metadata, error) {
 		return metadata{}, fmt.Errorf("invalid bulk name")
 	}
 	e := Entry{First: -1, Next: -1}
-	m := metadata{name: string(r[start : start+length-1]), entry: e, id: identity{uint64(u32(32)), u64(76)}}
+	m := metadata{name: string(r[start : start+length-1]), entry: e, id: identity{uint64(int64(int32(u32(32)))), u64(76)}}
 	switch u32(36) {
 	case 1:
 		m.entry.Kind = File

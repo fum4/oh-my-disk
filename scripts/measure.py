@@ -5,5 +5,5 @@ start = time.monotonic()
 p = subprocess.run(sys.argv[1:])
 r = resource.getrusage(resource.RUSAGE_CHILDREN)
 print(json.dumps(dict(wall_seconds=time.monotonic()-start, user_seconds=r.ru_utime,
-                      sys_seconds=r.ru_stime, peak_rss_bytes=r.ru_maxrss)), file=sys.stderr)
+                      sys_seconds=r.ru_stime, peak_rss_bytes=r.ru_maxrss * (1 if sys.platform == "darwin" else 1024))), file=sys.stderr)
 sys.exit(p.returncode)

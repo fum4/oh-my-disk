@@ -182,6 +182,9 @@ func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
 			}
 		}
 		if cmp == 0 {
+			if own {
+				return t.LessPath(a, b)
+			}
 			return t.Name(a) < t.Name(b)
 		}
 		if asc {

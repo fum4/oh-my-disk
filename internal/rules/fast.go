@@ -68,7 +68,7 @@ func (e *Engine) matchName(name string, project bool, best int, path func() stri
 			if strings.Count(p.literal, "/") == 1 {
 				ok = true
 			} else {
-				ok = strings.HasSuffix(get(), p.literal)
+				ok = strings.HasSuffix(get(), p.literal) || get() == p.literal[1:]
 			}
 		} else {
 			ok = get() == p.literal

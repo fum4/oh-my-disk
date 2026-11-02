@@ -184,3 +184,18 @@ func TestLargeFixtureBulkFallbackEquivalence(t *testing.T) {
 		}
 	}
 }
+
+func TestExclusionBasenamePrefilterIsExact(t *testing.T) {
+	root := t.TempDir()
+	for _, d := range []string{"a", "b"} {
+		os.Mkdir(root+"/"+d, 0700)
+		write(t, root+"/"+d+"/same", 4096)
+	}
+	r, e := Scan(context.Background(), root, Options{Exclude: []string{root + "/a/same"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if Find(r.Root, root+"/a/same") != nil || Find(r.Root, root+"/b/same") == nil {
+		t.Fatal("basename prefilter changed exclusion semantics")
+	}
+}

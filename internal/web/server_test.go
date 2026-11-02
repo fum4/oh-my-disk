@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/scanner"
@@ -88,4 +90,32 @@ func TestLazyPagesAndBudget(t *testing.T) {
 	if get("/api/category?name=unknown").Code != 200 {
 		t.Fatal("category route failed")
 	}
+}
+
+func TestLargeCachedResponseBounded(t *testing.T) {
+	path := os.Getenv("OMD_CACHE")
+	if path == "" {
+		t.Skip("set OMD_CACHE for an actual large-snapshot API measurement")
+	}
+	s, e := report.LoadCache(path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	h := handler(s, "127.0.0.1:1234", "secret")
+	r := httptest.NewRequest("GET", "http://127.0.0.1:1234/api/scan", nil)
+	r.AddCookie(&http.Cookie{Name: "omd", Value: "secret"})
+	w := httptest.NewRecorder()
+	start := time.Now()
+	h.ServeHTTP(w, r)
+	elapsed := time.Since(start)
+	var got report.Snapshot
+	if e = json.Unmarshal(w.Body.Bytes(), &got); e != nil {
+		t.Fatal(e)
+	}
+	count := 0
+	scanner.Walk(got.Scan.Root, func(*scanner.Node) { count++ })
+	if count > 1200 || len(got.Suggestions) > 100 {
+		t.Fatal("unbounded response")
+	}
+	t.Logf("%d source entries -> %d response nodes, %d bytes in %s", s.Scan.Entries, count, w.Body.Len(), elapsed)
 }

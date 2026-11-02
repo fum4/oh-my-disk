@@ -86,6 +86,7 @@ func TestFastMatchersAndAnalyzeEquivalent(t *testing.T) {
 func BenchmarkAnalyzeCompact(b *testing.B) {
 	e, _ := Load("", "/h")
 	tr := scanner.Compact(benchmarkTree())
+	tr.Paths = nil
 	now := time.Now()
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -111,4 +112,69 @@ func TestNestedDirectoryRulesKeepSpecificSuggestions(t *testing.T) {
 	if !reflect.DeepEqual(a, b) || !reflect.DeepEqual(c, d) || len(b) != 1 || b[0].Path != child.Path {
 		t.Fatalf("specific nested rule lost: %v %v", a, b)
 	}
+}
+
+func TestRootAndRelativeSuffixMatcherEquivalence(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "rules.yaml")
+	os.WriteFile(p, []byte("rules:\n - id: root-or-suffix\n   patterns: ['/', '**/Carthage/Build']\n   category: media\n   safety: user-data\n   explanation: custom root\n"), 0600)
+	e, err := Load(p, "/h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/", "Carthage/Build", "/Carthage/Build", "/x/Carthage/Build"} {
+		if e.Match(path, false) != e.referenceMatch(path, false) {
+			t.Fatalf("matcher differs at %s", path)
+		}
+	}
+}
+
+func TestWildcardScanRootAndNewProjectEquivalent(t *testing.T) {
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	compare := func(e *Engine, root *scanner.Node) {
+		t.Helper()
+		a, ac := e.analyzeReference(root, now, 0)
+		b, bc := e.AnalyzeTree(scanner.Compact(root), now, 0)
+		for i := range a {
+			a[i].LastActivity = a[i].LastActivity.UTC()
+		}
+		for i := range b {
+			b[i].LastActivity = b[i].LastActivity.UTC()
+		}
+		if !reflect.DeepEqual(a, b) || !reflect.DeepEqual(ac, bc) {
+			t.Fatalf("wildcard root/project semantics differ: %v %v / %v %v", a, ac, b, bc)
+		}
+
+		tr := scanner.Compact(root)
+		paths := tr.Paths
+		tr.Paths = nil
+		canonical := true
+		for id, path := range paths {
+			if tr.Path(int32(id)) != path {
+				canonical = false
+				break
+			}
+		}
+		if canonical {
+			c, cc := e.AnalyzeTree(tr, now, 0)
+			for i := range c {
+				c[i].LastActivity = c[i].LastActivity.UTC()
+			}
+			if !reflect.DeepEqual(a, c) || !reflect.DeepEqual(ac, cc) {
+				t.Fatal("production compact wildcard semantics differ")
+			}
+		}
+	}
+	e, _ := Load("", "/h")
+	compare(e, node("/h/.cache/app", 0, now, node("/h/.cache/app/blob", 100, now)))
+	compare(e, node("/Applications/Example.app", 0, now, node("/Applications/Example.app/binary", 100, now)))
+	// Legacy pointer trees can encode sparse levels; their explicit paths govern
+	// wildcard matching, just as in the original engine.
+	compare(e, node("/h", 0, now, node("/h/.cache/app", 100, now)))
+	p := filepath.Join(t.TempDir(), "rules.yaml")
+	os.WriteFile(p, []byte("rules:\n - id: project-wild\n   patterns: ['/h/projects/*']\n   project: true\n   category: caches\n   safety: cache\n   explanation: custom project\n"), 0600)
+	e, err := Load(p, "/h")
+	if err != nil {
+		t.Fatal(err)
+	}
+	compare(e, node("/h", 0, now, node("/h/projects", 0, now, node("/h/projects/app", 100, now, node("/h/projects/app/package.json", 1, now)))))
 }

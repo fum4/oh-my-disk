@@ -2,6 +2,7 @@ package rules
 
 import (
 	"github.com/fum4/oh-my-disk/internal/scanner"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -33,6 +34,7 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 			j := stack[len(stack)-1]
 			stack = stack[:len(stack)-1]
 			n := t.At(j.id)
+			wasProject := j.project >= 0
 			if n.Kind == scanner.Directory {
 				for c := n.First; c >= 0; c = t.At(c).Next {
 					if markers[t.Name(c)] {
@@ -40,6 +42,9 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 						break
 					}
 				}
+			}
+			if len(t.Paths) > 0 || (!wasProject && j.project >= 0) {
+				j.wild = e.parentMatch(filepath.Dir(t.Path(j.id)), j.project >= 0)
 			}
 			r := e.matchName(t.Name(j.id), j.project >= 0, j.wild, func() string { return t.Path(j.id) })
 			childWild := -1
@@ -61,7 +66,7 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 			break
 		}
 	}
-	states[0] = state{rule: int32(e.matchName(t.Name(0), project >= 0, -1, func() string { return t.RootPath })), project: project}
+	states[0] = state{rule: int32(e.matchName(t.Name(0), project >= 0, e.parentMatch(filepath.Dir(t.RootPath), project >= 0), func() string { return t.RootPath })), project: project}
 	roots = roots[:0]
 	for c := root.First; c >= 0; c = t.At(c).Next {
 		roots = append(roots, c)

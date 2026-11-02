@@ -32,12 +32,14 @@ func Scan(ctx context.Context, root string, opts Options) (*Result, error) {
 	t.Add(re)
 	res := &Result{Tree: t, Started: time.Now(), CrossMounts: opts.CrossMounts, Skipped: []Skipped{}}
 	excludes := map[string]bool{}
+	excludeNames := map[string]bool{}
 	for _, p := range opts.Exclude {
 		p, err = filepath.Abs(p)
 		if err != nil {
 			return nil, err
 		}
 		excludes[p] = true
+		excludeNames[filepath.Base(p)] = true
 	}
 	if excludes[root] {
 		return nil, fmt.Errorf("scan root is excluded: %s", root)
@@ -74,10 +76,11 @@ func Scan(ctx context.Context, root string, opts Options) (*Result, error) {
 	})
 	if skipData {
 		excludes["/System/Volumes/Data"] = true
+		excludeNames["Data"] = true
 	}
 	workers := opts.Workers
 	if workers <= 0 {
-		workers = 4 * runtime.NumCPU()
+		workers = 2 * runtime.NumCPU()
 	}
 	if workers > 64 {
 		workers = 64
@@ -166,7 +169,7 @@ func Scan(ctx context.Context, root string, opts Options) (*Result, error) {
 				e.NameLen = uint32(len(m.name))
 				offset += e.NameLen
 				p := ""
-				if len(excludes) > 0 || e.Kind == Directory {
+				if excludeNames[m.name] || e.Kind == Directory {
 					p = filepath.Join(b.job.path, m.name)
 				}
 				reason := ""
