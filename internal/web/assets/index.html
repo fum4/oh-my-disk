@@ -413,7 +413,6 @@
       </symbol>
     </svg>
     <aside class="side">
-      <div class="app-name">oh-my-disk</div>
       <nav class="group" aria-label="Main navigation">
         <button id="overview" class="nv active">
           <svg class="i" aria-hidden="true">
@@ -451,7 +450,7 @@
     <main class="main-content">
       <div class="bar intro">
         <div class="title">
-          <b id="view-title">Overview</b
+          <button id="overview-back" class="link" hidden>← Overview</button><b id="view-title">Overview</b
           ><span id="scan-info">Scan Home to see what’s taking space.</span>
         </div>
         <div class="sp"></div>
@@ -473,17 +472,16 @@
       </div>
       <section id="scan-options" class="options-strip" aria-label="Scan and display settings" hidden>
         <section id="desktop" hidden>
-          <label class="target-chip"
+          <div class="target-chip"
             ><svg class="i" aria-hidden="true">
               <use href="#regular-folder" /></svg
             ><select id="scan-root" aria-label="Scan target">
               <option value="home">Home</option>
               <option value="/">Macintosh HD</option>
               <option value="custom">Chosen folder</option>
-            </select></label
+            </select><button id="choose-folder" class="link">Change folder…</button></div
           >
           <span id="chosen-path"></span>
-          <button id="choose-folder" class="link" hidden>Change folder…</button>
           <button id="start-scan" hidden>Scan</button
           ><button id="open-last" class="link" hidden>Open last scan</button>
           <p id="desktop-error" role="alert"></p>
@@ -524,11 +522,20 @@
           </button>
         </div>
       </section>
-      <div id="scan-strip" hidden>
-        <progress id="scan-spinner" aria-label="Scan progress"></progress
-        ><span id="progress" role="status" aria-live="polite"></span
-        ><button id="cancel-scan" class="link" hidden>Cancel</button>
-      </div>
+      <section id="scan-strip" aria-label="Scan in progress" hidden>
+        <h2 id="scan-target">Home</h2>
+        <p id="progress" role="status" aria-live="polite">Walking folders…</p>
+        <div class="scan-orbit">
+          <svg id="scan-spinner" viewBox="0 0 280 280" role="progressbar" aria-label="Scanning folders">
+            <circle class="scan-track" cx="140" cy="140" r="124"/>
+            <circle class="scan-sweep" cx="140" cy="140" r="124"/>
+          </svg>
+          <div class="scan-count"><strong id="scan-count" class="num">0</strong><span>items</span></div>
+        </div>
+        <p id="scan-stats" class="num">0 folders · 0/s</p>
+        <p id="scan-path" title=""></p>
+        <button id="cancel-scan" class="link" hidden>Cancel</button>
+      </section>
       <div
         id="scan-feedback"
         class="banner banner-error"
@@ -549,14 +556,10 @@
         <button id="dismiss-access" class="icon-action" aria-label="Dismiss Full Disk Access warning" title="Dismiss warning">×</button>
       </aside>
       <section id="welcome" class="empty" hidden>
-        <h2 id="empty-title" hidden>Your disk, a little clearer.</h2>
-        <p id="empty-description" hidden>
-          Scan Home to explore your disk, on your own or with an agent.
-        </p>
         <div class="launch-cards" id="launch-cards">
           <article class="launch-card">
-            <h3>A place for every byte.</h3>
-            <p>Scan a folder to see what’s taking space.</p>
+            <h3 id="launch-title">A place for every byte.</h3>
+            <p id="launch-description">Scan a folder to see what’s taking space.</p>
             <div class="scan-command-bar" role="group" aria-label="Scan options">
               <details id="folder-picker">
                 <summary aria-label="Choose scan folder"><svg class="i" aria-hidden="true"><use href="#regular-folder-open"/></svg><span class="segment-label">Folder</span><b id="folder-choice">Home</b><svg class="i command-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></summary>
@@ -571,10 +574,6 @@
               <button id="plain-scan" class="btn pri">Scan<span class="kbd">⌘R</span></button>
             </div>
           </article>
-        </div>
-        <div id="empty-actions" class="empty-actions" hidden>
-          <button id="welcome-scan" class="btn sec">Choose Folder…</button>
-          <button id="empty-scan" class="btn pri">Scan</button>
         </div>
       </section>
       <div id="agent-control" class="agent-control" hidden>
@@ -592,7 +591,7 @@
             <span class="step">3</span>
             <h2>What you can clean</h2>
             <span class="r" id="rail-count"></span
-            ><button class="link" id="review-cleanup">Show all</button>
+            ><button class="link page-link" id="review-cleanup">See all in Cleanup <svg class="i nav-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></button>
           </div>
           <div class="gain">
             <div class="k">You could get back</div>
@@ -683,7 +682,7 @@
               <span class="step">2</span>
               <h2>What’s taking space</h2>
               <span class="r num" id="home-total"></span
-              ><button class="link" id="show-folders">Show all</button>
+              ><button class="link page-link" id="show-folders">See all in Folders <svg class="i nav-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></button>
             </div>
             <div class="fh">
               <span></span><span>Folder</span><span></span
@@ -774,20 +773,24 @@
         <div id="terminal-screen"></div>
       </section>
       <footer>
-        <span id="scan-status">Local scan · no data leaves this device</span
-        ><span
-          >Allocated ≠ guaranteed reclaimable ·
-          <button class="link" id="details-toggle">
-            Accounting notes
-          </button></span
-        >
+        <span id="scan-status">Local scan · no data leaves this device</span>
+        <span>Allocated ≠ guaranteed reclaimable</span>
       </footer>
-      <aside id="notes" hidden>
-        <p id="volume-values"></p>
-        <p id="volume-note"></p>
-        <p id="accounting"></p>
-        <div id="skipped"></div>
-      </aside>
+      <section id="counting-disclosure" aria-label="Scan accounting">
+        <div class="counting-heading">
+          <button class="link" id="details-toggle"></button>
+          <button id="notes-close" class="icon-action" aria-label="Close counting notes" hidden><svg class="i" aria-hidden="true"><use href="#regular-x"/></svg></button>
+        </div>
+        <div class="notes-reveal"><aside id="notes" hidden>
+          <h3>What's included</h3>
+          <div id="volume-values"></div>
+          <div id="accounting"></div>
+          <h3>Sizes</h3>
+          <div id="volume-note"></div>
+          <h3>What's skipped</h3>
+          <div id="skipped"></div>
+        </aside></div>
+      </section>
     </main>
     <dialog id="trash-confirm">
       <div class="dialog-icon">

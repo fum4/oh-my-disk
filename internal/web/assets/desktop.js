@@ -66,6 +66,7 @@ if (nativeApp) {
     chosen = path === "home" || path === "/" ? "" : path;
     $("scan-root").value = chosen ? "custom" : path;
     $("chosen-path").textContent = chosen;
+    try { localStorage.setItem("omd-scan-target", path); } catch {}
     $("scan-root").options[2].textContent = chosen
       ? chosen.split("/").filter(Boolean).pop()
       : "Chosen folder";
@@ -78,6 +79,7 @@ if (nativeApp) {
     );
     showMode(mode);
   }
+  try { const saved = localStorage.getItem("omd-scan-target"); if (saved) window.selectScanTarget(saved); } catch {}
   showMode(mode);
   scanState(false);
   async function pick() {
@@ -153,6 +155,7 @@ if (nativeApp) {
       const s = await nativeApp.State();
       home = s.home;
       window.scanHome = home;
+      const presentingScan = s.busy || (s.phase === "Complete" && s.revision !== revision);
       window.agentStateChanged?.(s);
       for (const id of [
         "start-scan",
@@ -160,28 +163,24 @@ if (nativeApp) {
         "choose-folder",
         "scan-root",
         "scan-another",
-        "empty-scan",
-        "welcome-scan",
         "landing-choose",
       ])
-        $(id).disabled = s.busy;
+        $(id).disabled = presentingScan;
       document
         .querySelectorAll(".location-open")
-        .forEach((b) => (b.disabled = s.busy));
+        .forEach((b) => (b.disabled = presentingScan));
       $("start-scan").textContent = s.hasScan ? "Scan again" : "Scan";
-      if (document.body.classList.contains("is-scanning") !== s.busy)
-        scanState(s.busy);
-      $("scan-strip").hidden = !s.busy;
+      if (document.body.classList.contains("is-scanning") !== presentingScan)
+        scanState(presentingScan);
+      $("scan-strip").hidden = !presentingScan;
       $("cancel-scan").hidden =
         !s.busy || s.phase === "Opening last cached scan";
       $("open-last").hidden = !s.hasScan || opened;
       $("export-json").disabled = !s.hasScan;
       $("export-summary").disabled = !s.hasScan;
-      $("progress").textContent = s.busy
-        ? `${s.phase} · ${s.entries.toLocaleString()} entries · ${s.directories.toLocaleString()} folders · ${Math.round(s.rate).toLocaleString()} entries/s`
-        : s.phase;
-      $("progress").title = s.path || "";
+      updateScanProgress(s);
       if (s.error) reportError(s.error);
+      else if (!s.busy && /Cancel[le]+d/i.test(s.phase)) showFeedback("Scan cancelled. Choose a folder when you’re ready.");
       $("access-banner").hidden = accessDismissed || !s.protected.length;
       if (s.revision !== revision && !loading) {
         if (opened || s.phase === "Complete") {
@@ -193,6 +192,7 @@ if (nativeApp) {
               showResults();
               window.addLocation(snapshot.scan.root.path);
             }
+            if (!s.busy) scanState(false);
             window.agentScanComplete?.();
           } finally {
             loading = false;

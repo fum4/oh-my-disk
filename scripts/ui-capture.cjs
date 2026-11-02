@@ -107,11 +107,14 @@ fs.mkdirSync(".build/screens", { recursive: true });
       await shot(`${prefix}-access-options`);
       await page.evaluate(() => {
         document.querySelector("#access-banner").hidden = true;
-        document.body.classList.add("is-scanning");
+        scanState(true);
+        updateScanProgress({busy: true, phase: "walking", entries: 608715, directories: 74457, rate: 60864, path: "/Users/fixture/Library/Application Support/Example/Cache"});
+        document.querySelector("#cancel-scan").hidden = false;
       });
+      await page.waitForFunction(() => Number(document.querySelector("#scan-count").textContent.replace(/\D/g, "")) >= 608700);
       await shot(`${prefix}-scanning`);
       await page.evaluate(() => {
-        document.body.classList.remove("is-scanning");
+        scanState(false);
         snapshot = undefined;
         showMode("overview");
       });
@@ -119,19 +122,23 @@ fs.mkdirSync(".build/screens", { recursive: true });
       for (const id of ["folders", "categories", "cleanup-tab"]) {
         await page.locator(`#${id}`).click();
         await page.evaluate(() => {
-          const description = document.querySelector("#empty-description");
+          const description = document.querySelector("#launch-description");
           const bounds = description.getBoundingClientRect();
           const welcome = document.querySelector("#welcome").getBoundingClientRect();
           assertLayout(bounds.left >= welcome.left && bounds.right <= welcome.right,
             "Empty description exceeds its page");
           assertLayout(description.scrollWidth <= description.clientWidth,
             "Empty description overflows");
-          const secondary = document.querySelector("#welcome-scan").getBoundingClientRect();
-          const primary = document.querySelector("#empty-scan").getBoundingClientRect();
-          assertLayout(secondary.left < primary.left && secondary.y === primary.y && secondary.height === primary.height,
-            "Empty actions must be secondary left and primary right, at equal height");
-          assertLayout(primary.left - secondary.right >= 8 && primary.left - secondary.right <= 12,
-            "Empty action gap");
+          const bar = document.querySelector(".scan-command-bar").getBoundingClientRect();
+          const primary = document.querySelector("#plain-scan").getBoundingClientRect();
+          assertLayout(document.querySelectorAll(".scan-command-bar").length === 1,
+            "Empty pages must reuse the landing command bar");
+          assertLayout(bar.left >= welcome.left && bar.right <= welcome.right,
+            "Command bar exceeds its page");
+          assertLayout(Math.abs(bar.left + bar.width / 2 - welcome.left - welcome.width / 2) < 2,
+            "Command bar must be centered");
+          assertLayout(primary.height === 44 && primary.y > bounds.bottom,
+            "Scan action must be inside the command bar below its copy");
           function assertLayout(ok, message) { if (!ok) throw Error(message); }
         });
         await shot(`${prefix}-empty-${id}`);

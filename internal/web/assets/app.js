@@ -8,6 +8,8 @@ let snapshot,
   sortKey = "bytes",
   sortAsc = false,
   shown = 200;
+const categoryLabel = (name) => name ? (/^ai models$/i.test(name) ? "AI models" : name.charAt(0).toUpperCase() + name.slice(1)) : name;
+const displayName = (node) => node.category_name ? categoryLabel(node.category_name) : node.name;
 const parents = new WeakMap(),
   colors = new WeakMap();
 const palette = [
@@ -57,7 +59,7 @@ function index(n, parent, base) {
 function tooltip(e, n) {
   const t = $("tooltip");
   t.replaceChildren(
-    document.createTextNode(n.path),
+    document.createTextNode(n.category_name ? categoryLabel(n.category_name) : n.path),
     dom("strong", "", fmt(n.bytes)),
     dom(
       "span",
@@ -137,9 +139,13 @@ function arc(r1, r2, a, b) {
 function canvasChart(w, h) {
   const canvas = dom("canvas");
   const scale = devicePixelRatio || 1;
-  canvas.width = w * scale;
-  canvas.height = h * scale;
-  canvas.style.width = "100%";
+  const panel = document.querySelector(".map-panel");
+  const cssSize = Math.max(120, Math.min((panel?.clientWidth || 384) - 24, (panel?.clientHeight || 500) - 120));
+  const drawScale = cssSize / w;
+  canvas.width = cssSize * scale;
+  canvas.height = cssSize * h / w * scale;
+  canvas.style.width = cssSize + "px";
+  canvas.style.height = cssSize * h / w + "px";
   canvas.style.maxWidth = Math.min(w, (540 * w) / h) + "px";
   canvas.style.aspectRatio = `${w} / ${h}`;
   canvas.setAttribute(
@@ -147,7 +153,7 @@ function canvasChart(w, h) {
     "Space map. Use the folder table to navigate with a keyboard.",
   );
   const ctx = canvas.getContext("2d");
-  ctx.scale(scale, scale);
+  ctx.scale(scale * drawScale, scale * drawScale);
   const regions = [];
   const hit = (e) => {
     const r = canvas.getBoundingClientRect();
@@ -155,7 +161,7 @@ function canvasChart(w, h) {
       y = ((e.clientY - r.top) * h) / r.height;
     return [...regions]
       .reverse()
-      .find((z) => ctx.isPointInPath(z.path, x * scale, y * scale));
+      .find((z) => ctx.isPointInPath(z.path, x * scale * drawScale, y * scale * drawScale));
   };
   canvas.onpointermove = (e) => {
     const z = hit(e);
@@ -168,11 +174,14 @@ function canvasChart(w, h) {
     const z = hit(e);
     if (z) navigate(z.node);
   };
-  return { canvas, ctx, regions };
+  return { canvas, ctx, regions, textScale: 1 / drawScale };
 }
 function sunburst() {
-  const { canvas, ctx, regions } = canvasChart(600, 600);
+  const { canvas, ctx, regions, textScale } = canvasChart(600, 600);
   let segments = 0;
+  const visibleDepth = (node, depth = 0) => depth >= 5 ? depth :
+    Math.max(depth, ...(node.children || []).filter(child => child.bytes > 0).map(child => visibleDepth(child, depth + 1)));
+  const band = (294 - 125) / Math.max(1, visibleDepth(current));
   function ring(n, start, end, depth, base) {
     if (depth > 5 || n.bytes <= 0) return;
     let angle = start;
@@ -184,7 +193,7 @@ function sunburst() {
           b = Math.min(next - 0.0018, angle + 2 * Math.PI - 0.0001);
         if (b > a) {
           const path = new Path2D(
-            arc(86 + (depth - 1) * 39, 86 + depth * 39 - 2, a, b),
+            arc(125 + (depth - 1) * band, 125 + depth * band - 2, a, b),
           );
           ctx.fillStyle = color;
           ctx.globalAlpha = 1 - (depth - 1) * 0.105;
@@ -200,28 +209,24 @@ function sunburst() {
   ring(current, 0, Math.PI * 2, 1, null);
   ctx.globalAlpha = 1;
   const center = new Path2D();
-  center.arc(300, 300, 81, 0, Math.PI * 2);
+  center.arc(300, 300, 120, 0, Math.PI * 2);
   const theme = getComputedStyle(document.documentElement);
   ctx.fillStyle = theme.getPropertyValue("--card").trim() || "#fff";
   ctx.fill(center);
-  ctx.strokeStyle = "#ffffff18";
+  ctx.strokeStyle = theme.getPropertyValue("--hair").trim();
   ctx.stroke(center);
   regions.push({ path: center, node: parents.get(current) || current });
   ctx.textAlign = "center";
   ctx.fillStyle = theme.getPropertyValue("--label").trim() || "#1d1d1f";
-  ctx.font = "300 25px Inter";
-  ctx.fillText(fmt(current.bytes), 300, 287);
-  const label = current.name || "/";
-  ctx.fillStyle = "#a5aebb";
-  ctx.font = "12px Inter";
-  ctx.fillText(label.length > 21 ? label.slice(0, 19) + "…" : label, 300, 311);
-  ctx.fillStyle = "#8a93a0";
-  ctx.font = "12px Inter";
-  ctx.fillText(
-    parents.has(current) ? "↑ Parent folder" : "Allocated on disk",
-    300,
-    334,
-  );
+  ctx.font = `500 ${Math.max(25, 15 * textScale)}px system-ui`;
+  ctx.fillText(fmt(current.bytes), 300, 300 - 10 * textScale, 228);
+  const label = displayName(current) || "/";
+  ctx.fillStyle = theme.getPropertyValue("--label-2").trim();
+  ctx.font = `${13 * textScale}px system-ui`;
+  const maxChars = Math.max(8, Math.floor(228 / (7 * textScale)));
+  ctx.fillText(label.length > maxChars ? label.slice(0, maxChars - 1) + "…" : label, 300, 300 + 13 * textScale);
+  ctx.font = `${11 * textScale}px system-ui`;
+  ctx.fillText(parents.has(current) ? "↑ Parent" : "Allocated", 300, 300 + 33 * textScale);
   return canvas;
 }
 // Squarified treemap: pack short rows to keep aspect ratios close to one.
@@ -280,7 +285,7 @@ function squarify(items, x, y, w, h) {
   return out;
 }
 function treemap() {
-  const { canvas, ctx, regions } = canvasChart(680, 500);
+  const { canvas, ctx, regions, textScale } = canvasChart(600, 600);
   const items = ordered(current)
     .filter((n) => n.bytes > 0)
     .slice(0, 199);
@@ -297,7 +302,7 @@ function treemap() {
       synthetic: true,
       more_parent: current,
     });
-  for (const [i, r] of squarify(items, 3, 3, 674, 494).entries()) {
+  for (const [i, r] of squarify(items, 3, 3, 594, 594).entries()) {
     if (r.w < 1 || r.h < 1) continue;
     const path = new Path2D();
     path.roundRect(
@@ -312,20 +317,20 @@ function treemap() {
     ctx.fill(path);
     ctx.globalAlpha = 1;
     regions.push({ path, node: r.n });
-    if (r.w > 65 && r.h > 44) {
-      const max = Math.floor(r.w / 7) - 2;
+    if (r.w > 80 * textScale && r.h > 48 * textScale) {
+      const max = Math.floor(r.w / (7 * textScale)) - 2;
       const name =
-        r.n.name.length > max
-          ? r.n.name.slice(0, Math.max(1, max - 1)) + "…"
-          : r.n.name;
+        displayName(r.n).length > max
+          ? displayName(r.n).slice(0, Math.max(1, max - 1)) + "…"
+          : displayName(r.n);
       const lightTile =
         parseInt(palette[i % palette.length].slice(1, 3), 16) > 145;
       ctx.fillStyle = lightTile ? "#080b10" : "#ffffff";
-      ctx.font = "600 12px system-ui";
-      ctx.fillText(name, r.x + 12, r.y + 23);
+      ctx.font = `600 ${13 * textScale}px system-ui`;
+      ctx.fillText(name, r.x + 12 * textScale, r.y + 23 * textScale);
       ctx.fillStyle = lightTile ? "#151a22" : "#e5e9f0";
-      ctx.font = "12px Inter";
-      ctx.fillText(fmt(r.n.bytes), r.x + 12, r.y + 42);
+      ctx.font = `${12 * textScale}px system-ui`;
+      ctx.fillText(fmt(r.n.bytes), r.x + 12 * textScale, r.y + 42 * textScale);
     }
   }
   return canvas;
@@ -348,12 +353,13 @@ function render() {
     const b = dom(
       "button",
       "",
-      n === root ? (mode === "categories" ? "Categories" : n.path) : n.name,
+      n === root ? (mode === "categories" ? "Categories" : n.path) : displayName(n),
     );
+    if (i === chain.length - 1) b.setAttribute("aria-current", "location");
     b.addEventListener("click", () => navigate(n));
     $("breadcrumbs").append(b);
   });
-  $("folder-name").textContent = current.name || "/";
+  $("folder-name").textContent = displayName(current) || "/";
   $("folder-size").textContent = fmt(current.bytes);
   $("folder-actions").replaceChildren();
   if (window.go?.main?.App && !current.synthetic)
@@ -368,12 +374,13 @@ function render() {
       const s = dom("span"),
         dot = dom("i", "dot");
       dot.style.background = palette[i % palette.length];
-      s.append(dot, document.createTextNode(c.name));
+      s.append(dot, document.createTextNode(displayName(c)));
       $("legend").append(s);
     });
   renderTable();
 }
 function renderTable() {
+  $("explorer").classList.toggle("category-summary", mode === "categories" && current === root);
   const children = [...(current.children || [])];
   children.sort((a, b) => {
     let val;
@@ -399,9 +406,9 @@ function renderTable() {
             ? itemIcon(n.name)
             : "file-text"),
       ),
-      dom("span", "filename", n.name + (n.kind === "symlink" ? " ↗" : "")),
+      dom("span", "filename", displayName(n) + (n.kind === "symlink" ? " ↗" : "")),
     );
-    b.title = n.path;
+    b.title = n.category_name ? categoryLabel(n.category_name) : n.path;
     b.addEventListener("click", () => navigate(n));
     name.append(selectionBox(n), b);
     const bar = dom("div", "size-bar"),
@@ -495,7 +502,46 @@ function categoryTree() {
   return r;
 }
 
-function showMode(next) {
+const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+let lastScanSubtitle = "", overviewScroll = [], restoreOverviewAfterFilter = false;
+function captureScroll() {
+  return [document.querySelector("main"), $("content-grid"), $("overview-folders"), $("suggestion-list")].map(node => [node, node.scrollTop]);
+}
+function pageFade() {
+  if (!reducedMotion()) $("content-grid").animate?.([{opacity: 0, transform: "translateY(4px)"}, {opacity: 1, transform: "none"}], {duration: 180, easing: "ease-out"});
+}
+function returnOverview() {
+  const filtersChanged = !!($("suggest-category").value || $("suggest-safety").value);
+  showMode("overview", false, true);
+  restoreOverviewAfterFilter = filtersChanged;
+  $("overview-back").hidden = true;
+  for (const [node, top] of overviewScroll) node.scrollTop = top;
+}
+$("overview-back").onclick = () => history.state?.omdOverview ? history.back() : returnOverview();
+window.addEventListener("popstate", e => {
+  if (e.state?.omdOverview) { showMode(e.state.page, true, true); $("overview-back").hidden = false; }
+  else if (!$("overview-back").hidden) returnOverview();
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape" || e.target.closest?.("dialog, #terminal-screen")) return;
+  if ($("details-toggle").getAttribute("aria-expanded") === "true") {
+    toggleNotes(false); $("details-toggle").focus(); return;
+  }
+  if (document.querySelector("details[open]")) return;
+  if (!$("overview-back").hidden) { e.preventDefault(); $("overview-back").click(); }
+});
+function showMode(next, fromOverview = false, historyNavigation = false) {
+  if (next !== mode) {
+    if (next !== "overview") restoreOverviewAfterFilter = false;
+    if (fromOverview && mode === "overview" && !historyNavigation) {
+      overviewScroll = captureScroll();
+      history.pushState({ omdOverview: true, page: next }, "");
+    } else if (!historyNavigation && history.state?.omdOverview) history.replaceState(null, "");
+    $("overview-back").hidden = !fromOverview;
+    pageFade();
+    document.querySelector("main").scrollTop = 0;
+    $("content-grid").scrollTop = 0;
+  }
   mode = next;
   $("scan-options").hidden = !snapshot;
   $("rescan-picker").open = false;
@@ -537,18 +583,18 @@ function showMode(next) {
     $("disk-caption").textContent = target + " is ready to scan";
     $("folder-choice").textContent = target;
     $("folder-picker").querySelector("summary").setAttribute("aria-label", "Choose scan folder, current: " + target);
-    $("empty-title").textContent = copy[0];
-    $("empty-description").textContent =
-      copy[1] + " Scan " + target + " to begin.";
     const landing = mode === "overview";
-    $("empty-title").hidden = landing;
-    $("empty-description").hidden = landing;
-    $("launch-cards").hidden = !landing;
-    $("empty-actions").hidden = landing;
+    $("launch-title").textContent = landing ? "A place for every byte." : copy[0];
+    $("launch-description").textContent = landing ? "Scan a folder to see what’s taking space." : copy[1];
+    $("launch-cards").hidden = false;
+    if (document.body.classList.contains("is-scanning")) scanningHeader();
     window.agentViewChanged?.();
     document.querySelector(".view-switch").hidden = true;
     return;
   }
+  $("scan-info").textContent = document.body.classList.contains("is-scanning")
+    ? "Scanning " + scanTarget + "…"
+    : {overview: lastScanSubtitle, folders: "Explore your folders by size.", categories: "See your space grouped by kind.", "cleanup-tab": "Review what you can safely clear."}[mode];
   window.agentViewChanged?.();
   $("overview-panel").hidden = mode !== "overview";
   $("explorer").hidden = mode === "cleanup-tab" || mode === "overview";
@@ -652,7 +698,7 @@ function renderSuggestions() {
       details.append(itemActions(s.path, s.suggested_command));
     title.append(
       name,
-      dom("div", "d", `${s.category}, ${s.stale_days} days unused`),
+      dom("div", "d", `${categoryLabel(s.category)}, ${s.stale_days} days unused`),
     );
     const safe =
       !s.personal &&
@@ -709,6 +755,10 @@ function renderSuggestions() {
       ),
     );
   updateSelection();
+  if (overview && restoreOverviewAfterFilter) {
+    for (const [node, top] of overviewScroll) node.scrollTop = top;
+    restoreOverviewAfterFilter = false;
+  }
 }
 $("sunburst").onclick = () => {
   view = "sunburst";
@@ -744,12 +794,62 @@ document.querySelectorAll("[data-sort]").forEach(
       }
     }),
 );
+// One label for the disclosure trigger and its accessible close action.
+const COUNTING_LABEL = "How we counted";
+$("details-toggle").textContent = COUNTING_LABEL;
+$("notes-close").setAttribute("aria-label", "Close " + COUNTING_LABEL);
 $("details-toggle").setAttribute("aria-expanded", "false");
 $("details-toggle").setAttribute("aria-controls", "notes");
-$("details-toggle").onclick = () => {
-  $("notes").hidden = !$("notes").hidden;
-  $("details-toggle").setAttribute("aria-expanded", String(!$("notes").hidden));
-};
+let notesTimer;
+function toggleNotes(open) {
+  clearTimeout(notesTimer);
+  const panel = $("counting-disclosure");
+  $("details-toggle").setAttribute("aria-expanded", String(open));
+  $("notes-close").hidden = !open;
+  $("notes").inert = !open;
+  if (open) {
+    $("notes").hidden = false;
+    // Establish the collapsed geometry before expanding the grid track.
+    panel.getBoundingClientRect();
+    panel.classList.add("open");
+  } else {
+    panel.classList.remove("open");
+    notesTimer = setTimeout(() => { $("notes").hidden = true; }, reducedMotion() ? 0 : 180);
+  }
+}
+$("details-toggle").onclick = () => toggleNotes($("details-toggle").getAttribute("aria-expanded") !== "true");
+$("notes-close").onclick = () => { toggleNotes(false); $("details-toggle").focus(); };
+function noteRow(label, sentence, value) {
+  const row = dom("div", "note-row");
+  row.append(dom("span", "note-term", label), dom("span", "note-copy", sentence));
+  if (value !== undefined) row.append(dom("span", "num note-value", value));
+  return row;
+}
+function renderCounting() {
+  const s = snapshot, v = s.volume;
+  $("volume-values").replaceChildren();
+  if (v) for (const [label, sentence, bytes] of [
+    ["Capacity", "Total space on this filesystem.", v.capacity],
+    ["Used", "Space currently allocated on the volume.", v.used],
+    ["Available", "Space available to your files.", v.available],
+    ["Outside scan", "System, other users, snapshots and inaccessible data.", v.outside],
+  ]) $("volume-values").append(noteRow(label, sentence, fmt(bytes)));
+  $("accounting").replaceChildren(
+    noteRow("Files", "Allocated blocks; cloud placeholders use logical bytes.", fmt(s.scan.root.bytes)),
+    noteRow("Read-only", "Nothing is removed without your Trash confirmation."));
+  $("volume-note").replaceChildren(
+    noteRow("Reclaim", "Shared blocks, clones and compression can change freed space."),
+    noteRow("APFS", "Shared and purgeable space can differ from macOS totals."),
+    noteRow("Last used", "Access times may be unavailable or affected by scanning."));
+  if (v?.excess) $("volume-note").append(noteRow("Overlap", "Shared blocks or placeholders exceed volume usage.", fmt(v.excess)));
+  const skipped = s.skipped_count || s.scan.skipped.length;
+  $("skipped").replaceChildren(noteRow("Paths", skipped ? "Some folders could not be read; totals are partial." : "All accessible paths were counted.", skipped.toLocaleString()));
+  for (const p of s.scan.skipped.slice(0, 500)) {
+    const row = noteRow(p.path, p.reason);
+    row.title = p.path + " — " + p.reason;
+    $("skipped").append(row);
+  }
+}
 function loadSnapshot() {
   return fetch("/api/scan")
     .then((r) => {
@@ -774,22 +874,18 @@ function loadSnapshot() {
               ? `${Math.floor(age / 60)} hours ago`
               : finished.toLocaleDateString();
       const seconds = Math.max(1, Math.round((finished - started) / 1000));
-      $("scan-info").textContent =
+      lastScanSubtitle = $("scan-info").textContent =
         `Last scan ${ago}, took ${seconds} ${seconds === 1 ? "second" : "seconds"}`;
       $("scan-info").title =
         s.scan.root.path + ", " + finished.toLocaleString();
-      $("web-root").value = s.scan.root.path;
+      if (window.go?.main?.App || !$("web-root").value) $("web-root").value = s.scan.root.path;
       $("welcome").hidden = true;
       $("content-grid").hidden = false;
-      $("accounting").textContent = s.note;
+      renderCounting();
       $("scan-status").textContent =
         s.skipped_count || s.scan.skipped.length
           ? `${s.skipped_count || s.scan.skipped.length} skipped paths · partial totals · local only`
           : "Local scan · no data leaves this device";
-      if (s.scan.skipped.length)
-        $("skipped").append(dom("h3", "", "Skipped paths"));
-      for (const p of s.scan.skipped.slice(0, 500))
-        $("skipped").append(dom("p", "", p.path + " — " + p.reason));
       selected.clear();
       updateSelection();
       for (const [id, values] of [
@@ -799,7 +895,7 @@ function loadSnapshot() {
         const select = $(id),
           value = select.value;
         select.replaceChildren(new Option("All", ""));
-        for (const v of values) select.add(new Option(v, v));
+        for (const v of values) select.add(new Option(id === "suggest-category" ? categoryLabel(v) : v, v));
         select.value = value;
       }
       await refreshSuggestions();
@@ -828,13 +924,6 @@ function renderVolume() {
   ]) {
     $(id).textContent = (bytes / 1e9).toFixed(2) + " GB";
   }
-  $("volume-values").textContent =
-    `${fmt(v.capacity)} capacity · ${fmt(v.used)} used · ${fmt(v.available)} available · ${fmt(v.outside)} outside scanned folder`;
-  $("volume-note").textContent =
-    snapshot.volume_note +
-    (v.excess
-      ? ` Scanned allocation exceeds used by ${fmt(v.excess)} (shared blocks or cloud placeholders).`
-      : "");
 }
 $("binary-units").checked = binaryUnits;
 for (const [id, on] of [
@@ -859,6 +948,7 @@ $("binary-units").onchange = (e) => {
   if (snapshot) {
     $("total").textContent = fmt(snapshot.scan.root.bytes);
     renderVolume();
+    renderCounting();
     renderOverview();
     renderSuggestions();
     render();
@@ -1018,6 +1108,18 @@ $("confirm-trash").onclick = async () => {
   }
 };
 if (!window.go?.main?.App) {
+  let target = "home";
+  try { target = localStorage.getItem("omd-scan-target") || "home"; } catch {}
+  window.scanTargetLabel = () => target === "home" ? "Home" : target === "/" ? "Macintosh HD" : target.split("/").filter(Boolean).pop() || "Home";
+  window.selectScanTarget = path => {
+    target = path;
+    $("web-root").value = path === "home" ? snapshot?.scan.root.path || "" : path;
+    $("folder-choice").textContent = window.scanTargetLabel();
+    try { localStorage.setItem("omd-scan-target", path); } catch {}
+    if (!snapshot) showMode(mode);
+  };
+  $("web-root").addEventListener("change", () => window.selectScanTarget($("web-root").value));
+  window.selectScanTarget(target);
   $("web-scan").hidden = false;
   $("web-start-scan").onclick = async () => {
     const b = $("web-start-scan");
@@ -1237,7 +1339,7 @@ function renderOverview() {
     );
     row.title = n.other ? "Explore all folders" : n.path;
     row.onclick = () => {
-      showMode("folders");
+      showMode("folders", true);
       if (!n.other) navigate(n);
     };
     list.append(row);
@@ -1255,9 +1357,39 @@ function showFeedback(message) {
     dom("span", "", message),
   );
 }
-function scanState(busy, message = "Scanning…") {
+let scanTarget = "Home", scanCounterTimer, displayedEntries = 0, desiredEntries = 0;
+function scanningHeader() { $("scan-info").textContent = "Scanning " + scanTarget + "…"; }
+function updateScanProgress(state) {
+  const phase = (state.phase || "walking").toLowerCase();
+  $("progress").textContent = !state.busy ? state.phase :
+    phase.includes("open") ? "Opening your scan…" :
+    /class|scor/.test(phase) ? "Scoring cleanup…" :
+    /aggreg|measur|siz|cache|writ/.test(phase) ? "Measuring sizes…" : "Walking folders…";
+  desiredEntries = Math.max(desiredEntries, Number(state.entries) || 0);
+  $("scan-spinner").setAttribute("aria-label", $("progress").textContent);
+  $("scan-stats").textContent = `${Number(state.directories || 0).toLocaleString()} folders · ${new Intl.NumberFormat(undefined, {notation: "compact", maximumFractionDigits: 0}).format(state.rate || 0)}/s`;
+  const path = state.path || "";
+  $("scan-path").title = path;
+  $("scan-path").textContent = path.length > 72 ? path.slice(0, 32) + "…" + path.slice(-37) : path;
+  if (state.busy) scanningHeader();
+}
+function scanState(busy) {
   document.body.classList.toggle("is-scanning", busy);
   if (busy) {
+    toggleNotes(false);
+    showFeedback("");
+    scanTarget = window.scanTargetLabel?.() || $("folder-choice").textContent || "Home";
+    $("scan-target").textContent = scanTarget;
+    scanningHeader();
+    displayedEntries = desiredEntries = 0;
+    $("scan-count").textContent = "0";
+    $("scan-stats").textContent = "0 folders · 0/s";
+    $("scan-path").textContent = "";
+    clearInterval(scanCounterTimer);
+    scanCounterTimer = setInterval(() => {
+      displayedEntries = reducedMotion() ? desiredEntries : Math.min(desiredEntries, displayedEntries + Math.max(1, Math.ceil((desiredEntries - displayedEntries) * .5)));
+      $("scan-count").textContent = displayedEntries.toLocaleString();
+    }, 100);
     $("folder-picker").open = false;
     $("rescan-picker").open = false;
   }
@@ -1270,18 +1402,21 @@ function scanState(busy, message = "Scanning…") {
   );
   if (!busy) $("hub-scan").append(dom("span", "kbd", "⌘R"));
   $("scan-strip").hidden = !busy;
-  $("empty-scan").disabled = busy;
   window.agentViewChanged?.();
-  if (busy) $("progress").textContent = message;
-  else showFeedback("");
+  if (busy) $("progress").textContent = "Walking folders…";
+  else {
+    clearInterval(scanCounterTimer);
+    showMode(mode);
+    pageFade();
+  }
 }
 $("review-cleanup").onclick = () => {
   $("suggest-category").value = "";
   $("suggest-safety").value = "";
-  showMode("cleanup-tab");
+  showMode("cleanup-tab", true);
   refreshSuggestions();
 };
-$("show-folders").onclick = () => showMode("folders");
+$("show-folders").onclick = () => showMode("folders", true);
 $("hub-scan").onclick = () => {
   const target = $(window.go?.main?.App ? "start-scan" : "web-start-scan");
   if (!target.disabled) return target.onclick();
@@ -1292,7 +1427,7 @@ async function chooseScanFolder() {
   $("web-root").focus();
   $("web-root").select();
 }
-$("scan-another").onclick = $("welcome-scan").onclick = chooseScanFolder;
+$("scan-another").onclick = chooseScanFolder;
 $("landing-choose").onclick = () => {
   $("folder-picker").open = false;
   return chooseScanFolder();
@@ -1301,7 +1436,6 @@ $("rescan-new").onclick = () => {
   $("rescan-picker").open = false;
   return chooseScanFolder();
 };
-$("empty-scan").onclick = () => $("hub-scan").click();
 // Portals keep menus above panels and out of scroll/overflow containers.
 function floatingMenu(picker, onOpen = () => {}) {
   const menu = picker.querySelector(".agent-menu");
@@ -1423,3 +1557,14 @@ document.addEventListener("keydown", (e) => {
     target.focus();
   }
 });
+
+if (window.ResizeObserver) {
+  let mapSize = "", mapFrame;
+  new ResizeObserver(entries => {
+    const r = entries[0].contentRect, size = `${Math.round(r.width)}:${Math.round(r.height)}`;
+    if (size === mapSize || !r.width || !r.height) return;
+    mapSize = size;
+    cancelAnimationFrame(mapFrame);
+    mapFrame = requestAnimationFrame(() => { if (snapshot && !$("explorer").hidden) render(); });
+  }).observe(document.querySelector(".map-panel"));
+}

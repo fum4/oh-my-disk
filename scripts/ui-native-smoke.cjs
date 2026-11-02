@@ -99,21 +99,21 @@ const wait = async (fn) => {
     assert.equal($("view-title").textContent, "Folders");
     assert.equal($("scan-feedback").hidden, true);
     assert.equal(d.querySelector("details.scan-options"), null);
-    assert.match($("empty-description").textContent, /folders.*Home/);
-    assert.equal($("empty-description").hidden, false);
-    assert.equal($("empty-title").hidden, false);
-    assert.equal($("launch-cards").hidden, true);
-    assert.equal($("empty-actions").hidden, false);
-    assert.deepEqual(
-      [...$("empty-actions").children].map((b) => b.id),
-      ["welcome-scan", "empty-scan"],
-    );
+    assert.match($("launch-description").textContent, /folders/);
+    assert.equal($("launch-cards").hidden, false);
+    assert.equal($("empty-actions"), null);
+    const sharedCommand = d.querySelector(".scan-command-bar");
+    const sharedAgent = $("agent-control");
     assert.equal($("welcome").classList.contains("card"), false);
     assert($("access-banner").compareDocumentPosition($("welcome")) & w.Node.DOCUMENT_POSITION_FOLLOWING);
     for (const id of ["categories", "cleanup-tab", "overview"]) {
       $(id).click();
       assert.equal($(id).getAttribute("aria-current"), "page");
       assert.equal($("content-grid").hidden, true);
+      assert.equal(d.querySelector(".scan-command-bar"), sharedCommand);
+      assert.equal($("agent-control"), sharedAgent);
+      assert.equal($("launch-cards").hidden, false);
+      assert.equal($("empty-actions"), null);
       assert.equal($("ask-agent").hidden, true);
     }
     assert.equal($("ask-agent").hidden, true);
@@ -187,6 +187,8 @@ const wait = async (fn) => {
   assert.equal($("ask-agent").hidden, true);
   assert.equal($("web-scan").hidden, true);
   assert.equal($("desktop").hidden, false);
+  assert.equal($("choose-folder").hidden, false);
+  assert.equal($("choose-folder").parentElement, $("scan-root").parentElement);
   $("folders").click(); // Safe before a snapshot has been opened.
   await $("open-last").onclick();
   await wait(() => d.querySelector("#overview-folders .fr"));
@@ -206,7 +208,20 @@ const wait = async (fn) => {
   await $("hub-scan").onclick();
   await wait(() => !$("cancel-scan").hidden);
   assert.equal($("hub-scan").disabled, true);
-  assert.match($("progress").textContent, /Walking · 42 entries/);
+  assert.equal($("progress").textContent, "Walking folders…");
+  assert.equal($("scan-target").textContent, "home");
+  assert.equal($("scan-info").textContent, "Scanning home…");
+  await wait(() => $("scan-count").textContent === "42");
+  assert.equal($("scan-stats").textContent, "8 folders · 20/s");
+  assert.equal($("scan-path").title, fixture);
+  assert.equal($("scan-spinner").getAttribute("aria-valuenow"), null);
+  $("categories").click();
+  assert.equal($("categories").getAttribute("aria-current"), "page");
+  assert.equal($("scan-info").textContent, "Scanning home…");
+  state.phase = "classifying";
+  await wait(() => $("progress").textContent === "Scoring cleanup…");
+  state.phase = "writing cache";
+  await wait(() => $("progress").textContent === "Measuring sizes…");
   await $("cancel-scan").onclick();
   await wait(() => $("cancel-scan").hidden);
   assert.equal($("hub-scan").disabled, false);

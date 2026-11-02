@@ -77,7 +77,7 @@ const wait = async (fn) => {
       (a, b) => b[1] - a[1],
     )[0][0];
     [...d.querySelectorAll("#children .filename")]
-      .find((n) => n.textContent === largest)
+      .find((n) => n.textContent.toLowerCase() === largest.toLowerCase())
       .click();
     await wait(() => d.querySelectorAll("#children .filename").length === 200);
     more().click();
@@ -146,6 +146,22 @@ const wait = async (fn) => {
     new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
   );
   assert.equal(d.activeElement, firstOverviewRow.nextElementSibling);
+  // Overview links are navigation, with a reversible history entry.
+  $("overview-folders").scrollTop = 48;
+  $("show-folders").click();
+  assert.equal($("view-title").textContent, "Folders");
+  assert.equal($("folders").getAttribute("aria-current"), "page");
+  assert.equal($("overview-back").hidden, false);
+  assert.match($("scan-info").textContent, /Explore your folders/);
+  $("overview-back").click();
+  await wait(() => $("view-title").textContent === "Overview");
+  assert.equal($("overview-folders").scrollTop, 48);
+  $("review-cleanup").click();
+  assert.equal($("view-title").textContent, "Cleanup");
+  assert.equal($("cleanup-tab").getAttribute("aria-current"), "page");
+  d.dispatchEvent(new w.KeyboardEvent("keydown", {key: "Escape"}));
+  await wait(() => $("view-title").textContent === "Overview");
+  assert.equal($("overview-back").hidden, true);
   $("folders").click();
   assert.ok(d.querySelector("#chart canvas"));
   assert.equal($("overview-panel").hidden, true);
@@ -161,6 +177,8 @@ const wait = async (fn) => {
   assert.ok(d.querySelector("#chart canvas"));
   assert.equal($("treemap").getAttribute("aria-pressed"), "true");
   $("categories").click();
+  assert.equal($("explorer").classList.contains("category-summary"), true);
+  for (const label of d.querySelectorAll("#children .filename")) assert.match(label.textContent, /^[A-Z]/);
   const category = d.querySelector("#children .filename");
   category.click();
   await wait(() => $("folder-name").textContent === category.textContent);
@@ -199,6 +217,18 @@ const wait = async (fn) => {
   $("details-toggle").click();
   assert.equal($("notes").hidden, false);
   assert.ok($("accounting").textContent);
+  assert.equal($("details-toggle").textContent, "How we counted");
+  assert.equal($("details-toggle").getAttribute("aria-expanded"), "true");
+  assert.equal($("counting-disclosure").classList.contains("open"), true);
+  assert.ok(d.querySelectorAll("#notes .note-row").length >= 5);
+  $("notes-close").click();
+  await wait(() => $("notes").hidden);
+  $("details-toggle").click();
+  d.dispatchEvent(new w.KeyboardEvent("keydown", {key: "Escape"}));
+  await wait(() => $("notes").hidden);
+  $("details-toggle").click();
+  $("details-toggle").click();
+  await wait(() => $("notes").hidden);
   const fixture = process.cwd() + "/.fixtures/home";
   assert.ok(
     $("scan-info").title.startsWith(fixture),
