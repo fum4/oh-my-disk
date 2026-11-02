@@ -1,4 +1,4 @@
-// Package web exposes a read-only, loopback-only view of an immutable snapshot.
+// Package web exposes loopback-only disk analysis with explicit, authenticated actions.
 package web
 
 import (
@@ -31,7 +31,7 @@ type Options struct {
 
 func handler(s *report.Snapshot, host, token string) http.Handler {
 	mux := http.NewServeMux()
-	installAPI(mux, s)
+	mux.Handle("/api/", controller(s, nil))
 	sub, _ := fs.Sub(assets, "assets")
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,7 @@ func handler(s *report.Snapshot, host, token string) http.Handler {
 			http.Error(w, "invalid host", http.StatusForbidden)
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && (r.Method != http.MethodPost || (r.URL.Path != "/api/trash" && r.URL.Path != "/api/rescan")) {
 			http.Error(w, "read-only", http.StatusMethodNotAllowed)
 			return
 		}
@@ -55,6 +55,10 @@ func handler(s *report.Snapshot, host, token string) http.Handler {
 				http.Error(w, "Open the private URL printed by oh-my-disk", http.StatusForbidden)
 				return
 			}
+		}
+		if r.Method == "POST" && r.Header.Get("Origin") != "" && r.Header.Get("Origin") != "http://"+host {
+			http.Error(w, "invalid origin", 403)
+			return
 		}
 		mux.ServeHTTP(w, r)
 	})
@@ -72,12 +76,12 @@ func Serve(ctx context.Context, s *report.Snapshot, o Options) error {
 	token := hex.EncodeToString(tokenBytes)
 	url := "http://" + ln.Addr().String() + "/?token=" + token
 	if o.JSON != "" {
-		if err = report.WriteJSON(o.JSON, map[string]any{"url": url, "root": s.Scan.Root.Path, "read_only": true}); err != nil {
+		if err = report.WriteJSON(o.JSON, map[string]any{"url": url, "root": s.Scan.Root.Path, "read_only_scanning": true, "explicit_trash": true}); err != nil {
 			ln.Close()
 			return err
 		}
 	} else {
-		fmt.Fprintln(os.Stdout, "Read-only disk explorer:", url, "\nPress Ctrl-C to stop.")
+		fmt.Fprintln(os.Stdout, "Disk explorer (read-only scans; explicit Move to Trash):", url, "\nPress Ctrl-C to stop.")
 	}
 	server := &http.Server{Handler: handler(s, ln.Addr().String(), token), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second}
 	done := make(chan struct{})
@@ -109,9 +113,14 @@ func Serve(ctx context.Context, s *report.Snapshot, o Options) error {
 
 // Assets and SnapshotHandler are shared by the native WebView. No TCP listener,
 // browser cookies or authentication token are needed within that process.
-func Assets() fs.FS { sub, _ := fs.Sub(assets, "assets"); return sub }
-func SnapshotHandler(s *report.Snapshot) http.Handler {
+func Assets() fs.FS                                   { sub, _ := fs.Sub(assets, "assets"); return sub }
+func SnapshotHandler(s *report.Snapshot) http.Handler { return controller(s, nil) }
+func SnapshotHandlerRead(s *report.Snapshot) http.Handler {
 	mux := http.NewServeMux()
 	installAPI(mux, s)
 	return mux
+}
+
+func ManagedHandler(s *report.Snapshot, updated func(*report.Snapshot)) http.Handler {
+	return controller(s, updated)
 }

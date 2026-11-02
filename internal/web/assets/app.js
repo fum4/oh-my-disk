@@ -24,7 +24,7 @@ const palette = [
   "#80b8a9",
   "#b4bf71",
 ];
-let binaryUnits = localStorage.getItem("binaryUnits") === "true";
+let binaryUnits = false;
 const fmt = (b) => {
  const base = binaryUnits ? 1024 : 1000;
  const units = binaryUnits ? ["KiB","MiB","GiB","TiB","PiB","EiB"] : ["kB","MB","GB","TB","PB","EB"];
@@ -212,7 +212,7 @@ function treemap() {
 }
 
 function render() {
-  if (mode === "contenders") return;
+  if (mode === "cleanup-tab") return;
   ordered(current).forEach((n, i) =>
     colors.set(n, palette[i % palette.length]),
   );
@@ -277,7 +277,7 @@ function renderTable() {
     );
     b.title = n.path;
     b.addEventListener("click", () => navigate(n));
-    name.append(b);
+    name.append(selectionBox(n), b);
     const bar = dom("div", "size-bar"),
       fill = dom("i");
     fill.style.width =
@@ -338,13 +338,13 @@ function categoryTree() {
 
 function showMode(next) {
   mode = next;
-  ["folders", "categories", "contenders"].forEach((id) =>
+  ["folders", "categories", "cleanup-tab"].forEach((id) =>
     $(id).classList.toggle("active", id === mode),
   );
-  $("explorer").hidden = mode === "contenders";
-  $("suggestions").hidden = mode !== "contenders";
-  document.querySelector(".view-switch").hidden = mode === "contenders";
-  if (mode === "contenders") return;
+  $("explorer").hidden = mode === "cleanup-tab";
+  $("suggestions").hidden = mode !== "cleanup-tab";
+  document.querySelector(".view-switch").hidden = mode === "cleanup-tab";
+  if (mode === "cleanup-tab") return;
   root = mode === "categories" ? categoryTree() : snapshot.scan.root;
   current = root;
   shown = 200;
@@ -353,15 +353,15 @@ function showMode(next) {
 function renderSuggestions() {
   const list = $("suggestion-list");
   list.replaceChildren();
-  snapshot.suggestions.slice(0, 100).forEach((s, i) => {
-    const card = dom("article", "suggestion-card"),
-      body = dom("div"),
+  suggestionItems.forEach((s, i) => {
+    const card = dom("tr", "suggestion-card"),
+      body = dom("td"),
       badges = dom("div", "badges");
-    body.append(dom("h3", "", s.path));
+    body.append(selectionBox(s), dom("h3", "", s.path));
     badges.append(
       dom("span", "badge " + s.safety, s.safety.toUpperCase()),
       dom("span", "badge", s.category),
-      dom("span", "badge", s.stale_days + " DAYS SINCE ACTIVITY"),
+      dom("span", "badge", s.badge),
     );
     if (s.incomplete)
       badges.append(dom("span", "badge user-data", "PARTIAL SCAN"));
@@ -370,19 +370,11 @@ function renderSuggestions() {
       body.append(dom("p", "", "Project activity: " + s.project_path));
     if (s.suggested_command) body.append(dom("code", "", s.suggested_command));
     if (window.go?.main?.App) body.append(itemActions(s.path, s.suggested_command));
-    const size = dom("div", "suggestion-size", fmt(s.bytes));
-    size.append(
-      dom("small", "", "score " + Math.round(s.score).toLocaleString()),
-    );
-    card.append(
-      dom("span", "rank", String(i + 1).padStart(2, "0")),
-      body,
-      size,
-    );
+    card.append(body,dom("td","suggestion-score",Math.round(s.score)+"/100"),dom("td","suggestion-size",fmt(s.bytes)),dom("td","suggestion-stale",s.stale_days+" days"));
     list.append(card);
   });
-  if (!snapshot.suggestions.length)
-    list.append(dom("p", "empty", "No contenders above the scan threshold."));
+  if (!suggestionItems.length)
+    {const row=dom("tr"),cell=dom("td","empty","No cleanup suggestions match these filters above the scan threshold.");cell.colSpan=4;row.append(cell);list.append(row)}
 }
 $("sunburst").onclick = () => {
   view = "sunburst";
@@ -396,7 +388,7 @@ $("treemap").onclick = () => {
   $("sunburst").classList.remove("active");
   render();
 };
-["folders", "categories", "contenders"].forEach(
+["folders", "categories", "cleanup-tab"].forEach(
   (m) => ($(m).onclick = () => showMode(m)),
 );
 document.querySelectorAll("[data-sort]").forEach(
@@ -434,7 +426,11 @@ function loadSnapshot() { return fetch("/api/scan")
       $("skipped").append(dom("h3", "", "Skipped paths"));
     for (const p of s.scan.skipped.slice(0, 500))
       $("skipped").append(dom("p", "", p.path + " — " + p.reason));
-    renderSuggestions();
+    selected.clear(); updateSelection();
+    for(const [id,values] of [["suggest-category",Object.keys(s.categories)],["suggest-safety",["cache","reinstallable","user-data","unknown"]]]) {
+     const select=$(id),value=select.value;select.replaceChildren(new Option("All", ""));for(const v of values)select.add(new Option(v,v));select.value=value;
+    }
+    refreshSuggestions();
     showMode("folders");
   })
   .catch((e) => {
@@ -447,7 +443,7 @@ function renderVolume() {
  const v = snapshot.volume;
  $("volume").hidden = false;
  $("volume-values").textContent = `${fmt(v.capacity)} capacity · ${fmt(v.used)} used · ${fmt(v.available)} available · ${fmt(v.outside)} outside scanned folder`;
- $("volume-note").textContent = "Live volume totals. Outside includes inaccessible data, snapshots and filesystem overhead. APFS shared volumes, purgeable space and clones can differ from About This Mac." + (v.excess ? ` Scanned allocation exceeds used by ${fmt(v.excess)} (shared blocks or cloud placeholders).` : "");
+ $("volume-note").textContent = snapshot.volume_note + (v.excess ? ` Scanned allocation exceeds used by ${fmt(v.excess)} (shared blocks or cloud placeholders).` : "");
 }
 $("binary-units").checked = binaryUnits;
 $("binary-units").onchange = (e) => {
@@ -455,3 +451,41 @@ $("binary-units").onchange = (e) => {
  if(snapshot){$("total").textContent=fmt(snapshot.scan.root.bytes);renderVolume();renderSuggestions();render();}
 };
 if (!window.go?.main?.App) loadSnapshot();
+
+let suggestionSort="score",suggestionAsc=false,suggestionItems=[];
+let suggestionVersion=0;
+async function refreshSuggestions(){
+ const version=++suggestionVersion;
+ try{const r=await fetch(`/api/suggest?sort=${suggestionSort}&asc=${Number(suggestionAsc)}&category=${encodeURIComponent($("suggest-category").value)}&safety=${encodeURIComponent($("suggest-safety").value)}&limit=500`);if(!r.ok)throw Error(await r.text());const items=await r.json();if(version!==suggestionVersion)return;suggestionItems=items;renderSuggestions();}
+ catch(e){$("scan-info").textContent=e.message}
+}
+for(const b of document.querySelectorAll("[data-suggest-sort]"))b.onclick=()=>{suggestionAsc=b.dataset.suggestSort===suggestionSort?!suggestionAsc:false;suggestionSort=b.dataset.suggestSort;for(const c of document.querySelectorAll("[data-suggest-sort]"))c.classList.toggle("active",c.dataset.suggestSort===suggestionSort);refreshSuggestions()};
+$("suggest-category").onchange=$("suggest-safety").onchange=()=>refreshSuggestions();
+const selected=new Map();
+function selectionBox(n){
+ const box=dom("input");box.type="checkbox";box.dataset.selectionPath=n.path;box.setAttribute("aria-label","Select "+n.path);box.checked=selected.has(n.path);
+ box.disabled=!!n.synthetic||n.kind==="symlink"||n.path===snapshot?.scan.root.path;
+ box.onchange=()=>{
+  if(box.checked){for(const p of selected.keys())if(n.path.startsWith(p+"/")||p.startsWith(n.path+"/")){box.checked=false;$("trash-results").textContent="Select separate items without parent/child overlaps.";return}selected.set(n.path,n.bytes)}else selected.delete(n.path);
+  updateSelection();
+ };return box;
+}
+function updateSelection(){
+ for(const box of document.querySelectorAll("[data-selection-path]"))box.checked=selected.has(box.dataset.selectionPath);
+ $("selection-bar").hidden=selected.size===0;$("selection-total").textContent=`${selected.size} selected · ${fmt([...selected.values()].reduce((a,b)=>a+b,0))}`;
+}
+async function action(path,data){const r=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json","X-OMD-Action":"1"},body:JSON.stringify(data)});if(!r.ok)throw Error(await r.text());return r.json()}
+$("clear-selection").onclick=()=>{selected.clear();updateSelection();renderSuggestions();render()};
+$("trash-selected").onclick=()=>{$("confirm-total").textContent=$("selection-total").textContent;$("confirm-paths").textContent=[...selected.keys()].join("\n");$("trash-confirm").showModal()};
+$("cancel-trash").onclick=()=>$("trash-confirm").close();
+$("confirm-trash").onclick=async()=>{
+ const b=$("confirm-trash");b.disabled=true;
+ try{const result=await action("/api/trash",{paths:[...selected.keys()]});$("trash-confirm").close();await loadSnapshot();
+  const message=(result.results||[]).map(r=>r.path+": "+(r.trashed?"Moved to Trash":"Failed: "+r.error)+(r.trashed&&r.error?" · "+r.error:"")).join("\n")+(result.scan_error?"\nTotals could not refresh: "+result.scan_error:"");
+  $("trash-results").textContent=message;$("selection-bar").hidden=false;
+ }catch(e){$("trash-results").textContent=String(e);$("selection-bar").hidden=false;$("trash-confirm").close()}finally{b.disabled=false}
+};
+if(!window.go?.main?.App){
+ $("web-scan").hidden=false;
+ $("web-start-scan").onclick=async()=>{const b=$("web-start-scan");b.disabled=true;$("web-scan-status").textContent="Scanning…";try{const result=await action("/api/rescan",{root:$("web-root").value});if(result.scan_error)throw Error(result.scan_error);await loadSnapshot();$("web-scan-status").textContent="Complete"}catch(e){$("web-scan-status").textContent=String(e)}finally{b.disabled=false}};
+}

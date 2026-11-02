@@ -119,3 +119,51 @@ func TestLargeCachedResponseBounded(t *testing.T) {
 	}
 	t.Logf("%d source entries -> %d response nodes, %d bytes in %s", s.Scan.Entries, count, w.Body.Len(), elapsed)
 }
+
+func TestMutationRequiresTokenAndCSRFHeader(t *testing.T) {
+	s := &report.Snapshot{Scan: &scanner.Result{Root: &scanner.Node{Path: "/fixture"}}}
+	h := handler(s, "127.0.0.1:1234", "secret")
+	for _, tc := range []struct {
+		cookie, header, origin string
+		code                   int
+	}{
+		{"", "1", "", 403}, {"secret", "", "", 403}, {"secret", "1", "http://evil.example", 403}, {"secret", "1", "http://127.0.0.1:1234", 200},
+	} {
+		r := httptest.NewRequest("POST", "http://127.0.0.1:1234/api/trash", strings.NewReader(`{"paths":[]}`))
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("X-OMD-Action", tc.header)
+		r.Header.Set("Origin", tc.origin)
+		if tc.cookie != "" {
+			r.AddCookie(&http.Cookie{Name: "omd", Value: tc.cookie})
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if w.Code != tc.code {
+			t.Fatalf("%+v => %d %s", tc, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestRescanPublishesNewTree(t *testing.T) {
+	root := t.TempDir()
+	s := &report.Snapshot{Scan: &scanner.Result{Root: &scanner.Node{Path: "/old", Kind: "directory"}}}
+	h := SnapshotHandler(s)
+	p := root + "/new-file"
+	if err := os.WriteFile(p, []byte("new scan"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(map[string]string{"root": root})
+	r := httptest.NewRequest("POST", "/api/rescan", strings.NewReader(string(body)))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("X-OMD-Action", "1")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	if w.Code != 200 || strings.Contains(w.Body.String(), `"scan_error":"`) == false {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/scan", nil))
+	if w.Code != 200 || !strings.Contains(w.Body.String(), "new-file") || strings.Contains(w.Body.String(), `"path":"/old"`) {
+		t.Fatal("rescan did not replace tree", w.Code, w.Body.String())
+	}
+}

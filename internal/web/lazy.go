@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"github.com/fum4/oh-my-disk/internal/report"
+	"github.com/fum4/oh-my-disk/internal/rules"
 	"github.com/fum4/oh-my-disk/internal/scanner"
 	"net/http"
 	"sort"
@@ -42,7 +43,29 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 			*report.Snapshot
 			SkippedCount int            `json:"skipped_count"`
 			Volume       *report.Volume `json:"volume,omitempty"`
-		}{&out, len(s.Scan.Skipped), volume(s)})
+			VolumeNote   string         `json:"volume_note"`
+		}{&out, len(s.Scan.Skipped), volume(s), report.VolumeNote})
+	})
+	mux.HandleFunc("/api/suggest", func(w http.ResponseWriter, r *http.Request) {
+		limit, ok := param(r, "limit", 100, 1, 500)
+		if !ok {
+			http.Error(w, "invalid limit", 400)
+			return
+		}
+		v, err := rules.Select(s.Suggestions, r.URL.Query().Get("sort"), r.URL.Query().Get("category"), r.URL.Query().Get("safety"), 0)
+		if err != nil {
+			http.Error(w, err.Error(), 400)
+			return
+		}
+		if r.URL.Query().Get("asc") == "1" {
+			for i, j := 0, len(v)-1; i < j; i, j = i+1, j-1 {
+				v[i], v[j] = v[j], v[i]
+			}
+		}
+		if len(v) > limit {
+			v = v[:limit]
+		}
+		respond(w, v)
 	})
 	mux.HandleFunc("/api/node", func(w http.ResponseWriter, r *http.Request) {
 		id, a := param(r, "id", 0, 0, int(t.Count)-1)

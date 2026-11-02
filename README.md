@@ -1,6 +1,6 @@
 # oh-my-disk
 
-A local, read-only disk-space analyzer for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a native Wails macOS desktop app and a DaisyDisk-inspired explorer shared with the CLI.
+A local disk-space analyzer with read-only scanning and explicit Move to Trash for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a native Wails macOS desktop app and a DaisyDisk-inspired explorer shared with the CLI.
 
 **It never deletes, moves, or edits scanned content.** There is no cleanup subcommand, execution hook, cleanup API, or generated cleanup script. Suggested commands are plain text for a human to review. The desktop app only invokes macOS `open` for Reveal in Finder and Full Disk Access settings. The CLI browser UI invokes the platform browser opener. Suggested cleanup commands are never run.
 
@@ -51,12 +51,12 @@ selection. A previous compact CLI/app cache loads without rescanning and is
 available through **Open last cached scan**. Cache timestamps remain visible;
 volume totals are read live when the result is opened.
 
-Every real item (including the current folder and contenders) has **Reveal in
+Every real item (including the current folder and cleanup suggestions) has **Reveal in
 Finder** and **Copy path** actions. Suggested commands can be copied as text.
 **Export JSON** writes the full tree; **Export LLM summary** writes a bounded
-summary with up to 50 top entries and 50 contenders. Both use native save dialogs and refuse to overwrite an
+summary with up to 50 top entries and 50 cleanup suggestions. Both use native save dialogs and refuse to overwrite an
 existing file, even if the save dialog offers Replace. Choose a new filename.
-No deletion or Trash operations are implemented.
+Select folder table rows or Cleanup suggestions with checkboxes. The sticky selection bar shows count and total size; **Move to Trash** opens a dialog listing every path and the total. Nothing moves until you confirm. Per-item failures remain visible. Successful moves trigger a fresh scan to update totals.
 
 The app probes protected `~/Library` folders. If macOS denies access, a banner
 links to **System Settings → Privacy & Security → Full Disk Access**. Enable the
@@ -65,14 +65,14 @@ probe, not a guarantee that every folder is readable. The app never changes
 permissions. The CLI's Terminal permission is separate from the app's permission.
 
 Sizes default to decimal **MB/GB**, matching Finder (1 GB = 1,000,000,000 bytes).
-The UI's persistent **Binary units (GiB)** setting and CLI `--binary` flag opt
+The UI's optional **Binary units (GiB)** setting (off at each launch) and CLI `--binary` flag opt
 into powers of 1024. JSON always contains integer bytes; input suffixes such as
 `--min-size 1MiB` keep their explicit meaning.
 
 The **Whole disk · containing volume** panel and CLI header use `statfs`:
 capacity = blocks × block size, available = available blocks × block size,
 used = capacity − available, and outside scanned folder = max(0, used − scanned
-allocation). This residual includes unreadable paths, unscanned folders,
+allocation). This residual includes System, Applications, other users, unreadable paths, unscanned folders,
 snapshots and filesystem overhead. It is an accounting remainder rather than
 an inventory of those files. APFS shared containers, purgeable space, clones
 and cloud placeholders can differ from About This Mac; when allocation exceeds
@@ -109,7 +109,7 @@ limitations recorded during implementation.
 ```sh
 ./oh-my-disk scan                      # home directory, progress on stderr
 ./oh-my-disk top --limit 25            # largest entries in the latest scan
-./oh-my-disk suggest --limit 20        # ranked, disjoint free-space contenders
+./oh-my-disk suggest --limit 20        # ranked, disjoint cleanup suggestions
 ./oh-my-disk explain "$HOME/.npm"      # rule, safety, age, size, human-only command
 ./oh-my-disk ui                        # reuse the scan and open a local browser
 ```
@@ -125,7 +125,7 @@ limitations recorded during implementation.
 
 Permission errors are reported with skipped paths, and the scan continues. Terminal may need macOS Full Disk Access to inspect protected Mail/Messages/backups. Partial totals are clearly marked; the tool never changes permissions or requests elevated privileges. Other filesystem devices are skipped unless `--cross-mounts` is set.
 
-The UI has a clickable, zoomable sunburst, a squarified treemap toggle, breadcrumbs, a sortable child table, category breakdowns and ranked contenders. Click a segment or folder to drill in; click the sunburst center to go back. Small segments and entries beyond the chart’s display budget remain in the paginated table. Category drill-down attributes each entry’s own allocated blocks, so it does not count parent totals a second time.
+Web mode also has a **Scan** button and an absolute root field; leaving the field empty rescans the displayed root. The UI has a clickable, zoomable sunburst, a squarified treemap toggle, breadcrumbs, a sortable child table, category breakdowns and ranked cleanup suggestions. Click a segment or folder to drill in; click the sunburst center to go back. Small segments and entries beyond the chart’s display budget remain in the paginated table. Category drill-down attributes each entry’s own allocated blocks, so it does not count parent totals a second time.
 
 ## JSON and LLM exports
 
@@ -143,15 +143,44 @@ Every subcommand accepts `--json` (stdout) or `--json NEW-FILE.json`. Progress g
 
 `scan` JSON contains `version`, `scan` (tree, timestamps, skips, entry count), `suggestions`, `categories`, and an accounting note. Nodes include allocated `bytes` for the subtree, `own_bytes`, regular-file entry count, type, category, metadata timestamps, latest subtree activity and incomplete/hardlink flags. File counts include all regular-file directory entries, including hardlink aliases; their allocated blocks are counted once.
 
-`--depth` and `--min-size` prune the exported tree without changing its aggregate totals or the full cached scan. Defaults: unlimited depth and 1 MiB minimum for tree entries and contenders. Use `--min-size 0` for a full file-level export. `top` includes overlapping parent/child totals and explicitly labels them. `suggest` outputs only disjoint contenders. `explain` also resolves inherited rules for files inside known locations. `ui --json` outputs connection information, not the tree.
+`--depth` and `--min-size` prune the exported tree without changing its aggregate totals or the full cached scan. Defaults: unlimited depth and 1 MiB minimum for tree entries and cleanup suggestions. Use `--min-size 0` for a full file-level export. `top` includes overlapping parent/child totals and explicitly labels them. `suggest` outputs only disjoint cleanup suggestions. `explain` also resolves inherited rules for files inside known locations. `ui --json` outputs connection information, not the tree.
 
 `--summary FILE` emits compact, bounded JSON with the root, scan time, totals, category totals, top N entries, top N disjoint suggestions and an accounting note. The sample fixture’s eight-item summary is about 7 KB. Paths and explanations affect length; lower `--limit` to fit a smaller context. Summary generation never needs an LLM, API key or network connection.
+
+## MCP server
+
+`./oh-my-disk mcp` runs a stdio MCP server inside the CLI binary using the [official Go SDK](https://github.com/modelcontextprotocol/go-sdk). It exposes only six read-only tools: `scan(root, refresh)`, `summary(limit)`, `top(path, depth, limit)`, `suggest(sort, limit, category, safety)`, `explain(path)`, and `whole_disk`. **No Trash/deletion tool is registered.** Suggested command strings are informational text only.
+
+Call `scan` with an absolute root before querying a new folder; `refresh: true` forces a fresh metadata walk. An existing private cache can be queried without rescanning. Scans in an MCP session stay in memory and do not replace the desktop/CLI cache. Results are compact JSON, with limits of 100 items, top depth 8 and 64 KiB per response; oversized responses return an error asking for a narrower request. Stdout contains protocol messages only. The client process’s OS permissions determine readable folders.
+
+For [Claude Desktop](https://modelcontextprotocol.io/docs/develop/connect-local-servers), open its Developer configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS). For [Cursor](https://docs.cursor.com/context/model-context-protocol), use `.cursor/mcp.json` in the project or `~/.cursor/mcp.json` globally. Merge this entry with existing servers and replace the binary path:
+
+```json
+{
+  "mcpServers": {
+    "oh-my-disk": {
+      "command": "/absolute/path/to/oh-my-disk",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+For [Codex](https://developers.openai.com/codex/config-reference), add to `~/.codex/config.toml` (or the trusted project config):
+
+```toml
+[mcp_servers.oh-my-disk]
+command = "/absolute/path/to/oh-my-disk"
+args = ["mcp"]
+```
+
+Restart or reload the client’s MCP connection after saving. Example request: “Scan /Users/me/Projects, then show 10 cleanup suggestions sorted by stale days.”
 
 ## Ranking and rules
 
 The embedded YAML lives in [internal/rules/rules.yaml](internal/rules/rules.yaml). It covers npm, Yarn, pnpm, Bun, pip/uv, Go module/build caches, Gradle, Android SDK/images/AVDs, Xcode DerivedData/Archives/DeviceSupport/caches, simulators and runtimes, CocoaPods, Carthage, SwiftPM, Homebrew, Docker Desktop, Hugging Face, LM Studio, Ollama, generic macOS/Linux caches, Expo, browser test downloads, AI editor caches/state, project artifacts, Trash, Downloads, media, Mail/Messages and iOS backups. Unknown large branches appear as **“Big, check yourself.”**
 
-The score is:
+The raw ranking score (JSON `raw_score`) is:
 
 ```text
 allocated_bytes × safety_weight × (1 + min(stale_days / 180, 1))
@@ -160,6 +189,16 @@ cache:         1.00  (regenerable; still review first)
 reinstallable: 0.55  (SDKs, downloaded models, applications)
 user-data:     0.12  (archives, backups, Docker volumes, sessions, downloads)
 unknown:       0.04  (inspect yourself)
+```
+
+The displayed **cleanup score** (JSON `score`) is `100 × raw_score / (raw_score + 1,000,000,000)`, rounded to an integer in the UI/CLI. One weighted decimal GB scores 50; nine score 90. This fixed, monotonic 0–100 scale stays comparable across scans and filters; 100 is the limiting value. It expresses cleanup priority, not confidence or guaranteed recoverable space. JSON retains full precision. A one-line badge gives safety, stale days and decimal GB.
+
+Cleanup suggestions default to **Score**, with **Size** and **Time since last activity** sorts available in the segmented control and column headers (click again to reverse). Category and safety filters apply before limiting results. CLI equivalents:
+
+```sh
+./oh-my-disk suggest --sort score
+./oh-my-disk suggest --sort size --category caches --safety cache --limit 30
+./oh-my-disk suggest --sort stale
 ```
 
 **Effort is never part of the score.** Staleness uses the later of latest subtree mtime/regular-file atime and clamps future timestamps to zero days. Project artifacts use the enclosing project’s latest subtree mtime, so old `target` files in an active project are not treated as an abandoned project. Projects are recognized by markers including `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, Gradle/Maven/Swift/CMake manifests and `.git`. Generic `build`, `dist`, `target`, `.venv`, `.next` and `.turbo` names outside a recognized project are not assumed safe.
@@ -186,16 +225,19 @@ rules:
 
 Patterns are anchored, case-sensitive paths: `~/` expands using the current home; `*` matches within one path component; `**` spans components. Absolute patterns and `**/name` anywhere patterns are supported. Rules are tested in order, custom rules first. Reusing a built-in `id` overrides it. Allowed categories are `caches`, `dev tooling`, `AI models`, `media`, `apps`, `downloads`, `project build artifacts`, `unknown`; allowed safety values are shown above. Unknown fields and invalid categories/safety levels fail clearly. `{path}` is replaced with a shell-quoted path in command text. `--home PATH` lets you classify another user’s home or a fixture without accessing your own home.
 
-## Read-only behavior, privacy and accounting
+## Safety, privacy and accounting
 
+- Scanning is read-only. Deletion requires an explicit UI confirmation or `oh-my-disk trash /absolute/path ...` with `--yes` or typing `yes` at the interactive prompt. macOS uses `NSFileManager.trashItemAtURL`, so items remain restorable in Finder’s Trash. There is no permanent deletion fallback; non-macOS builds refuse Trash operations.
+- Every selected path must still exist in the latest scan with the same device/inode. Symlinks and paths containing symlink components are rejected. Protected paths include `/`, `/System`, `/Library`, `/Applications`, `/usr`, `/bin`, `/sbin`, `/private`, the home and `~/Library` folders themselves, Documents, Desktop, Photos Library bundles, Mobile Documents (iCloud), CloudStorage, and anything outside the scan root. Selecting a directory containing protected data is also rejected. The scan root itself cannot be trashed. `/private/var/folders` permits only current-user-owned caches matched by a cache rule. Scan identities survive the private binary cache; legacy JSON exports cannot authorize Trash without a fresh scan.
+- Trash attempts append JSON records to `~/Library/Logs/oh-my-disk/trash.log`, including failures. A durable intent record is required before moving an item. The CLI invalidates its cache after successful moves; UI sessions rescan and recompute tree/category totals. Revalidation occurs immediately before each native move; concurrent filesystem activity can still race any path-based OS operation.
 - Scanner operations are metadata reads (macOS bulk attributes, or directory reads plus descriptor-relative `fstatat`); it never opens regular file contents. Symlinks are recorded but not traversed, including loop/broken links. A symlink root is rejected. Directory opens are pinned to the root descriptor, reject symlinks in every relative path component, and verify inode identity; changing trees can still produce partial, non-atomic snapshots.
 - Sizes use allocated blocks (`st_blocks × 512` or equivalent bulk attributes), including directory metadata. Dataless iCloud/File Provider placeholders are counted by logical file length and flagged `dataless`; their contents are never opened. Dataless directories are left unenumerated and marked incomplete to avoid hydration. Sparse files therefore reflect allocated storage. Hardlinks are deduplicated by `(device, inode)` and charged to the first lexical path, deterministically during the parallel walk. A category can inherit those blocks even when another hardlink appears elsewhere.
 - Other devices are skipped by default. For macOS `/`, both the sealed System device and firmlinked Data device are included through the normal namespace, while `/System/Volumes/Data` is omitted. Repeated directory identities are skipped to prevent alias loops. `--cross-mounts` does not re-enable the duplicate Data subtree.
 - APFS clones, snapshots, compression, purgeable storage and filesystem accounting can make these totals differ from Finder or actual reclaimable space. APFS clone-aware accounting is not implemented. A scan never represents a transactionally consistent snapshot.
 - atime may be disabled, coarse, or updated by directory reads; it is only a conservative activity hint. Directory atimes are recorded but excluded from subtree activity for ranking, so scanning does not make an old cache look newly used. File metadata and mtime are not changed by the tool. OS-managed access-time updates can occur from reading directories.
-- The private scan cache defaults to `$TMPDIR/oh-my-disk-<uid>/latest.bin` (via Go’s OS temp directory), outside the usual home scan. It survives normal command runs but may be cleared by OS temp housekeeping. `--cache /private/path/state/latest.bin` selects a different cache; its directory must have mode `0700`. The cache is a versioned binary stream with a checksum; legacy JSON caches remain readable when selected explicitly with `--cache`. Only valid application caches may be replaced. Use a dedicated state directory. `--no-cache` performs a fresh scan without loading or saving state.
+- The private scan cache defaults to `$TMPDIR/oh-my-disk-<uid>/latest.bin` (via Go’s OS temp directory), outside the usual home scan. It survives normal command runs but may be cleared by OS temp housekeeping. `--cache /private/path/state/latest.bin` selects a different cache; its directory must have mode `0700`. The cache is a versioned binary stream with a checksum. Persisting device/inode adds 16 bytes per scanned entry (80-byte compact entries). The new identity-bearing format requires a fresh scan (`--refresh`) after upgrading from an older binary cache; legacy JSON caches remain readable when selected explicitly with `--cache`. Only valid application caches may be replaced. Use a dedicated state directory. `--no-cache` performs a fresh scan without loading or saving state.
 - The application’s cache path/directory and requested export files are excluded before scanning. New reports are created with mode `0600`; an existing report is never replaced. The cache writer uses a private temporary report and atomic rename. It removes only its own temporary report on completion.
-- The server listens on `127.0.0.1`, uses a random per-launch token and SameSite HTTP-only cookie, validates Host, accepts GET/HEAD only, and serves no external assets. No analytics or remote calls. The token URL and JSON reports expose private filenames; share them deliberately.
+- The server listens on `127.0.0.1`, uses a random per-launch token and SameSite HTTP-only cookie, validates Host, uses GET/HEAD for reads and token-authenticated POST for explicit rescan/Trash actions, with strict same-origin JSON headers and Origin checks, and serves no external assets. No analytics or remote calls. The token URL and JSON reports expose private filenames; share them deliberately.
 
 ## Development and verification
 
@@ -206,7 +248,7 @@ go test -race ./...
 go vet ./...
 ```
 
-Tests cover allocated bytes, sparse files, deterministic hardlinks, non-followed symlinks, denied permissions, exclusions, cancellation, wide worker queues, macOS Data-device policy, built-in matching, custom overrides, conservative project detection, project staleness, ranking, disjointness, category totals, cache reuse, report protection, export pruning and the read-only local server. CI runs tests on macOS and Linux.
+Tests cover allocated bytes, sparse files, deterministic hardlinks, non-followed symlinks, denied permissions, exclusions, cancellation, wide worker queues, macOS Data-device policy, built-in matching, custom overrides, conservative project detection, project staleness, ranking, disjointness, category totals, cache reuse, report protection, export pruning and the token-protected local server, CSRF rejection, protected Trash paths, inode revalidation, audit records and an MCP client driving the binary over stdio. CI runs tests on macOS and Linux.
 
 Create and scan a realistic synthetic developer home without touching real user data:
 

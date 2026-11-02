@@ -154,7 +154,7 @@ arenas, allocation-free path comparisons, an exclusion basename prefilter that
 avoids constructing paths for ordinary files, compact candidate descriptors, and
 building rich suggestion strings only after disjoint selection. The resulting
 live heap on the fixture is about 80 MiB (down from 113 MiB in the first compact
-prototype). Each entry is 64 bytes; directories have an additional 40-byte
+prototype). These measurements predate the Trash follow-up: retaining device/inode adds 16 bytes per entry (80 bytes now). At the measured revision, each entry is 64 bytes; directories have an additional 40-byte
 aggregate record. Names and indices contain no per-entry maps or pointers.
 
 Using a **1-byte** threshold generated ~146,000 final home suggestions and used

@@ -101,7 +101,7 @@ func (a *App) checkAccess() {
 	a.mu.Unlock()
 }
 func (a *App) publish(s *report.Snapshot) {
-	h := web.SnapshotHandler(s)
+	h := web.ManagedHandler(s, func(next *report.Snapshot) { a.mu.Lock(); a.snapshot = next; a.mu.Unlock() })
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.snapshot = s
@@ -120,10 +120,6 @@ func (a *App) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	a.mu.RLock()
 	h := a.handler
 	a.mu.RUnlock()
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		http.Error(w, "read-only", 405)
-		return
-	}
 	if h == nil {
 		http.Error(w, "No scan yet", 404)
 		return

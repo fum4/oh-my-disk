@@ -15,12 +15,12 @@
           ><span class="logo">◉</span> oh-my-disk<span class="version"
             >v1</span
           ></a
-        ><span class="readonly">● READ-ONLY BY DESIGN</span>
+        ><span class="readonly">● READ-ONLY SCANS · EXPLICIT TRASH</span>
       </header>
       <section id="desktop" hidden>
         <div class="eyebrow">SPACE TO THINK</div>
         <h1>Your disk, understood.</h1>
-        <p>Explore what takes up space. Your files stay untouched.</p>
+        <p>Explore what takes up space. Scanning leaves files untouched. Move selected items to Trash only after confirmation.</p>
         <div class="desktop-controls">
           <label>Scan folder <select id="scan-root"><option value="home">Home</option><option value="/">Whole disk (/)</option><option value="custom">Choose folder…</option></select></label>
           <span id="chosen-path"></span>
@@ -35,6 +35,7 @@
         <div class="desktop-controls"><button id="export-json" disabled>Export JSON…</button><button id="export-summary" disabled>Export LLM summary…</button></div>
       </section>
       <aside id="access-banner" hidden><strong>Some Library folders are protected by macOS.</strong><p>Enable oh-my-disk in Full Disk Access, then quit, reopen and rescan. You can continue with partial results.</p><button id="full-disk-access">Open Full Disk Access settings</button></aside>
+      <section id="web-scan" hidden><label>Scan root <input id="web-root" placeholder="Absolute folder path"></label> <button id="web-start-scan">Scan</button><span id="web-scan-status" role="status"></span></section>
       <section id="volume" hidden><strong>Whole disk · containing volume</strong><p id="volume-values"></p><small id="volume-note"></small></section>
       <label class="unit-setting" title="Decimal GB = 1,000,000,000 bytes (Finder). Binary GiB = 1,073,741,824 bytes."><input type="checkbox" id="binary-units"> Binary units (GiB)</label>
       <section class="intro">
@@ -52,7 +53,7 @@
         <div class="tabs" aria-label="Organization">
           <button id="folders" class="active">Folders</button
           ><button id="categories">By category</button
-          ><button id="contenders">Free-space contenders</button>
+          ><button id="cleanup-tab">Cleanup suggestions</button>
         </div>
         <div class="view-switch" aria-label="Visualization">
           <button id="sunburst" class="active">◉ Sunburst</button
@@ -111,14 +112,18 @@
         <div class="suggestion-intro">
           <div>
             <span class="eyebrow">START WITH THE LOWEST RISK</span>
-            <h2>Your free-space contenders</h2>
+            <h2>Your cleanup suggestions</h2>
           </div>
           <p>
-            Ranked by size × safety × staleness.<br />Commands are for your
-            review. Nothing runs here.
+            Cleanup score combines size, safety and staleness.<br />Select items to move to Trash after review.
           </p>
         </div>
-        <div id="suggestion-list"></div>
+        <div class="suggestion-controls">
+ <div class="tabs" aria-label="Suggestion sort"><button data-suggest-sort="score" class="active">Score</button><button data-suggest-sort="size">Size</button><button data-suggest-sort="stale">Time since last activity</button></div>
+ <label>Category <select id="suggest-category"><option value="">All categories</option></select></label>
+ <label>Safety <select id="suggest-safety"><option value="">All safety levels</option></select></label>
+ </div>
+ <div class="table-scroll"><table class="cleanup-table"><thead><tr><th>Selection / Path</th><th><button data-suggest-sort="score">Cleanup score ↕</button></th><th><button data-suggest-sort="size">Size ↕</button></th><th><button data-suggest-sort="stale">Time since last activity ↕</button></th></tr></thead><tbody id="suggestion-list"></tbody></table></div>
       </section>
       <footer>
         <span id="scan-status">Local scan · no data leaves this device</span
@@ -132,6 +137,8 @@
         <div id="skipped"></div>
       </aside>
     </div>
+    <div id="selection-bar" hidden><span id="selection-total"></span><button id="trash-selected">Move to Trash</button><button id="clear-selection">Clear</button><span id="trash-results" role="status"></span></div>
+    <dialog id="trash-confirm"><h2>Move to Trash?</h2><p id="confirm-total"></p><pre id="confirm-paths"></pre><p>Items can be restored from Trash.</p><button id="confirm-trash">Move to Trash</button><button id="cancel-trash">Cancel</button></dialog>
     <div id="tooltip" role="tooltip" hidden></div>
   </body>
 </html>
