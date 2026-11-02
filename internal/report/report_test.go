@@ -113,3 +113,46 @@ func TestLegacyCloudCacheRequiresRescanButCanBeReplaced(t *testing.T) {
 		t.Fatal("fresh local allocation", got, err)
 	}
 }
+
+func TestDesktopCacheCompatibility(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Chmod(dir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "current.cache")
+	s := &Snapshot{Version: 1, Scan: &scanner.Result{Root: &scanner.Node{Path: "/fixture", Bytes: 123}}}
+	if err := SaveCache(path, s); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadCurrentCache(path)
+	if err != nil || got.Scan.Root.Bytes != 123 {
+		t.Fatalf("current cache: %v, %v", got, err)
+	}
+	current, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := json.Marshal(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, data := range [][]byte{append([]byte("OMDCACH5"), current[8:]...), legacy} {
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := LoadCurrentCache(path); got != nil || !os.IsNotExist(err) {
+			t.Fatalf("older cache should behave as no scan: %v, %v", got, err)
+		}
+		retained, err := os.ReadFile(path)
+		if err != nil || string(retained) != string(data) {
+			t.Fatalf("compatibility check changed cache: %v", err)
+		}
+	}
+	// Current-format corruption is still an error rather than an outdated scan.
+	if err := os.WriteFile(path, current[:len(current)-4], 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadCurrentCache(path); err == nil || os.IsNotExist(err) {
+		t.Fatalf("hid current corruption: %v", err)
+	}
+}

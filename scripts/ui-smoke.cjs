@@ -101,7 +101,7 @@ const wait = async (fn) => {
   assert.equal($("explorer").hidden, true);
   assert.equal(d.querySelectorAll("#disk-legend .li").length, 4);
   assert.ok(d.querySelector("#ringsvg circle"));
-  assert.equal($("full-disk-access").textContent, "Open Settings");
+  assert.equal($("full-disk-access").textContent, "Open settings");
   assert.equal(
     d.querySelector("[data-suggest-sort=score]").textContent.trim(),
     "Best",

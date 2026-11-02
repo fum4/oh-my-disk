@@ -303,3 +303,21 @@ func validateExisting(path string) error {
 	}
 	return nil
 }
+
+// LoadCurrentCache opens only the current desktop cache format. Older caches
+// represent a location with no current scan; the CLI may still import legacy JSON.
+func LoadCurrentCache(path string) (*Snapshot, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var magic [8]byte
+	if _, err := f.ReadAt(magic[:], 0); err != nil {
+		return nil, err
+	}
+	if string(magic[:]) != cacheMagic {
+		return nil, os.ErrNotExist
+	}
+	return readCache(f)
+}

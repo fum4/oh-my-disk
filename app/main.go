@@ -18,6 +18,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -53,8 +54,10 @@ func main() {
 	a := &App{}
 	err := wails.Run(&options.App{
 		Title: "oh-my-disk", Width: 1280, Height: 900, MinWidth: 900, MinHeight: 650,
-		BackgroundColour: options.NewRGB(15, 20, 32),
+		BackgroundColour: options.NewRGBA(0, 0, 0, 0),
+		Mac:              &mac.Options{TitleBar: mac.TitleBarHiddenInset(), WebviewIsTransparent: true, WindowIsTranslucent: true},
 		AssetServer:      &assetserver.Options{Assets: web.Assets(), Handler: http.HandlerFunc(a.serveHTTP)},
+		OnDomReady:       func(context.Context) { configureWindowAppearance() },
 		OnStartup:        a.startup, OnShutdown: func(context.Context) { a.Cancel(); a.CloseAgent() }, Bind: []interface{}{a},
 	})
 	if err != nil {
@@ -74,7 +77,7 @@ func (a *App) startup(ctx context.Context) {
 	go func() {
 		defer func() { a.mu.Lock(); a.status.Busy = false; a.status.Phase = ""; a.mu.Unlock() }()
 		a.checkAccess()
-		s, err := report.LoadCache(report.CachePath())
+		s, err := report.LoadCurrentCache(report.CachePath())
 		if err == nil {
 			a.publish(s)
 		} else if !os.IsNotExist(err) {

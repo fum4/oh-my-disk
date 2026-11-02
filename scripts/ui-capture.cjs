@@ -91,19 +91,19 @@ fs.mkdirSync(".build/screens", { recursive: true });
       await page.locator("#overview").click();
       await page.evaluate(() => {
         document.querySelector("#access-banner").hidden = false;
-        document.querySelector(".scan-options").open = true;
+        setOptionsOpen(true);
       });
       await shot(`${prefix}-access-options`);
       await page.evaluate(() => {
-        document.querySelector(".scan-options").open = false;
+        setOptionsOpen(false);
         document.querySelector("#access-banner").hidden = true;
         document.body.classList.add("is-scanning");
       });
       await shot(`${prefix}-scanning`);
       await page.evaluate(() => {
         document.body.classList.remove("is-scanning");
-        document.querySelector("#content-grid").hidden = true;
-        document.querySelector("#welcome").hidden = false;
+        snapshot = undefined;
+        showMode("overview");
       });
       await shot(`${prefix}-empty`);
       await page.evaluate(() =>

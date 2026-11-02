@@ -25,6 +25,9 @@ const palette = [
   "#718096",
 ];
 let binaryUnits = false;
+try {
+  binaryUnits = localStorage.getItem("binaryUnits") === "true";
+} catch {}
 const fmt = (b) => {
   const base = binaryUnits ? 1024 : 1000;
   const units = binaryUnits
@@ -493,7 +496,6 @@ function categoryTree() {
 }
 
 function showMode(next) {
-  if (!snapshot) return;
   mode = next;
   ["overview", "folders", "categories", "cleanup-tab"].forEach((id) => {
     $(id).classList.toggle("active", id === mode);
@@ -506,6 +508,40 @@ function showMode(next) {
     categories: "Categories",
     "cleanup-tab": "Cleanup",
   }[mode];
+  if (!snapshot) {
+    $("content-grid").hidden = true;
+    $("welcome").hidden = false;
+    const copy = {
+      overview: [
+        "Your disk, a little clearer.",
+        "Explore your disk, on your own or with an agent.",
+      ],
+      folders: [
+        "A place for every byte.",
+        "See which folders take the most space, then explore inside them.",
+      ],
+      categories: [
+        "See the bigger picture.",
+        "Group your files by kind to understand where your space goes.",
+      ],
+      "cleanup-tab": [
+        "Make room for what’s next.",
+        "Find caches and other cleanup candidates, with guidance for every choice.",
+      ],
+    }[mode];
+    const target = window.scanTargetLabel?.() || "Home";
+    $("scan-info").textContent =
+      "Scan " + target + " to see what’s taking space.";
+    $("disk-caption").textContent = target + " is ready to scan";
+    $("empty-title").textContent = copy[0];
+    $("empty-description").textContent =
+      copy[1] + " Scan " + target + " to begin.";
+    $("launch-cards").hidden = mode !== "overview";
+    document.querySelector(".agent-disclosure").hidden = mode !== "overview";
+    $("empty-scan").hidden = mode === "overview";
+    document.querySelector(".view-switch").hidden = true;
+    return;
+  }
   $("overview-panel").hidden = mode !== "overview";
   $("explorer").hidden = mode === "cleanup-tab" || mode === "overview";
   $("suggestions").hidden = !["cleanup-tab", "overview"].includes(mode);
@@ -793,9 +829,25 @@ function renderVolume() {
       : "");
 }
 $("binary-units").checked = binaryUnits;
+for (const [id, on] of [
+  ["units-decimal", !binaryUnits],
+  ["units-binary", binaryUnits],
+]) {
+  $(id).classList.toggle("active", on);
+  $(id).setAttribute("aria-pressed", String(on));
+}
 $("binary-units").onchange = (e) => {
   binaryUnits = e.target.checked;
-  localStorage.setItem("binaryUnits", String(binaryUnits));
+  try {
+    localStorage.setItem("binaryUnits", String(binaryUnits));
+  } catch {}
+  for (const [id, on] of [
+    ["units-decimal", !binaryUnits],
+    ["units-binary", binaryUnits],
+  ]) {
+    $(id).classList.toggle("active", on);
+    $(id).setAttribute("aria-pressed", String(on));
+  }
   if (snapshot) {
     $("total").textContent = fmt(snapshot.scan.root.bytes);
     renderVolume();
@@ -957,6 +1009,7 @@ if (!window.go?.main?.App) {
     const b = $("web-start-scan");
     b.disabled = true;
     $("web-scan-status").textContent = "Scanning…";
+    setOptionsOpen(false);
     scanState(true);
     try {
       const result = await action("/api/rescan", { root: $("web-root").value });
@@ -1113,8 +1166,6 @@ function renderOverview() {
   $("disk-caption").textContent = v
     ? `${gb(free)} free of ${gb(capacity)}`
     : "Disk capacity unavailable";
-  $("home-name").textContent = scan.name || "Selected folder";
-  $("home-name").title = scan.path;
   $("nav-folders").textContent = fmt(scan.bytes);
   $("nav-categories").textContent = Object.keys(snapshot.categories).length;
   $("nav-cleanup-tab").textContent = (lowerBound ? "≥ " : "") + fmt(reclaim);
@@ -1182,24 +1233,14 @@ function renderOverview() {
     list.append(dom("p", "empty", "No folders in this scan."));
 }
 function showFeedback(message) {
-  const oldFormat = /format|version|refresh|cache.*(old|incompat)/i.test(
-    message,
-  );
+  // Cache compatibility is an app concern, never a user-facing recovery flow.
+  if (/older cache format|older format|rescan with --refresh/i.test(message))
+    message = "";
   $("scan-feedback").hidden = !message;
   $("scan-feedback").replaceChildren(
-    dom(
-      "span",
-      "",
-      oldFormat
-        ? "This saved scan uses an older format. Scan again to update it."
-        : message,
-    ),
+    icon("fill-warning-circle"),
+    dom("span", "", message),
   );
-  if (message) {
-    const retry = dom("button", "btn sec", "Scan Again");
-    retry.onclick = () => $("hub-scan").click();
-    $("scan-feedback").append(retry);
-  }
 }
 function scanState(busy, message = "Scanning…") {
   document.body.classList.toggle("is-scanning", busy);
@@ -1211,10 +1252,10 @@ function scanState(busy, message = "Scanning…") {
     ),
   );
   if (!busy) $("hub-scan").append(dom("span", "kbd", "⌘R"));
-  if (busy) {
-    $("scan-feedback").hidden = false;
-    $("scan-feedback").textContent = message;
-  } else showFeedback("");
+  $("scan-strip").hidden = !busy;
+  $("empty-scan").disabled = busy;
+  if (busy) $("progress").textContent = message;
+  else showFeedback("");
 }
 $("review-cleanup").onclick = () => {
   $("suggest-category").value = "";
@@ -1228,28 +1269,67 @@ $("hub-scan").onclick = () => {
   if (!target.disabled) return target.onclick();
 };
 $("toolbar-choose").onclick = () => {
-  document.querySelector(".scan-options").open = true;
+  setOptionsOpen(true);
   if (window.go?.main?.App) return $("choose-folder").onclick();
   $("web-root").focus();
   $("web-root").select();
 };
 $("scan-another").onclick = $("welcome-scan").onclick = () =>
   $("toolbar-choose").click();
-for (const [id, value] of [
-  ["location-home", "home"],
-  ["location-disk", "/"],
-])
+$("empty-scan").onclick = () => $("hub-scan").click();
+function setOptionsOpen(open) {
+  $("scan-options").hidden = !open;
+  $("options-toggle").setAttribute("aria-expanded", String(open));
+  if (open) {
+    const main = document
+      .querySelector(".main-content")
+      .getBoundingClientRect();
+    const bar = document.querySelector(".bar").getBoundingClientRect();
+    $("scan-options").style.top = bar.bottom - main.top + 8 + "px";
+    $(window.go?.main?.App ? "scan-root" : "web-root").focus();
+  }
+}
+$("options-toggle").onclick = () => setOptionsOpen($("scan-options").hidden);
+$("options-close").onclick = () => {
+  setOptionsOpen(false);
+  $("options-toggle").focus();
+};
+document.addEventListener("pointerdown", (e) => {
+  if (
+    !$("scan-options").hidden &&
+    !e.target.closest("#scan-options, #options-toggle, #toolbar-choose")
+  )
+    setOptionsOpen(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("scan-options").hidden) {
+    setOptionsOpen(false);
+    $("options-toggle").focus();
+  }
+});
+for (const [id, binary] of [
+  ["units-decimal", false],
+  ["units-binary", true],
+]) {
   $(id).onclick = () => {
-    document.querySelector(".scan-options").open = true;
-    if (window.go?.main?.App) {
-      $("scan-root").value = value;
-      $("scan-root").onchange();
-    } else {
-      $("web-root").value =
-        value === "home" ? snapshot?.scan.root.path || "" : "/";
-      $("web-root").focus();
+    $("binary-units").checked = binary;
+    $("binary-units").dispatchEvent(new Event("change"));
+    for (const [other, on] of [
+      ["units-decimal", !binary],
+      ["units-binary", binary],
+    ]) {
+      $(other).classList.toggle("active", on);
+      $(other).setAttribute("aria-pressed", String(on));
     }
   };
+}
+// Reserve each button's layout box; only its painted surface grows by 2px.
+document.addEventListener("pointerover", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
+  b.style.setProperty("--hover-x", 1 + 2 / Math.max(1, b.offsetWidth));
+  b.style.setProperty("--hover-y", 1 + 2 / Math.max(1, b.offsetHeight));
+});
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {
     e.preventDefault();

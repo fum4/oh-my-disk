@@ -19,6 +19,7 @@ const wait = async (fn) => {
   const vc = new VirtualConsole();
   vc.on("jsdomError", (e) => errors.push(e.message));
   const empty = process.argv.includes("--empty");
+  let pickedFolder = fixture;
   const state = {
     home: fixture,
     busy: false,
@@ -59,8 +60,11 @@ const wait = async (fn) => {
         main: {
           App: {
             State: async () => ({ ...state }),
-            Agents: async () => [{name:"claude",path:"/mock/claude"},{name:"codex",path:"/mock/codex"}],
-            PickFolder: async () => fixture,
+            Agents: async () => [
+              { name: "claude", path: "/mock/claude" },
+              { name: "codex", path: "/mock/codex" },
+            ],
+            PickFolder: async () => pickedFolder,
             Scan: async (root) => {
               calls.push(["scan", root]);
               state.busy = true;
@@ -92,6 +96,37 @@ const wait = async (fn) => {
     assert.equal($("content-grid").hidden, true);
     $("folders").click();
     assert.equal($("welcome").hidden, false);
+    assert.equal($("view-title").textContent, "Folders");
+    assert.equal($("scan-feedback").hidden, true);
+    assert.equal(d.querySelector("details.scan-options"), null);
+    assert.match($("empty-description").textContent, /folders.*Home/);
+    for (const id of ["categories", "cleanup-tab", "overview"]) {
+      $(id).click();
+      assert.equal($(id).getAttribute("aria-current"), "page");
+      assert.equal($("content-grid").hidden, true);
+    }
+    $("options-toggle").click();
+    assert.equal($("scan-options").hidden, false);
+    $("units-binary").click();
+    assert.equal($("binary-units").checked, true);
+    assert.equal($("units-binary").getAttribute("aria-pressed"), "true");
+    $("options-close").click();
+    assert.equal($("scan-options").hidden, true);
+    const locationCount = $("locations").childElementCount;
+    $("locations").querySelector(".location-remove").click();
+    assert.equal($("locations").childElementCount, locationCount - 1);
+    assert.equal($("location-toast").hidden, false);
+    assert.equal(
+      JSON.parse(w.localStorage.getItem("omd-locations-v1")).length,
+      locationCount - 1,
+    );
+    $("undo-location").click();
+    assert.equal($("locations").childElementCount, locationCount);
+    $("location-home").click();
+    await wait(() => calls.some((c) => c[0] === "scan"));
+    assert.equal(calls.find((c) => c[0] === "scan")[1], fixture);
+    await $("cancel-scan").onclick();
+    await wait(() => !$("hub-scan").disabled);
     await $("toolbar-choose").onclick();
     assert.equal($("chosen-path").textContent, fixture);
     await $("hub-scan").onclick();
@@ -100,13 +135,40 @@ const wait = async (fn) => {
     assert.equal(d.body.classList.contains("is-scanning"), true);
     await $("cancel-scan").onclick();
     await wait(() => $("cancel-scan").hidden);
+    pickedFolder = fixture + "/Downloads";
+    await $("scan-another").onclick();
+    assert.equal(calls.at(-1)[1], pickedFolder);
+    assert(
+      JSON.parse(w.localStorage.getItem("omd-locations-v1")).includes(
+        pickedFolder,
+      ),
+    );
+    await $("cancel-scan").onclick();
+    await wait(() => !$("hub-scan").disabled);
+    // Reload the Locations module with the same saved storage, as on launch.
+    w.eval(fs.readFileSync("internal/web/assets/locations.js", "utf8"));
+    assert(
+      [...d.querySelectorAll(".location-open")].some(
+        (b) => b.title === "Scan " + pickedFolder,
+      ),
+    );
+    const row = [...d.querySelectorAll(".location-row")].find(
+      (n) => n.querySelector(".location-open").title === "Scan " + pickedFolder,
+    );
+    row.querySelector(".location-remove").click();
+    w.eval(fs.readFileSync("internal/web/assets/locations.js", "utf8"));
+    assert(
+      ![...d.querySelectorAll(".location-open")].some(
+        (b) => b.title === "Scan " + pickedFolder,
+      ),
+    );
     state.error = "older cache format; rescan with --refresh";
-    await wait(() => !$("scan-feedback").hidden);
-    assert.match($("scan-feedback").textContent, /Scan Again/);
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal($("scan-feedback").hidden, true);
     assert(!$("scan-feedback").textContent.includes("--refresh"));
     assert.equal(errors.length, 0, errors.join("\n"));
     console.log(
-      "PASS: native empty welcome, navigation before scan, toolbar picker, scan skeleton/progress/cancel, old-cache recovery action.",
+      "PASS: native empty welcome, navigation before scan, toolbar picker, options, units, favorites removal/Undo/persistence, scan progress/cancel, silent old-cache handling.",
     );
     w.close();
     return;
@@ -117,18 +179,13 @@ const wait = async (fn) => {
   $("folders").click(); // Safe before a snapshot has been opened.
   await $("open-last").onclick();
   await wait(() => d.querySelector("#overview-folders .fr"));
-  assert.equal($("chosen-path").textContent, fixture);
-  assert.equal($("overview-panel").hidden, false);
-  assert.equal($("explorer").hidden, true);
-  assert.equal(d.querySelector(".view-switch").hidden, true);
+  assert.equal($("scan-root").value, "home");
+  assert.equal($("overview-panel").hidden, true);
+  assert.equal($("explorer").hidden, false);
+  assert.equal(d.querySelector(".view-switch").hidden, false);
   state.error = "older cache format; rescan with --refresh";
-  await wait(() => !$("scan-feedback").hidden);
-  assert.match($("scan-feedback").textContent, /older format/);
-  assert(!$("scan-feedback").textContent.includes("--refresh"));
-  assert.equal(
-    $("scan-feedback").querySelector("button").textContent,
-    "Scan Again",
-  );
+  await new Promise((r) => setTimeout(r, 450));
+  assert.equal($("scan-feedback").hidden, true);
   state.error = "";
   await $("choose-folder").onclick();
   assert.equal($("scan-root").value, "custom");

@@ -6,6 +6,7 @@
     <title>oh-my-disk</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
+    <script src="/locations.js" defer></script>
     <script src="/desktop.js" defer></script>
     <link rel="stylesheet" href="/vendor/xterm.css" />
     <script src="/vendor/xterm.js" defer></script>
@@ -390,6 +391,15 @@
           d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z"
         />
       </symbol>
+      <symbol id="regular-sliders" viewBox="0 0 256 256">
+        <path
+          d="M40 64h176M40 128h176M40 192h176M88 40v48M168 104v48M112 168v48"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="16"
+          stroke-linecap="round"
+        />
+      </symbol>
     </svg>
     <aside class="side">
       <div class="app-name">oh-my-disk</div>
@@ -412,15 +422,10 @@
       </nav>
       <div class="group">
         <div class="gh">Locations</div>
-        <button class="nv" id="location-home">
-          <svg class="i" aria-hidden="true"><use href="#fill-house" /></svg
-          ><span id="home-name">Home</span><span class="ct">Home</span></button
-        ><button class="nv" id="location-disk">
-          <svg class="i" aria-hidden="true"><use href="#fill-hard-drive" /></svg
-          >Macintosh HD</button
-        ><button class="nv add" id="scan-another">
+        <div id="locations" role="list" aria-label="Favorite locations"></div>
+        <button class="nv add" id="scan-another">
           <svg class="i" aria-hidden="true"><use href="#regular-plus" /></svg
-          >Scan Another Folder…
+          >Scan another folder
         </button>
       </div>
       <div class="vol">
@@ -429,49 +434,132 @@
           ><span id="volume-name">Macintosh HD</span>
         </div>
         <div class="vbar" id="disk-bar"></div>
-        <div class="s num" id="disk-caption">Choose a folder to begin</div>
+        <div class="s num" id="disk-caption">Home is ready to scan</div>
       </div>
     </aside>
     <main class="main-content">
       <div class="bar intro">
         <div class="title">
           <b id="view-title">Overview</b
-          ><span id="scan-info"
-            >Choose a folder to see what’s taking space.</span
-          >
+          ><span id="scan-info">Scan Home to see what’s taking space.</span>
         </div>
         <div class="sp"></div>
-        <button id="ask-claude" class="btn sec" disabled>Ask Claude</button><button id="ask-codex" class="btn sec" disabled>Ask Codex</button>
+        <button id="ask-claude" class="btn sec" disabled>Ask Claude</button
+        ><button id="ask-codex" class="btn sec" disabled>Ask Codex</button>
         <button id="toolbar-choose" class="btn sec">
           <svg class="i" aria-hidden="true">
             <use href="#regular-folder-open" /></svg
           >Choose Folder…</button
+        ><button
+          id="options-toggle"
+          class="btn sec"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+          aria-controls="scan-options"
+        >
+          <svg class="i" aria-hidden="true"><use href="#regular-sliders" /></svg
+          >Options</button
         ><button id="hub-scan" class="btn pri">
           <svg class="i" aria-hidden="true">
             <use href="#regular-arrow-clockwise" /></svg
           >Scan Again<span class="kbd">⌘R</span>
         </button>
       </div>
-      <div id="scan-feedback" role="status" hidden></div>
+      <div id="scan-strip" hidden>
+        <progress id="scan-spinner" aria-label="Scan progress"></progress
+        ><span id="progress" role="status" aria-live="polite"></span
+        ><button id="cancel-scan" class="link" hidden>Cancel</button>
+      </div>
+      <div
+        id="scan-feedback"
+        class="banner banner-error"
+        role="status"
+        hidden
+      ></div>
       <section id="welcome" class="card empty" hidden>
-        <h2>Your disk, a little clearer.</h2>
-        <p>See what’s taking space, on your own or with an agent.</p>
-        <div class="launch-cards">
-          <article class="launch-card"><svg class="i"><use href="#regular-hard-drive" /></svg><h3>Scan my disk</h3><p>Explore your disk and review cleanup suggestions.</p><button id="plain-scan" class="btn pri">Scan My Disk</button></article>
-          <article class="launch-card"><svg class="i"><use href="#regular-magnifying-glass" /></svg><h3>Scan with Claude</h3><p>Scan, then chat about your biggest safe wins.</p><button id="scan-claude" class="btn sec" disabled>Checking…</button><a id="install-claude" hidden href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Install Claude Code ↗</a></article>
-          <article class="launch-card"><svg class="i"><use href="#regular-magnifying-glass" /></svg><h3>Scan with Codex</h3><p>Scan, then get help making sense of your disk.</p><button id="scan-codex" class="btn sec" disabled>Checking…</button><a id="install-codex" hidden href="https://developers.openai.com/codex/cli" target="_blank" rel="noopener">Install Codex CLI ↗</a></article>
+        <h2 id="empty-title">Your disk, a little clearer.</h2>
+        <p id="empty-description">
+          Scan Home to explore your disk, on your own or with an agent.
+        </p>
+        <div class="launch-cards" id="launch-cards">
+          <article class="launch-card">
+            <svg class="i"><use href="#regular-hard-drive" /></svg>
+            <h3>Scan my disk</h3>
+            <p>Explore your disk and review cleanup suggestions.</p>
+            <button id="plain-scan" class="btn pri">Scan</button>
+          </article>
+          <article class="launch-card">
+            <svg class="i"><use href="#regular-magnifying-glass" /></svg>
+            <h3>Scan with Claude</h3>
+            <p>Scan, then chat about your biggest safe wins.</p>
+            <button id="scan-claude" class="btn sec" disabled>Checking…</button
+            ><a
+              id="install-claude"
+              hidden
+              href="https://code.claude.com/docs/en/setup"
+              target="_blank"
+              rel="noopener"
+              >Install Claude Code ↗</a
+            >
+          </article>
+          <article class="launch-card">
+            <svg class="i"><use href="#regular-magnifying-glass" /></svg>
+            <h3>Scan with Codex</h3>
+            <p>Scan, then get help making sense of your disk.</p>
+            <button id="scan-codex" class="btn sec" disabled>Checking…</button
+            ><a
+              id="install-codex"
+              hidden
+              href="https://developers.openai.com/codex/cli"
+              target="_blank"
+              rel="noopener"
+              >Install Codex CLI ↗</a
+            >
+          </article>
         </div>
-        <p class="agent-disclosure">Agent chats use your CLI account and share requested scan metadata with its provider.</p>
+        <p class="agent-disclosure">
+          Agent chats use your CLI account and share requested scan metadata
+          with its provider.
+        </p>
+        <button id="empty-scan" class="btn pri" hidden>Scan</button>
         <button id="welcome-scan" class="btn sec">Choose Folder…</button>
       </section>
-      <aside id="agent-tip"><span id="agent-tip-text">Available in the desktop app</span><a id="tip-install-claude" href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener" hidden>Install Claude</a><a id="tip-install-codex" href="https://developers.openai.com/codex/cli" target="_blank" rel="noopener" hidden>Install Codex</a><button id="agent-check" class="btn sec" hidden>Check Again</button><button id="agent-dismiss" class="btn ghost" aria-label="Dismiss agent tip">Dismiss</button></aside>
-      <aside id="access-banner" hidden>
-        <strong>Some Library folders are protected by macOS.</strong>
+      <aside id="agent-tip">
+        <span id="agent-tip-text">Available in the desktop app</span
+        ><a
+          id="tip-install-claude"
+          href="https://code.claude.com/docs/en/setup"
+          target="_blank"
+          rel="noopener"
+          hidden
+          >Install Claude</a
+        ><a
+          id="tip-install-codex"
+          href="https://developers.openai.com/codex/cli"
+          target="_blank"
+          rel="noopener"
+          hidden
+          >Install Codex</a
+        ><button id="agent-check" class="btn sec" hidden>Check again</button
+        ><button
+          id="agent-dismiss"
+          class="btn ghost"
+          aria-label="Dismiss agent tip"
+        >
+          Dismiss
+        </button>
+      </aside>
+      <aside id="access-banner" class="banner banner-warning" hidden>
+        <strong
+          ><svg class="i" aria-hidden="true">
+            <use href="#fill-warning-circle" /></svg
+          >Some Library folders are protected by macOS.</strong
+        >
         <p>
           Enable Full Disk Access, then reopen and scan again. You can explore
           partial results.
         </p>
-        <button id="full-disk-access" class="btn sec">Open Settings</button>
+        <button id="full-disk-access" class="btn sec">Open settings</button>
       </aside>
       <div id="content-grid" class="grid">
         <div id="overview-panel" class="overview-left">
@@ -505,7 +593,7 @@
               <span class="step">2</span>
               <h2>What’s taking space</h2>
               <span class="r num" id="home-total"></span
-              ><button class="link" id="show-folders">Show All</button>
+              ><button class="link" id="show-folders">Show all</button>
             </div>
             <div class="fh">
               <span></span><span>Folder</span><span></span
@@ -576,7 +664,7 @@
             <span class="step">3</span>
             <h2>What you can clean</h2>
             <span class="r" id="rail-count"></span
-            ><button class="link" id="review-cleanup">Show All</button>
+            ><button class="link" id="review-cleanup">Show all</button>
           </div>
           <div class="gain">
             <div class="k">You could get back</div>
@@ -597,7 +685,7 @@
               <button data-suggest-sort="score" class="active">Best</button
               ><button data-suggest-sort="size" class="">Largest</button
               ><button data-suggest-sort="stale" class="">
-                Unused Longest
+                Unused longest
               </button>
             </div>
             <span class="cnt" id="sort-hint"
@@ -642,50 +730,105 @@
         ><span id="hud-scanned"></span><span id="hud-outside"></span
         ><span id="total"></span>
       </section>
-      <details class="scan-options">
-        <summary>Scan options and exports</summary>
+      <section
+        id="scan-options"
+        class="options-popover"
+        role="dialog"
+        aria-label="Scan options"
+        hidden
+      >
+        <div class="options-heading">
+          <h2>Scan options</h2>
+          <button
+            id="options-close"
+            class="icon-action"
+            aria-label="Close options"
+          >
+            ×
+          </button>
+        </div>
         <section id="desktop" hidden>
-          <div class="desktop-controls">
-            <label
-              >Scan folder
-              <select id="scan-root">
-                <option value="home">Home</option>
-                <option value="/">Whole disk (/)</option>
-                <option value="custom">Choose Folder…</option>
-              </select></label
-            ><span id="chosen-path"></span
-            ><button id="choose-folder" class="btn sec">Choose Folder…</button
-            ><button id="start-scan" class="btn pri">
-              <svg class="i" aria-hidden="true">
-                <use href="#regular-arrow-clockwise" /></svg
-              >Scan</button
-            ><button id="cancel-scan" hidden>Cancel</button
-            ><button id="open-last" hidden>Open Last Cached Scan</button>
-          </div>
-          <div id="progress" role="status" aria-live="polite"></div>
-          <progress id="scan-spinner" hidden></progress>
+          <label class="target-chip"
+            ><svg class="i" aria-hidden="true">
+              <use href="#regular-folder" /></svg
+            ><select id="scan-root" aria-label="Scan target">
+              <option value="home">Home</option>
+              <option value="/">Macintosh HD</option>
+              <option value="custom">Chosen folder</option>
+            </select></label
+          >
+          <span id="chosen-path"></span>
+          <button id="choose-folder" class="link">Change folder…</button>
+          <button id="start-scan" hidden>Scan</button
+          ><button id="open-last" class="link" hidden>Open last scan</button>
           <p id="desktop-error" role="alert"></p>
-          <div class="desktop-controls">
-            <button id="export-json" disabled>Export JSON…</button
-            ><button id="export-summary" disabled>Export LLM Summary…</button>
-          </div>
         </section>
         <section id="web-scan" hidden>
-          <label
-            >Scan folder
-            <input id="web-root" placeholder="Absolute folder path" /></label
-          ><button id="web-start-scan">Scan</button
+          <label class="web-target"
+            >Scan target<input
+              id="web-root"
+              placeholder="Absolute folder path" /></label
+          ><button id="web-start-scan" hidden>Scan</button
           ><span id="web-scan-status" role="status"></span>
         </section>
-        <label class="unit-setting"
-          ><input type="checkbox" id="binary-units" /> Binary units (GiB)</label
-        >
-      </details>
+        <div class="options-label">Display units</div>
+        <div class="seg unit-segments" aria-label="Display units">
+          <button id="units-decimal" aria-pressed="true" class="active">
+            GB <span>decimal</span></button
+          ><button id="units-binary" aria-pressed="false">
+            GiB <span>binary</span>
+          </button>
+        </div>
+        <input type="checkbox" id="binary-units" hidden />
+        <div class="options-label">Take your scan with you</div>
+        <div class="export-cards">
+          <button id="export-json" class="export-card" disabled>
+            <svg class="i" aria-hidden="true">
+              <use href="#regular-download-simple" /></svg
+            ><span
+              ><strong>Export JSON</strong
+              ><small>Full scan data for your own tools.</small></span
+            ></button
+          ><button id="export-summary" class="export-card" disabled>
+            <svg class="i" aria-hidden="true">
+              <use href="#regular-file-text" /></svg
+            ><span
+              ><strong>Summary for AI</strong
+              ><small
+                >A compact summary to share with an assistant.</small
+              ></span
+            >
+          </button>
+        </div>
+      </section>
+      <section id="agent-terminal" aria-label="Agent terminal" hidden>
+        <div
+          id="terminal-resize"
+          role="separator"
+          aria-label="Resize terminal"
+          aria-orientation="horizontal"
+          tabindex="0"
+        ></div>
+        <div class="terminal-heading">
+          <strong
+            id="terminal-title"
+            title="Agent chats share requested scan metadata with your CLI provider"
+            >Agent</strong
+          ><span id="terminal-status" role="status"></span>
+          <div class="sp"></div>
+          <button id="terminal-copy" class="btn sec">Copy</button
+          ><button id="terminal-paste" class="btn sec">Paste</button
+          ><button id="terminal-close" class="btn sec">Close</button>
+        </div>
+        <div id="terminal-screen"></div>
+      </section>
       <footer>
         <span id="scan-status">Local scan · no data leaves this device</span
         ><span
           >Allocated ≠ guaranteed reclaimable ·
-          <button id="details-toggle">Accounting notes</button></span
+          <button class="link" id="details-toggle">
+            Accounting notes
+          </button></span
         >
       </footer>
       <aside id="notes" hidden>
@@ -695,11 +838,6 @@
         <div id="skipped"></div>
       </aside>
     </main>
-    <section id="agent-terminal" aria-label="Agent terminal" hidden>
-      <div id="terminal-resize" role="separator" aria-label="Resize terminal" aria-orientation="horizontal" tabindex="0"></div>
-      <div class="terminal-heading"><strong id="terminal-title" title="Agent chats share requested scan metadata with your CLI provider">Agent</strong><span id="terminal-status" role="status"></span><div class="sp"></div><button id="terminal-copy" class="btn sec">Copy</button><button id="terminal-paste" class="btn sec">Paste</button><button id="terminal-close" class="btn sec">Close</button></div>
-      <div id="terminal-screen"></div>
-    </section>
     <dialog id="trash-confirm">
       <div class="dialog-icon">
         <svg class="i" aria-hidden="true"><use href="#regular-trash" /></svg>
@@ -719,6 +857,10 @@
         </button>
       </div>
     </dialog>
+    <div id="location-toast" role="status" hidden>
+      <span>Removed from Locations</span
+      ><button id="undo-location" class="link">Undo</button>
+    </div>
     <div id="tooltip" role="tooltip" hidden></div>
   </body>
 </html>
