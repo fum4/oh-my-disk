@@ -41,6 +41,8 @@ type App struct {
 	cancel   context.CancelFunc
 	snapshot *report.Snapshot
 	handler  http.Handler
+	agentMu  sync.Mutex
+	terminal *agentSession
 	status   Status
 }
 
@@ -53,7 +55,7 @@ func main() {
 		Title: "oh-my-disk", Width: 1280, Height: 900, MinWidth: 900, MinHeight: 650,
 		BackgroundColour: options.NewRGB(15, 20, 32),
 		AssetServer:      &assetserver.Options{Assets: web.Assets(), Handler: http.HandlerFunc(a.serveHTTP)},
-		OnStartup:        a.startup, OnShutdown: func(context.Context) { a.Cancel() }, Bind: []interface{}{a},
+		OnStartup:        a.startup, OnShutdown: func(context.Context) { a.Cancel(); a.CloseAgent() }, Bind: []interface{}{a},
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)

@@ -19,4 +19,13 @@ SHIM
  export PATH
 fi
 cd app
-exec ../.build/bin/wails build -platform "${1:-darwin/arm64}"
+../.build/bin/wails build -platform "${1:-darwin/arm64}"
+cd ..
+case "${1:-darwin/arm64}" in
+ darwin/universal)
+  GOOS=darwin GOARCH=arm64 go build -o .build/cli-arm64 .
+  GOOS=darwin GOARCH=amd64 go build -o .build/cli-amd64 .
+  lipo -create .build/cli-arm64 .build/cli-amd64 -output build/bin/oh-my-disk.app/Contents/MacOS/oh-my-disk-cli ;;
+ *) GOOS=darwin GOARCH=arm64 go build -o build/bin/oh-my-disk.app/Contents/MacOS/oh-my-disk-cli . ;;
+esac
+codesign --force --deep --sign - build/bin/oh-my-disk.app

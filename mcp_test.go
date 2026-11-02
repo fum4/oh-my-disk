@@ -3,10 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"github.com/fum4/oh-my-disk/internal/report"
+	"github.com/fum4/oh-my-disk/internal/rules"
+	"github.com/fum4/oh-my-disk/internal/scanner"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -75,5 +79,41 @@ func TestMCPOverStdio(t *testing.T) {
 		if e == nil && !r.IsError {
 			t.Fatal("accepted invalid input")
 		}
+	}
+}
+
+func TestMCPSessionSnapshot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "session-only"), make([]byte, 8192), 0600); err != nil {
+		t.Fatal(err)
+	}
+	scan, err := scanner.Scan(context.Background(), root, scanner.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	engine, err := rules.Load("", root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := filepath.Join(t.TempDir(), "private", "scan.bin")
+	if err = report.SaveCache(cache, report.New(scan, engine, 0)); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMCPStdioHelper$")
+	cmd.Env = append(os.Environ(), "OMD_MCP_HELPER=1", "OMD_SESSION_SCAN="+cache)
+	client := mcp.NewClient(&mcp.Implementation{Name: "session-test", Version: "1"}, nil)
+	session, err := client.Connect(ctx, &mcp.CommandTransport{Command: cmd}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "summary"})
+	if err != nil || result.IsError {
+		t.Fatalf("%+v %v", result, err)
+	}
+	if !strings.Contains(result.Content[0].(*mcp.TextContent).Text, root) {
+		t.Fatal("MCP did not load the private session scan")
 	}
 }

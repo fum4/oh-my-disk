@@ -56,7 +56,11 @@ func newMCPServer() *mcp.Server {
 				return nil, nil, err
 			}
 			if snapshot == nil {
-				snapshot, _ = report.LoadCache(report.CachePath())
+				cache := os.Getenv("OMD_SESSION_SCAN")
+				if cache == "" {
+					cache = report.CachePath()
+				}
+				snapshot, _ = report.LoadCache(cache)
 			}
 			if name == "scan" {
 				root := a.Root

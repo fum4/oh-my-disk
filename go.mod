@@ -3,6 +3,7 @@ module github.com/fum4/oh-my-disk
 go 1.26.0
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/wailsapp/wails/v2 v2.17.1
 	golang.org/x/sys v0.48.0
