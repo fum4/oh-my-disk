@@ -14,12 +14,12 @@ fs.mkdirSync(".build/screens", { recursive: true });
     env: { ...process.env, HOME: process.cwd() + "/.build/chrome-home" },
   });
   const page = await browser.newPage({
-      viewport: { width: 1440, height: 1080 },
+      viewport: { width: 1440, height: 900 },
     }),
     errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto(url);
-  await page.waitForSelector(".category-cluster");
+  await page.waitForSelector("#overview-folders .fr");
   await page.evaluate(() => document.fonts.ready);
   for (const id of ["overview", "folders", "categories", "cleanup-tab"]) {
     await page.locator("#" + id).click();
@@ -41,6 +41,28 @@ fs.mkdirSync(".build/screens", { recursive: true });
   });
   await page.locator("#cancel-trash").click();
   await page.locator("#clear-selection").click();
+  await page.setViewportSize({ width: 900, height: 900 });
+  for (const id of ["overview", "folders", "categories", "cleanup-tab"]) {
+    await page.locator("#" + id).click();
+    if (
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      )
+    )
+      throw Error("900px overflow: " + id);
+    await page.screenshot({
+      path: ".build/screens/" + id + "-900.png",
+      fullPage: true,
+    });
+  }
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator("#overview").click();
+  await page.screenshot({
+    path: ".build/screens/overview-dark.png",
+    fullPage: true,
+  });
+  await page.emulateMedia({ colorScheme: "light" });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator("#overview").click();
   await page.screenshot({

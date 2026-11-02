@@ -18,11 +18,12 @@ const wait = async (fn) => {
     calls = [];
   const vc = new VirtualConsole();
   vc.on("jsdomError", (e) => errors.push(e.message));
+  const empty = process.argv.includes("--empty");
   const state = {
     home: fixture,
     busy: false,
-    hasScan: true,
-    revision: 1,
+    hasScan: !empty,
+    revision: empty ? 0 : 1,
     phase: "Cached",
     entries: 42,
     directories: 8,
@@ -84,15 +85,50 @@ const wait = async (fn) => {
   const w = app.window,
     d = w.document,
     $ = (id) => d.getElementById(id);
+  if (empty) {
+    await wait(() => !$("desktop").hidden);
+    assert.equal($("welcome").hidden, false);
+    assert.equal($("content-grid").hidden, true);
+    $("folders").click();
+    assert.equal($("welcome").hidden, false);
+    await $("toolbar-choose").onclick();
+    assert.equal($("chosen-path").textContent, fixture);
+    await $("hub-scan").onclick();
+    await wait(() => !$("cancel-scan").hidden);
+    assert.equal($("hub-scan").disabled, true);
+    assert.equal(d.body.classList.contains("is-scanning"), true);
+    await $("cancel-scan").onclick();
+    await wait(() => $("cancel-scan").hidden);
+    state.error = "older cache format; rescan with --refresh";
+    await wait(() => !$("scan-feedback").hidden);
+    assert.match($("scan-feedback").textContent, /Scan Again/);
+    assert(!$("scan-feedback").textContent.includes("--refresh"));
+    assert.equal(errors.length, 0, errors.join("\n"));
+    console.log(
+      "PASS: native empty welcome, navigation before scan, toolbar picker, scan skeleton/progress/cancel, old-cache recovery action.",
+    );
+    w.close();
+    return;
+  }
   await wait(() => !$("open-last").hidden);
   assert.equal($("web-scan").hidden, true);
   assert.equal($("desktop").hidden, false);
   $("folders").click(); // Safe before a snapshot has been opened.
   await $("open-last").onclick();
-  await wait(() => d.querySelector(".category-cluster"));
+  await wait(() => d.querySelector("#overview-folders .fr"));
+  assert.equal($("chosen-path").textContent, fixture);
   assert.equal($("overview-panel").hidden, false);
   assert.equal($("explorer").hidden, true);
   assert.equal(d.querySelector(".view-switch").hidden, true);
+  state.error = "older cache format; rescan with --refresh";
+  await wait(() => !$("scan-feedback").hidden);
+  assert.match($("scan-feedback").textContent, /older format/);
+  assert(!$("scan-feedback").textContent.includes("--refresh"));
+  assert.equal(
+    $("scan-feedback").querySelector("button").textContent,
+    "Scan Again",
+  );
+  state.error = "";
   await $("choose-folder").onclick();
   assert.equal($("scan-root").value, "custom");
   assert.equal($("chosen-path").textContent, fixture);
@@ -116,9 +152,9 @@ const wait = async (fn) => {
   await copy.onclick();
   assert.equal(calls.at(-1)[0], "copy");
   $("cleanup-tab").click();
-  await wait(() => d.querySelector(".suggestion-card .item-actions"));
+  await wait(() => d.querySelector(".suggestion-details .item-actions"));
   const cmd = [
-    ...d.querySelectorAll(".suggestion-card .item-actions button"),
+    ...d.querySelectorAll(".suggestion-details .item-actions button"),
   ].find((b) => b.textContent === "Copy suggested command");
   assert(cmd);
   await cmd.onclick();

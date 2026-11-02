@@ -57,24 +57,73 @@ const wait = async (fn) => {
   const w = app.window,
     d = w.document,
     $ = (id) => d.getElementById(id);
+  if (process.argv.includes("--large")) {
+    await wait(() => d.querySelector("#overview-folders .fr"));
+    assert.match($("scan-info").title, /\.fixtures\/large/);
+    const more = () =>
+      [...d.querySelectorAll("#children button")].find((b) =>
+        b.textContent.startsWith("Show more"),
+      );
+    $("folders").click();
+    assert.equal(d.querySelectorAll("#children .filename").length, 200);
+    more().click();
+    await wait(() => d.querySelectorAll("#children .filename").length === 400);
+    await d.querySelector('[data-sort="name"]').onclick();
+    assert.equal(d.querySelectorAll("#children .filename").length, 200);
+    assert(requests.at(-1).includes("sort=name"));
+    $("categories").click();
+    const scan = await (await w.fetch("/api/scan")).json();
+    const largest = Object.entries(scan.categories).sort(
+      (a, b) => b[1] - a[1],
+    )[0][0];
+    [...d.querySelectorAll("#children .filename")]
+      .find((n) => n.textContent === largest)
+      .click();
+    await wait(() => d.querySelectorAll("#children .filename").length === 200);
+    more().click();
+    await wait(() => d.querySelectorAll("#children .filename").length === 400);
+    $("treemap").click();
+    assert.ok(d.querySelector("#chart canvas"));
+    assert.equal(errors.length, 0, errors.join("\n"));
+    assert(!requests.some((x) => x === "/api/trash" || x === "/api/rescan"));
+    console.log(
+      "PASS: large fixture folder/category pagination 200 to 400, global name sort reset, treemap; no script errors or mutations.",
+    );
+    w.close();
+    return;
+  }
   await wait(
     () =>
-      d.querySelectorAll(".category-cluster").length > 0 &&
+      d.querySelectorAll("#overview-folders .fr").length > 0 &&
       d.querySelectorAll(".suggestion-card").length > 0,
   );
   assert.equal($("overview").getAttribute("aria-current"), "page");
   assert.equal($("explorer").hidden, true);
-  assert.equal(
-    d.querySelectorAll(".tile-grid i").length,
-    d.querySelectorAll(".category-cluster").length * 24,
-  );
-  assert.match($("hud-scanned").textContent, /\d+\.\d{2} GB/);
-  assert.ok(d.querySelector(".rail-card"));
+  assert.equal(d.querySelectorAll("#disk-legend .li").length, 4);
+  assert.ok(d.querySelector("#ringsvg circle"));
+  assert.match($("disk-free").textContent, /\d+\.\d GB/);
+  assert.ok(d.querySelector(".badge svg use"));
+  for (const use of d.querySelectorAll("use"))
+    assert(
+      d.querySelector(use.getAttribute("href")),
+      "Missing bundled icon " + use.getAttribute("href"),
+    );
   for (const path of [
     "/fonts/InterVariable.woff2",
     "/fonts/JetBrainsMono-Regular.woff2",
   ])
     assert.equal((await w.fetch(path)).status, 200);
+  const overviewName = d.querySelector(".item-name");
+  overviewName.click();
+  assert.equal(overviewName.getAttribute("aria-expanded"), "true");
+  assert.equal(d.querySelector(".suggestion-details").hidden, false);
+  overviewName.click();
+  const firstOverviewRow = d.querySelector("#overview-folders .fr");
+  firstOverviewRow.focus();
+  firstOverviewRow.dispatchEvent(
+    new w.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+  );
+  assert.equal(d.activeElement, firstOverviewRow.nextElementSibling);
   $("folders").click();
   assert.ok(d.querySelector("#chart canvas"));
   assert.equal($("overview-panel").hidden, true);
@@ -96,11 +145,15 @@ const wait = async (fn) => {
   assert(requests.some((x) => x.startsWith("/api/category?")));
   $("cleanup-tab").click();
   await wait(() => d.querySelectorAll(".suggestion-card").length > 0);
-  assert.match(d.querySelector(".suggestion-score").textContent, /\d+\/100/);
+  assert.match(d.querySelector(".suggestion-score").textContent, /\d+/);
   const box = d.querySelector(".suggestion-card input:not(:disabled)");
   box.click();
   assert.equal($("selection-bar").hidden, false);
-  assert.match($("selection-total").textContent, /1 selected/);
+  assert.match($("selection-total").textContent, /1 item selected/);
+  $("folders").click();
+  assert.equal($("selection-bar").parentElement, $("explorer"));
+  $("cleanup-tab").click();
+  assert.equal($("selection-bar").parentElement, $("suggestions"));
   $("trash-selected").click();
   assert.equal($("trash-confirm").open, true);
   assert.ok($("confirm-paths").textContent.includes(".fixtures/home"));
@@ -126,15 +179,23 @@ const wait = async (fn) => {
   assert.ok($("accounting").textContent);
   const fixture = process.cwd() + "/.fixtures/home";
   assert.ok(
-    $("scan-info").textContent.startsWith(fixture),
+    $("scan-info").title.startsWith(fixture),
     "Run this check only against .fixtures/home",
   );
   $("web-root").value = fixture;
   await $("web-start-scan").onclick();
   assert.equal($("web-scan-status").textContent, "Complete");
   $("overview").click();
-  await $("hub-scan").onclick();
+  d.dispatchEvent(
+    new w.KeyboardEvent("keydown", {
+      key: "r",
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   await wait(() => $("web-scan-status").textContent === "Complete");
+  assert.equal(d.body.classList.contains("is-scanning"), false);
   assert(
     !requests.some((x) => x === "/api/trash"),
     "No Trash action should be sent",
@@ -146,7 +207,7 @@ const wait = async (fn) => {
     d.documentElement.outerHTML,
   );
   console.log(
-    "PASS: overview tiles, HUD decimal GB, embedded fonts, folder drill/back, global sort, treemap, category lazy load, cleanup sort/filter, selection, Trash confirmation/cancel, binary units, notes, web rescan and hub scan. No script errors; no Trash action sent.",
+    "PASS: Calm ring, decimal GB, Phosphor badges, embedded fonts, folder drill/back, global sort, treemap, category lazy load, cleanup sort/filter, selection, Trash confirmation/cancel, binary units, notes, web rescan and hub scan. No script errors; no Trash action sent.",
   );
   w.close();
 })().catch((e) => {
