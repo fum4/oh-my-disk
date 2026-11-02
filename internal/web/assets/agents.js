@@ -30,7 +30,7 @@
     const ready = !!snapshot;
     if (busy) $("agent-picker").open = false;
     const selected = installed[choice] ? choice : "";
-    const slot = !ready ? "scan-agent-slot" : ["overview", "cleanup-tab"].includes(mode) ? "results-agent-slot" : "toolbar-agent-slot";
+    const slot = !ready ? "scan-agent-slot" : "toolbar-agent-slot";
     const control = $("agent-control");
     if (control.parentElement !== $(slot)) $(slot).append(control);
     control.hidden = busy;
@@ -38,7 +38,7 @@
     $("ask-agent").disabled = !app || opening;
     $("ask-agent").title = app ? "Chat about these results" : "Available in the desktop app";
     $("agent-choice").textContent = names[selected] || "None";
-    $("agent-ask-label").textContent = selected ? "Ask" : "Ask agent";
+    $("agent-ask-label").textContent = "Ask agent";
     $("agent-selection").hidden = ready && !selected;
     const summary = $("agent-picker").querySelector("summary");
     $("agent-analyze").hidden = ready;
@@ -55,6 +55,7 @@
     const options = $("agent-options");
     if (signature !== optionState) {
       optionState = signature;
+      const hadFocus = options.contains(document.activeElement);
       options.replaceChildren();
       const add = (name, label, glyph = "") => {
         const b = dom("button", "agent-option");
@@ -84,15 +85,18 @@
           options.append(row);
         }
       }
+      if (hadFocus) options.querySelector('button[aria-pressed="true"]')?.focus({ preventScroll: true });
     }
-    $("agent-check").hidden = !app;
     $("plain-scan").disabled = busy || opening;
   }
+  let detection = 0;
   async function detect() {
-    $("agent-check").disabled = true;
+    const request = ++detection;
     try {
       // The same Go registry supplies desktop and browser presentation.
-      definitions = app ? await app.Agents() : await (await fetch("/api/agents")).json();
+      const found = app ? await app.Agents() : await (await fetch("/api/agents")).json();
+      if (request !== detection) return;
+      definitions = found;
       for (const d of definitions) names[d.name] = d.label;
       if (app) installed = Object.fromEntries(definitions.map(c => [c.name, c.path]));
       // A removed CLI falls back to a plain scan, even if installed again later.
@@ -101,7 +105,7 @@
         try { localStorage.setItem("omd-agent-choice", ""); } catch {}
       }
       render();
-    } finally { $("agent-check").disabled = false; }
+    } catch (e) { if (request === detection) error(e); }
   }
   function theme() {
     return {
@@ -242,7 +246,7 @@
   }
   $("ask-agent").onclick = () => {
     if (installed[choice]) return launch(choice);
-    else { $("agent-picker").open = true; $("agent-options").querySelector("button")?.focus(); }
+    else $("agent-picker").open = true;
   };
   window.agentViewChanged = render;
   const scan = $("hub-scan").onclick;
@@ -273,19 +277,7 @@
     render();
   };
   $("plain-scan").onclick = () => $("hub-scan").onclick();
-  document.addEventListener("click", e => {
-    if (!$("agent-picker").contains(e.target)) $("agent-picker").open = false;
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && $("agent-picker").open) {
-      $("agent-picker").open = false;
-      $("agent-picker").querySelector("summary").focus();
-    }
-  });
-  $("agent-picker").addEventListener("toggle", () => {
-    if ($("agent-picker").open) $("folder-picker").open = false;
-  });
-  $("agent-check").onclick = () => detect().catch(error);
+  floatingMenu($("agent-picker"), () => detect());
   $("terminal-close").onclick = () => close().catch(error);
   $("terminal-copy").onclick = () =>
     app.Copy(term?.getSelection() || "").catch(error);

@@ -65,7 +65,33 @@ require("node:fs").mkdirSync(".build/screens", { recursive: true });
           await page.waitForTimeout(180);
           assert.equal((await geometry(button)).transform, "none");
           assert.deepEqual(await geometry(button), normal, selector);
+          const paint = await button.evaluate(node => {
+            const before = getComputedStyle(node, "::before");
+            const style = getComputedStyle(node);
+            return { inset: [before.top, before.right, before.bottom, before.left],
+              outline: style.outlineStyle, border: style.borderWidth };
+          });
+          assert.deepEqual(paint.inset, ["-1px", "-1px", "-1px", "-1px"], selector);
+          assert.equal(paint.outline, "none", "No pointer hover outline");
+          assert.equal(paint.border, "0px", "Paint growth starts at the outer button edge");
         }
+      }
+    }
+    // Ring overlay and SVG use identical boxes through every responsive rule.
+    for (const [width, height] of [[1440, 900], [900, 900], [900, 700], [390, 900]]) {
+      await page.setViewportSize({ width, height });
+      const svg = await page.locator("#ringsvg").boundingBox();
+      const center = await page.locator(".rc .t").boundingBox();
+      assert.deepEqual(center, svg, "Ring overlay shares the SVG coordinate box");
+      for (const id of ["agent-picker", "rescan-picker"]) {
+        await page.locator(`#${id} summary`).click();
+        const menu = page.locator(`#${id}-menu`);
+        await menu.waitFor({ state: "visible" });
+        assert.equal(await menu.evaluate(n => n.parentElement === document.body), true);
+        const box = await menu.boundingBox();
+        assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= height);
+        await page.keyboard.press("Escape");
+        assert.equal(await page.locator(`#${id}`).evaluate(n => n.open), false);
       }
     }
     // Render the actual landing DOM without a saved snapshot.

@@ -117,7 +117,6 @@ if (nativeApp) {
       }
       $("desktop-error").textContent = "";
       await nativeApp.Scan(target);
-      setOptionsOpen(false);
       scanState(true);
       window.agentScanStarted?.();
     } catch (e) {
@@ -132,7 +131,6 @@ if (nativeApp) {
   $("open-last").onclick = async () => {
     await loadSnapshot();
     if (snapshot) showResults();
-    setOptionsOpen(false);
   };
   $("full-disk-access").onclick = () =>
     nativeApp.FullDiskAccess().catch(reportError);
@@ -161,7 +159,6 @@ if (nativeApp) {
         "hub-scan",
         "choose-folder",
         "scan-root",
-        "toolbar-choose",
         "scan-another",
         "empty-scan",
         "welcome-scan",

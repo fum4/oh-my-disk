@@ -53,11 +53,6 @@ fs.mkdirSync(".build/screens", { recursive: true });
             if (style.userSelect !== "none" && style.webkitUserSelect !== "none")
               throw Error("Selectable UI chrome: " + node.tagName);
           }
-          const gain = document.querySelector("#suggestions > .gain");
-          if (gain.getBoundingClientRect().height) {
-            const gap = document.querySelector("#results-agent-slot").getBoundingClientRect().top - gain.getBoundingClientRect().bottom;
-            if (gap < 16 || gap > 20) throw Error("Cleanup banner spacing: " + gap);
-          }
           const control = document.querySelector("#agent-control");
           if (!control.hidden && control.classList.contains("has-results")) {
             const ask = document.querySelector("#ask-agent").getBoundingClientRect();
@@ -108,11 +103,9 @@ fs.mkdirSync(".build/screens", { recursive: true });
       await page.locator("#overview").click();
       await page.evaluate(() => {
         document.querySelector("#access-banner").hidden = false;
-        setOptionsOpen(true);
       });
       await shot(`${prefix}-access-options`);
       await page.evaluate(() => {
-        setOptionsOpen(false);
         document.querySelector("#access-banner").hidden = true;
         document.body.classList.add("is-scanning");
       });

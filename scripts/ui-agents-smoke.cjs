@@ -147,6 +147,12 @@ const wait = async (fn) => {
       .map((file) => fs.readFileSync("internal/web/assets/" + file, "utf8"))
       .join("\n"),
   );
+  const refreshAgents = async () => {
+    $("agent-picker").open = false;
+    await new Promise(r => setTimeout(r, 10));
+    $("agent-picker").open = true;
+    await new Promise(r => setTimeout(r, 30));
+  };
   const option = name => [...$("agent-options").querySelectorAll("button")].find(b => b.textContent.includes(name));
   await wait(() => $("agent-options").textContent.includes("Claude"));
   assert.equal($("ask-agent").hidden, true);
@@ -164,7 +170,7 @@ const wait = async (fn) => {
     assert.equal(w.localStorage.getItem("omd-agent-choice"), available ? "claude" : "");
     if (!available) {
       available = true;
-      await $("agent-check").onclick();
+      await refreshAgents();
       assert.equal($("agent-choice").textContent, "None");
     }
     w.close();
@@ -193,6 +199,14 @@ const wait = async (fn) => {
   assert.ok($("agent-options").querySelector('a[aria-label="Install Claude"]'));
   assert.equal($("agent-tip"), null);
   assert.equal($("folder-choice").textContent, "Home");
+  assert.equal($("toolbar-choose"), null);
+  assert.equal($("options-toggle"), null);
+  assert.equal($("scan-another").textContent.trim(), "Scan folder");
+  const savedOptions = () => [...$("rescan-options").querySelectorAll("button")];
+  assert.deepEqual(savedOptions().map(b => b.textContent), [...$("locations").querySelectorAll(".location-name")].map(b => b.textContent));
+  savedOptions().find(b => b.textContent === "Macintosh HD").click();
+  assert.equal($("scan-root").value, "/");
+  assert.equal(state.busy, false);
   const folderOptions = () => [...$("folder-options").querySelectorAll("button")];
   assert.deepEqual(folderOptions().map(b => b.textContent), [...$("locations").querySelectorAll(".location-name")].map(b => b.textContent));
   folderOptions().find(b => b.textContent === "Macintosh HD").click();
@@ -215,7 +229,12 @@ const wait = async (fn) => {
   assert.equal($("folder-picker").open, false);
   assert.equal(w.document.activeElement, $("folder-picker").querySelector("summary"));
   available = true;
-  await $("agent-check").onclick();
+  await refreshAgents();
+  assert.equal($("agent-check"), null);
+  assert.equal($("agent-options").closest(".floating-menu").parentElement, w.document.body);
+  const unchanged = option("Claude");
+  await refreshAgents();
+  assert.equal(option("Claude"), unchanged); // No redraw when detection is unchanged.
   assert.ok(option("Claude"));
   assert.equal(option("Claude").querySelector("use").getAttribute("href"), "#agent-claude");
   assert.equal(option("Codex"), undefined);
@@ -293,11 +312,11 @@ const wait = async (fn) => {
   await $("terminal-close").onclick();
   assert.equal($("agent-terminal").hidden, true);
   assert.equal($("ask-agent").hidden, false);
-  assert.equal($("agent-control").parentElement.id, "results-agent-slot");
+  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
   $("folders").click();
   assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
   $("cleanup-tab").click();
-  assert.equal($("agent-control").parentElement.id, "results-agent-slot");
+  assert.equal($("agent-control").parentElement.id, "toolbar-agent-slot");
   await $("ask-agent").onclick();
   assert.equal(launched.length, 2);
   await $("terminal-close").onclick();
@@ -334,7 +353,7 @@ const wait = async (fn) => {
   assert.deepEqual(errors, []);
   w.close();
   console.log(
-    "PASS: install states, check again, command-bar folder selection, scan-to-agent handoff, terminal collapse/restore keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, close/reopen, cancelled scan never launches. Native terminal mocked.",
+    "PASS: install states, detect on open, command-bar folder selection, scan-to-agent handoff, terminal collapse/restore keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, close/reopen, cancelled scan never launches. Native terminal mocked.",
   );
 })().catch((e) => {
   console.error(e);

@@ -18,6 +18,9 @@
   </head>
   <body>
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="regular-x" viewBox="0 0 24 24">
+        <path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </symbol>
       <symbol id="agent-claude" viewBox="0 0 24 24">
         <path d="M12 2v20M2 12h20M5 5l14 14M5 19L19 5M8 3l8 18M3 8l18 8M3 16l18-8M8 21l8-18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
       </symbol>
@@ -433,7 +436,7 @@
         <div id="locations" role="list" aria-label="Favorite locations"></div>
         <button class="nv add" id="scan-another">
           <svg class="i" aria-hidden="true"><use href="#regular-plus" /></svg
-          >Scan another folder
+          >Scan folder
         </button>
       </div>
       <div class="vol">
@@ -453,25 +456,74 @@
         </div>
         <div class="sp"></div>
         <div id="toolbar-agent-slot"></div>
-        <button id="toolbar-choose" class="btn sec">
-          <svg class="i" aria-hidden="true">
-            <use href="#regular-folder-open" /></svg
-          >Choose Folder…</button
-        ><button
-          id="options-toggle"
-          class="btn sec"
-          aria-haspopup="dialog"
-          aria-expanded="false"
-          aria-controls="scan-options"
-        >
-          <svg class="i" aria-hidden="true"><use href="#regular-sliders" /></svg
-          >Options</button
-        ><button id="hub-scan" class="btn sec">
+        <div class="scan-split">
+        <button id="hub-scan" class="btn sec">
           <svg class="i" aria-hidden="true">
             <use href="#regular-arrow-clockwise" /></svg
           >Scan Again<span class="kbd">⌘R</span>
         </button>
+        <details id="rescan-picker">
+          <summary aria-label="Choose scan folder"><svg class="i command-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></summary>
+          <div class="agent-menu folder-menu">
+            <div id="rescan-options" role="group" aria-label="Saved Locations"></div>
+            <button id="rescan-new" class="agent-option">New folder…</button>
+          </div>
+        </details>
+        </div>
       </div>
+      <section id="scan-options" class="options-strip" aria-label="Scan and display settings" hidden>
+        <section id="desktop" hidden>
+          <label class="target-chip"
+            ><svg class="i" aria-hidden="true">
+              <use href="#regular-folder" /></svg
+            ><select id="scan-root" aria-label="Scan target">
+              <option value="home">Home</option>
+              <option value="/">Macintosh HD</option>
+              <option value="custom">Chosen folder</option>
+            </select></label
+          >
+          <span id="chosen-path"></span>
+          <button id="choose-folder" class="link" hidden>Change folder…</button>
+          <button id="start-scan" hidden>Scan</button
+          ><button id="open-last" class="link" hidden>Open last scan</button>
+          <p id="desktop-error" role="alert"></p>
+        </section>
+        <section id="web-scan" hidden>
+          <label class="web-target"
+            >Scan target<input
+              id="web-root"
+              placeholder="Absolute folder path" /></label
+          ><button id="web-start-scan" hidden>Scan</button
+          ><span id="web-scan-status" role="status"></span>
+        </section>
+
+        <div class="seg unit-segments" aria-label="Display units">
+          <button id="units-decimal" aria-pressed="true" class="active">
+            GB <span>decimal</span></button
+          ><button id="units-binary" aria-pressed="false">
+            GiB <span>binary</span>
+          </button>
+        </div>
+        <input type="checkbox" id="binary-units" hidden />
+
+        <div class="export-cards">
+          <button id="export-json" class="export-card" disabled>
+            <svg class="i" aria-hidden="true">
+              <use href="#regular-download-simple" /></svg
+            ><span
+              ><strong>Export JSON</strong
+              ></span
+            ></button
+          ><button id="export-summary" class="export-card" disabled>
+            <svg class="i" aria-hidden="true">
+              <use href="#regular-file-text" /></svg
+            ><span
+              ><strong>Summary for AI</strong
+              ></span
+            >
+          </button>
+        </div>
+      </section>
       <div id="scan-strip" hidden>
         <progress id="scan-spinner" aria-label="Scan progress"></progress
         ><span id="progress" role="status" aria-live="polite"></span
@@ -526,12 +578,11 @@
         </div>
       </section>
       <div id="agent-control" class="agent-control" hidden>
-        <button id="ask-agent" class="btn sec" hidden><span id="agent-ask-label">Ask agent</span></button>
+        <button id="ask-agent" class="btn pri" hidden><span id="agent-ask-label">Ask agent</span></button>
         <details id="agent-picker">
           <summary aria-label="Choose agent"><span id="agent-analyze">Analyze with</span><span id="agent-selection"><span id="agent-mark" aria-hidden="true"></span><span id="agent-choice">None</span></span><svg class="i agent-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></summary>
           <div class="agent-menu">
             <div id="agent-options" role="group" aria-label="Analyze with"></div>
-            <button id="agent-check" class="link">Check again</button>
           </div>
         </details>
       </div>
@@ -557,7 +608,6 @@
               </div>
             </div>
           </div>
-          <div id="results-agent-slot"></div>
           <div class="tools">
             <div class="seg" aria-label="Suggestion sort">
               <button data-suggest-sort="score" class="active">Best</button
@@ -704,77 +754,6 @@
         <span id="hud-used"></span><span id="hud-free"></span
         ><span id="hud-scanned"></span><span id="hud-outside"></span
         ><span id="total"></span>
-      </section>
-      <section
-        id="scan-options"
-        class="options-popover"
-        role="dialog"
-        aria-label="Scan options"
-        hidden
-      >
-        <div class="options-heading">
-          <h2>Scan options</h2>
-          <button
-            id="options-close"
-            class="icon-action"
-            aria-label="Close options"
-          >
-            ×
-          </button>
-        </div>
-        <section id="desktop" hidden>
-          <label class="target-chip"
-            ><svg class="i" aria-hidden="true">
-              <use href="#regular-folder" /></svg
-            ><select id="scan-root" aria-label="Scan target">
-              <option value="home">Home</option>
-              <option value="/">Macintosh HD</option>
-              <option value="custom">Chosen folder</option>
-            </select></label
-          >
-          <span id="chosen-path"></span>
-          <button id="choose-folder" class="link">Change folder…</button>
-          <button id="start-scan" hidden>Scan</button
-          ><button id="open-last" class="link" hidden>Open last scan</button>
-          <p id="desktop-error" role="alert"></p>
-        </section>
-        <section id="web-scan" hidden>
-          <label class="web-target"
-            >Scan target<input
-              id="web-root"
-              placeholder="Absolute folder path" /></label
-          ><button id="web-start-scan" hidden>Scan</button
-          ><span id="web-scan-status" role="status"></span>
-        </section>
-        <div class="options-label">Display units</div>
-        <div class="seg unit-segments" aria-label="Display units">
-          <button id="units-decimal" aria-pressed="true" class="active">
-            GB <span>decimal</span></button
-          ><button id="units-binary" aria-pressed="false">
-            GiB <span>binary</span>
-          </button>
-        </div>
-        <input type="checkbox" id="binary-units" hidden />
-        <div class="options-label">Take your scan with you</div>
-        <div class="export-cards">
-          <button id="export-json" class="export-card" disabled>
-            <svg class="i" aria-hidden="true">
-              <use href="#regular-download-simple" /></svg
-            ><span
-              ><strong>Export JSON</strong
-              ><small>Full scan data for your own tools.</small></span
-            ></button
-          ><button id="export-summary" class="export-card" disabled>
-            <svg class="i" aria-hidden="true">
-              <use href="#regular-file-text" /></svg
-            ><span
-              ><strong>Summary for AI</strong
-              ><small
-                >A compact summary to share with an assistant.</small
-              ></span
-            >
-          </button>
-        </div>
       </section>
       <section id="agent-terminal" aria-label="Agent terminal" hidden>
         <button id="terminal-resize" type="button" aria-label="Collapse terminal"

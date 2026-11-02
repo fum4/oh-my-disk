@@ -117,12 +117,10 @@ const wait = async (fn) => {
       assert.equal($("ask-agent").hidden, true);
     }
     assert.equal($("ask-agent").hidden, true);
-    $("options-toggle").click();
-    assert.equal($("scan-options").hidden, false);
+    assert.equal($("scan-options").hidden, true); // Minimal landing.
     $("units-binary").click();
     assert.equal($("binary-units").checked, true);
     assert.equal($("units-binary").getAttribute("aria-pressed"), "true");
-    $("options-close").click();
     assert.equal($("scan-options").hidden, true);
     const locationCount = $("locations").childElementCount;
     $("locations").querySelector(".location-remove").click();
@@ -139,7 +137,7 @@ const wait = async (fn) => {
     assert.equal(calls.find((c) => c[0] === "scan")[1], fixture);
     await $("cancel-scan").onclick();
     await wait(() => !$("hub-scan").disabled);
-    await $("toolbar-choose").onclick();
+    await $("rescan-new").onclick();
     assert.equal($("chosen-path").textContent, fixture);
     await $("hub-scan").onclick();
     await wait(() => !$("cancel-scan").hidden);
@@ -180,7 +178,7 @@ const wait = async (fn) => {
     assert(!$("scan-feedback").textContent.includes("--refresh"));
     assert.equal(errors.length, 0, errors.join("\n"));
     console.log(
-      "PASS: native empty welcome, navigation before scan, toolbar picker, options, units, favorites removal/Undo/persistence, scan progress/cancel, silent old-cache handling.",
+      "PASS: native empty welcome, navigation before scan, split scan picker, inline settings, units, favorites removal/Undo/persistence, scan progress/cancel, silent old-cache handling.",
     );
     w.close();
     return;

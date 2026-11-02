@@ -29,6 +29,7 @@
   function render() {
     $("locations").replaceChildren();
     $("folder-options").replaceChildren();
+    $("rescan-options").replaceChildren();
     for (const path of locations) {
       const option = dom("button", "agent-option", label(path));
       option.title = path === "home" ? "Home" : path;
@@ -42,6 +43,13 @@
         $("folder-picker").querySelector("summary").focus();
       };
       $("folder-options").append(option);
+      const saved = option.cloneNode(true);
+      saved.onclick = () => {
+        option.onclick();
+        $("rescan-picker").open = false;
+        $("rescan-picker").querySelector("summary").focus();
+      };
+      $("rescan-options").append(saved);
       const row = dom("div", "location-row");
       row.setAttribute("role", "listitem");
       const b = dom("button", "nv location-open");
@@ -66,7 +74,8 @@
             path === "home" ? snapshot?.scan.root.path || "" : path;
         await $("hub-scan").onclick();
       };
-      const remove = dom("button", "location-remove icon-action", "×");
+      const remove = dom("button", "location-remove icon-action");
+      remove.append(icon("regular-x"));
       remove.title = "Remove from Locations";
       remove.setAttribute(
         "aria-label",
@@ -113,18 +122,5 @@
     removed = null;
     $("locations").querySelector("button")?.focus();
   };
-  const picker = $("folder-picker");
-  picker.addEventListener("toggle", () => {
-    if (picker.open) $("agent-picker").open = false;
-  });
-  document.addEventListener("click", e => {
-    if (!picker.contains(e.target)) picker.open = false;
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && picker.open) {
-      picker.open = false;
-      picker.querySelector("summary").focus();
-    }
-  });
   render();
 })();

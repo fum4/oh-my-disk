@@ -497,6 +497,8 @@ function categoryTree() {
 
 function showMode(next) {
   mode = next;
+  $("scan-options").hidden = !snapshot;
+  $("rescan-picker").open = false;
   ["overview", "folders", "categories", "cleanup-tab"].forEach((id) => {
     $(id).classList.toggle("active", id === mode);
     if (id === mode) $(id).setAttribute("aria-current", "page");
@@ -1021,7 +1023,6 @@ if (!window.go?.main?.App) {
     const b = $("web-start-scan");
     b.disabled = true;
     $("web-scan-status").textContent = "Scanning…";
-    setOptionsOpen(false);
     scanState(true);
     try {
       const result = await action("/api/rescan", { root: $("web-root").value });
@@ -1256,7 +1257,10 @@ function showFeedback(message) {
 }
 function scanState(busy, message = "Scanning…") {
   document.body.classList.toggle("is-scanning", busy);
-  if (busy) $("folder-picker").open = false;
+  if (busy) {
+    $("folder-picker").open = false;
+    $("rescan-picker").open = false;
+  }
   $("hub-scan").disabled = busy;
   $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"),
@@ -1282,50 +1286,76 @@ $("hub-scan").onclick = () => {
   const target = $(window.go?.main?.App ? "start-scan" : "web-start-scan");
   if (!target.disabled) return target.onclick();
 };
-$("toolbar-choose").onclick = () => {
-  setOptionsOpen(true);
+async function chooseScanFolder() {
   if (window.go?.main?.App) return $("choose-folder").onclick();
+  $("scan-options").hidden = false;
   $("web-root").focus();
   $("web-root").select();
-};
-$("scan-another").onclick = $("welcome-scan").onclick = () =>
-  $("toolbar-choose").click();
+}
+$("scan-another").onclick = $("welcome-scan").onclick = chooseScanFolder;
 $("landing-choose").onclick = () => {
   $("folder-picker").open = false;
-  if (window.go?.main?.App) return $("choose-folder").onclick();
-  return $("toolbar-choose").click();
+  return chooseScanFolder();
+};
+$("rescan-new").onclick = () => {
+  $("rescan-picker").open = false;
+  return chooseScanFolder();
 };
 $("empty-scan").onclick = () => $("hub-scan").click();
-function setOptionsOpen(open) {
-  $("scan-options").hidden = !open;
-  $("options-toggle").setAttribute("aria-expanded", String(open));
-  if (open) {
-    const main = document
-      .querySelector(".main-content")
-      .getBoundingClientRect();
-    const bar = document.querySelector(".bar").getBoundingClientRect();
-    $("scan-options").style.top = bar.bottom - main.top + 8 + "px";
-    $(window.go?.main?.App ? "scan-root" : "web-root").focus();
+// Portals keep menus above panels and out of scroll/overflow containers.
+function floatingMenu(picker, onOpen = () => {}) {
+  const menu = picker.querySelector(".agent-menu");
+  const anchor = picker.querySelector("summary");
+  menu.hidden = true;
+  menu.id ||= picker.id + "-menu";
+  anchor.setAttribute("aria-controls", menu.id);
+  anchor.setAttribute("aria-expanded", "false");
+  anchor.setAttribute("aria-haspopup", "true");
+  function position() {
+    if (!picker.open) return;
+    const target = picker.id === "agent-picker" && snapshot ? $("agent-control")
+      : picker.id === "rescan-picker" ? picker.parentElement : anchor;
+    const r = target.getBoundingClientRect(), gap = 8, edge = 12;
+    menu.style.maxHeight = Math.max(80, innerHeight - edge * 2) + "px";
+    const m = menu.getBoundingClientRect();
+    const below = innerHeight - r.bottom - gap - edge;
+    const above = r.top - gap - edge;
+    const up = m.height > below && above > below;
+    menu.style.maxHeight = Math.max(40, up ? above : below) + "px";
+    const height = Math.min(m.height, Math.max(40, up ? above : below));
+    menu.style.left = Math.max(edge, Math.min(r.left, innerWidth - m.width - edge)) + "px";
+    menu.style.top = Math.max(edge, up ? r.top - gap - height : r.bottom + gap) + "px";
   }
+  picker.addEventListener("toggle", () => {
+    anchor.setAttribute("aria-expanded", String(picker.open));
+    if (picker.open) {
+      for (const other of document.querySelectorAll("#folder-picker, #rescan-picker, #agent-picker")) if (other !== picker) other.open = false;
+      menu.classList.add("floating-menu");
+      document.body.append(menu);
+      menu.hidden = false;
+      position();
+      menu.querySelector('button[aria-pressed="true"], button:not(:disabled), a')?.focus({ preventScroll: true });
+      onOpen();
+    } else {
+      menu.hidden = true;
+      picker.append(menu);
+    }
+  });
+  if (window.ResizeObserver) new ResizeObserver(position).observe(menu);
+  window.addEventListener("resize", position);
+  document.addEventListener("scroll", position, true);
+  document.addEventListener("click", e => {
+    if (!picker.contains(e.target) && !menu.contains(e.target)) picker.open = false;
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && picker.open) {
+      picker.open = false;
+      anchor.focus();
+    }
+  });
 }
-$("options-toggle").onclick = () => setOptionsOpen($("scan-options").hidden);
-$("options-close").onclick = () => {
-  setOptionsOpen(false);
-  $("options-toggle").focus();
-};
-document.addEventListener("pointerdown", (e) => {
-  if (
-    !$("scan-options").hidden &&
-    !e.target.closest("#scan-options, #options-toggle, #toolbar-choose")
-  )
-    setOptionsOpen(false);
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("scan-options").hidden) {
-    setOptionsOpen(false);
-    $("options-toggle").focus();
-  }
-});
+floatingMenu($("folder-picker"));
+floatingMenu($("rescan-picker"));
 for (const [id, binary] of [
   ["units-decimal", false],
   ["units-binary", true],

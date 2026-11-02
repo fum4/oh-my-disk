@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -100,16 +101,22 @@ func Detect() []CLI {
 		shell = "/bin/zsh"
 	}
 	login := func(shell, cmd string) string {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 750*time.Millisecond)
 		defer cancel()
 		b, _ := exec.CommandContext(ctx, shell, "-lc", cmd).Output()
 		lines := strings.Split(strings.TrimSpace(string(b)), "\n")
 		return lines[len(lines)-1]
 	}
-	out := []CLI{}
-	for _, d := range registry {
-		out = append(out, CLI{d, Resolve(d.Name, home, shell, exec.LookPath, login)})
+	out := make([]CLI, len(registry))
+	var workers sync.WaitGroup
+	for i, d := range registry {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			out[i] = CLI{d, Resolve(d.Name, home, shell, exec.LookPath, login)}
+		}()
 	}
+	workers.Wait()
 	return out
 }
 func ClaudeConfig(binary, scan string) ([]byte, error) {
