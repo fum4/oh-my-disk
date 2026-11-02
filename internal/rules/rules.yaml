@@ -1,0 +1,244 @@
+rules:
+  - id: npm
+    patterns: ['~/.npm']
+    category: caches
+    safety: cache
+    explanation: npm download cache. Packages can be downloaded again; offline installs may need it.
+    command: npm cache clean --force
+  - id: yarn
+    patterns: ['~/.yarn/cache', '~/Library/Caches/Yarn', '~/.cache/yarn']
+    category: caches
+    safety: cache
+    explanation: Yarn package downloads; regeneration requires network access. Preserve project zero-install caches unless intentional.
+    command: yarn cache clean
+  - id: yarn-tooling
+    patterns: ['~/.yarn']
+    category: dev tooling
+    safety: reinstallable
+    explanation: Yarn may store releases, plugins and package downloads here. Inspect before removing.
+    command: du -sh ~/.yarn/*
+  - id: pnpm
+    patterns: ['~/Library/pnpm/store', '~/.local/share/pnpm/store', '~/.pnpm-store', '~/.cache/pnpm']
+    category: caches
+    safety: cache
+    explanation: Content-addressed pnpm store; prune only unused packages.
+    command: pnpm store prune
+  - id: bun
+    patterns: ['~/.bun/install/cache']
+    category: caches
+    safety: cache
+    explanation: Bun package download cache; packages can be fetched again.
+    command: bun pm cache rm
+  - id: python-cache
+    patterns: ['~/Library/Caches/pip', '~/Library/Caches/uv', '~/.cache/pip', '~/.cache/uv']
+    category: caches
+    safety: cache
+    explanation: Python package and wheel downloads; regeneration may require network and compilation.
+    command: 'pip cache purge  # or: uv cache clean'
+  - id: go-modules
+    patterns: ['~/go/pkg/mod']
+    category: dev tooling
+    safety: cache
+    explanation: Downloaded Go modules; go will download them again as needed.
+    command: go clean -modcache
+  - id: go-build
+    patterns: ['~/Library/Caches/go-build', '~/.cache/go-build']
+    category: caches
+    safety: cache
+    explanation: Go compilation cache; the next build will be slower.
+    command: go clean -cache
+  - id: gradle
+    patterns: ['~/.gradle/caches', '~/.gradle/wrapper/dists']
+    category: caches
+    safety: cache
+    explanation: Gradle dependencies and distributions. Stop Gradle daemons before manually inspecting these.
+    command: du -sh ~/.gradle/caches ~/.gradle/wrapper/dists
+  - id: android-images
+    patterns: ['~/Library/Android/sdk/system-images', '~/Android/Sdk/system-images']
+    category: dev tooling
+    safety: reinstallable
+    explanation: Android emulator system images. Remove unused versions through Android Studio SDK Manager.
+    command: 'sdkmanager --list_installed'
+  - id: android-avd
+    patterns: ['~/.android/avd']
+    category: dev tooling
+    safety: user-data
+    explanation: Android virtual devices include writable user data and snapshots. Inspect devices before deleting through Device Manager.
+    command: avdmanager list avd
+  - id: android-sdk
+    patterns: ['~/Library/Android/sdk', '~/Android/Sdk']
+    category: dev tooling
+    safety: reinstallable
+    explanation: Installed Android SDK components. Use SDK Manager to remove unused versions.
+    command: sdkmanager --list_installed
+  - id: xcode-derived
+    patterns: ['~/Library/Developer/Xcode/DerivedData']
+    category: project build artifacts
+    safety: cache
+    explanation: Xcode intermediates and indexes; Xcode rebuilds them. Close active builds before manual cleanup.
+    command: 'du -sh {path}/*  # inspect DerivedData before manual removal'
+  - id: xcode-archives
+    patterns: ['~/Library/Developer/Xcode/Archives']
+    category: dev tooling
+    safety: user-data
+    explanation: Release archives and debug symbols may be needed for distribution or crash symbolication. Keep required releases.
+    command: open -a Xcode
+  - id: xcode-device-support
+    patterns: ['~/Library/Developer/Xcode/iOS DeviceSupport', '~/Library/Developer/Xcode/watchOS DeviceSupport']
+    category: dev tooling
+    safety: reinstallable
+    explanation: Device support and symbols for OS versions. Inspect and retain versions needed for current devices.
+    command: 'du -sh {path}/*'
+  - id: simulator-devices
+    patterns: ['~/Library/Developer/CoreSimulator/Devices']
+    category: dev tooling
+    safety: user-data
+    explanation: Simulator apps and user data. Apple tooling can remove devices whose runtimes are unavailable.
+    command: xcrun simctl delete unavailable
+  - id: simulator-runtimes
+    patterns: ['~/Library/Developer/CoreSimulator/Profiles/Runtimes', '/Library/Developer/CoreSimulator/Profiles/Runtimes', '/Library/Developer/CoreSimulator/Volumes', '/Library/Developer/CoreSimulator/Images']
+    category: dev tooling
+    safety: reinstallable
+    explanation: Installed simulator runtimes. Manage unused runtimes in Xcode Settings; mounted runtime contents may be skipped.
+    command: xcrun simctl runtime list
+  - id: xcode-cache
+    patterns: ['~/Library/Caches/com.apple.dt.Xcode', '~/Library/Developer/Xcode/DocumentationCache', '~/Library/Developer/Xcode/iOS Device Logs']
+    category: caches
+    safety: cache
+    explanation: Xcode downloaded documentation, caches or device logs; inspect before manual removal.
+    command: 'du -sh {path}/*'
+  - id: cocoapods
+    patterns: ['~/Library/Caches/CocoaPods', '~/.cocoapods/repos']
+    category: caches
+    safety: cache
+    explanation: CocoaPods cache or spec repositories. Dependencies may need to be fetched again.
+    command: pod cache clean --all
+  - id: carthage
+    patterns: ['~/Library/Caches/org.carthage.CarthageKit', '**/Carthage/Build']
+    category: project build artifacts
+    safety: cache
+    explanation: Carthage downloaded binaries and build outputs; bootstrap rebuilds them.
+    command: 'du -sh {path}/*'
+  - id: swiftpm
+    patterns: ['~/Library/Caches/org.swift.swiftpm', '~/.swiftpm/cache']
+    category: project build artifacts
+    safety: cache
+    explanation: SwiftPM dependency/build cache. Confirm a .build folder belongs to a Swift package before cleanup.
+    command: 'du -sh {path}/*'
+  - id: swiftpm-project
+    patterns: ['**/.build']
+    category: project build artifacts
+    safety: cache
+    project: true
+    explanation: SwiftPM build artifacts inside a recognized project; confirm source files are backed up.
+    command: 'rm -rf -- {path}  # review first; SwiftPM will rebuild'
+  - id: homebrew
+    patterns: ['~/Library/Caches/Homebrew', '~/.cache/Homebrew']
+    category: caches
+    safety: cache
+    explanation: Homebrew downloads; use Homebrew to remove outdated downloads and versions.
+    command: brew cleanup
+  - id: docker
+    patterns: ['~/Library/Containers/com.docker.docker/Data', '~/Library/Group Containers/group.com.docker', '~/.local/share/docker']
+    category: dev tooling
+    safety: user-data
+    explanation: Docker disks include images, containers and potentially irreplaceable volumes. Inspect Docker usage and back up volumes; logical free space differs from disk-image allocation.
+    command: docker system df -v
+  - id: huggingface
+    patterns: ['~/.cache/huggingface']
+    category: AI models
+    safety: reinstallable
+    explanation: Downloaded model weights and datasets; downloads can be large and may need access credentials. Check for local-only artifacts.
+    command: hf cache ls
+  - id: lmstudio
+    patterns: ['~/.lmstudio/models', '~/.cache/lm-studio/models']
+    category: AI models
+    safety: reinstallable
+    explanation: Local model downloads. Use LM Studio storage controls after checking for custom weights.
+    command: 'du -sh {path}/*'
+  - id: ollama
+    patterns: ['~/.ollama/models', '/usr/share/ollama/.ollama/models']
+    category: AI models
+    safety: reinstallable
+    explanation: Ollama model store; remove individual unused models through Ollama. Preserve custom models.
+    command: ollama list
+  - id: expo
+    patterns: ['~/.expo', '**/.expo']
+    category: caches
+    safety: cache
+    explanation: Expo development cache and local metadata; projects regenerate caches. Check settings before manual cleanup.
+    command: 'du -sh {path}/*'
+  - id: browser-downloads
+    patterns: ['~/Library/Caches/ms-playwright', '~/.cache/ms-playwright', '~/.cache/puppeteer', '~/Library/Caches/puppeteer']
+    category: dev tooling
+    safety: reinstallable
+    explanation: Playwright or Puppeteer browser downloads; frameworks can reinstall browsers.
+    command: 'du -sh {path}/*'
+  - id: ai-caches
+    patterns: ['~/.codeium/cache', '~/.codex/cache', '~/.cursor/Cache', '~/Library/Caches/com.todesktop.230313mzl4w4u92', '~/Library/Application Support/Cursor/Cache', '~/Library/Application Support/Cursor/CachedData', '~/Library/Application Support/Cursor/Code Cache', '~/Library/Application Support/Cursor/GPUCache', '~/Library/Application Support/Windsurf/Cache', '~/Library/Application Support/Windsurf/CachedData']
+    category: caches
+    safety: cache
+    explanation: Known AI editor cache locations; confirm the application is closed before manual cleanup.
+    command: 'du -sh {path}/*'
+  - id: ai-tool-data
+    patterns: ['~/.codeium', '~/.codex', '~/.cursor', '~/.lmstudio']
+    category: dev tooling
+    safety: user-data
+    explanation: AI tool state may include sessions, credentials, settings and custom models. Only explicit cache subfolders are considered regenerable.
+    command: 'du -sh {path}/*'
+  - id: node-modules
+    patterns: ['**/node_modules']
+    category: project build artifacts
+    safety: cache
+    project: true
+    explanation: Installed project dependencies. Preserve lockfiles; reinstall with the project package manager. Locally edited or linked modules need review.
+    command: 'rm -rf -- {path}  # only after review; reinstall using the project lockfile'
+  - id: project-outputs
+    patterns: ['**/target', '**/.venv', '**/build', '**/dist', '**/.next', '**/.turbo']
+    category: project build artifacts
+    safety: cache
+    project: true
+    explanation: Build output or virtual environment inside a recognized project. Confirm no manually maintained files are stored here.
+    command: 'rm -rf -- {path}  # only after checking project sources and lockfiles'
+  - id: trash
+    patterns: ['~/.Trash', '~/.local/share/Trash']
+    category: unknown
+    safety: user-data
+    explanation: Deleted user files can still be valuable. Review contents and empty Trash manually using Finder or the desktop file manager.
+    command: 'du -sh {path}/*'
+  - id: downloads
+    patterns: ['~/Downloads']
+    category: downloads
+    safety: user-data
+    explanation: Personal downloads; inspect and back up anything needed.
+    command: 'du -sh {path}/*'
+  - id: mail-messages
+    patterns: ['~/Library/Messages/Attachments', '~/Library/Mail']
+    category: media
+    safety: user-data
+    explanation: Personal messages and mail may not have another copy. Manage storage within the owning app after checking backups.
+    command: 'du -sh {path}/*'
+  - id: ios-backups
+    patterns: ['~/Library/Application Support/MobileSync/Backup']
+    category: dev tooling
+    safety: user-data
+    explanation: Local iPhone/iPad backups. Review backup dates and devices in Finder Manage Backups before removing.
+    command: 'du -sh {path}/*'
+  - id: cache-folders
+    patterns: ['~/.cache/*', '~/Library/Caches/*', '~/.cache', '~/Library/Caches']
+    category: caches
+    safety: cache
+    explanation: Conventional application cache. Usually regenerable, but review application-specific contents and close the app first.
+    command: 'du -sh {path}/*'
+  - id: apps
+    patterns: ['/Applications/*', '~/Applications/*']
+    category: apps
+    safety: reinstallable
+    explanation: Installed application bundle; confirm it is still available to reinstall and preserve associated user data.
+    command: 'du -sh {path}'
+  - id: media
+    patterns: ['~/Movies', '~/Music', '~/Pictures']
+    category: media
+    safety: user-data
+    explanation: Personal media libraries and original files. Back up and review in the owning application.
+    command: 'du -sh {path}/*'
