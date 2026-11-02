@@ -10,16 +10,16 @@ Wails and `oh-my-disk ui` embed the same `assets/` directory. Calm's tokens, typ
 - **Cleanup:** the same compact cleanup row component, filters, sort and reverse order, expandable explanations/path/project activity/commands/native actions, and 100-row display increments up to the existing API's 500-match cap.
 - **Shared:** sidebar locations/counts/disk bar, folder chooser, Scan Again and Command-R/Control-R, cached/native welcome, progress and cancel, skeleton treatment, recovery messages, Full Disk Access, exports, accounting notes, dark appearance, reduced motion, focus rings, and arrow/Home/End row navigation. Native row actions appear on hover or keyboard focus; cleanup details expand with a real button.
 
-The existing backend, API shapes, scanner, blocklist, Trash revalidation, MCP, and CLI semantics are unchanged. Checkbox state is synchronized across views; overlapping ancestor/descendant selections are still rejected. Trash always requires a confirmation dialog, with server checks unchanged.
+The shared UI preserves scan/cancel, lazy APIs, blocklist, Trash revalidation, MCP, and CLI features. The polish pass adds personal-content metadata and conservative ranking; dataless files now use local allocation and old binary caches require a rescan. Checkbox state is synchronized across views; overlapping ancestor/descendant selections are still rejected. Trash always requires a confirmation dialog, with server checks unchanged.
 
 ## Intentional differences from the static mockup
 
 - Values and filenames are live, with no preselected cleanup items or simulated hover/focus. Folder descriptions refer to the scanned folder because scanning outside Home is supported. The toolbar shows actual scan age and duration; its tooltip contains the full root and timestamp.
 - The sidebar uses an application label in place of decorative traffic lights; native window controls remain the responsibility of Wails.
 - Secondary scan roots, cache opening, unit preference, and exports live in **Scan options and exports**. Canvas maps remain in Folders/Categories to preserve their existing functionality.
-- Longer cleanup details expand below the compact row. Folder/category pages keep file counts and modified dates. Narrow windows stack the Overview cards below 1150px rather than squeeze their text into fixed columns.
+- Longer cleanup details expand below the compact row. Folder/category pages keep file counts and modified dates. Desktop windows retain two compact Overview columns with independent list scrolling. Windows at 700px or below stack cards; short desktop windows (700px tall or below) allow page scrolling to keep all controls reachable.
 - Progress is indeterminate, with actual phase and entry/folder counts in Wails. The existing scanner API supplies no reliable total or percentage. Browser rescans expose an indeterminate busy state while their synchronous API request completes.
-- Snapshot suggestions retain the existing 100-item cap: reclaim values display `≥` at the cap. Ring segments are clamped to the live disk's used space when APFS allocations exceed it; the before/after estimate is capped at capacity. Accounting notes explain that allocated bytes are not guaranteed reclaimed bytes.
+- Snapshot suggestions exclude personal files from Best and retain the existing 100-item cap: reclaim values include only complete cache/reinstallable candidates and display `≥` at the cap. Ring segments are clamped to the live disk's used space when APFS allocations exceed it; the before/after estimate is capped at capacity. Accounting notes explain that allocated bytes are not guaranteed reclaimed bytes.
 
 ## Reproduce
 
@@ -65,3 +65,16 @@ The capture script uses installed Google Chrome by default (`OMD_CHROME` can sel
 Logs are `.build/calm-{check,cli,app,codesign,web-smoke,native-smoke,empty-smoke,large-smoke,capture}.log`. `.build/screens/overview.dom.html` records the web smoke's final DOM. These are ignored artifacts.
 
 Commits are on branch `calm`, based on `5df2820`, in `.build/calm-git`; `.build/calm.bundle` contains the branch. The primary `.git` was not written.
+
+
+## Polish verification (2026-11-02)
+
+See [POLISH_REPORT.md](POLISH_REPORT.md) for all thirteen feedback items, extra sweep fixes, scoring examples, cache migration, and validation results.
+
+- `make check` (`go vet ./...`, `go test ./...`), `make cli`, `make app`, and strict/deep signature verification: passed.
+- Updated web, native bridge, empty-start, and large-list smoke checks: passed. Large fixture: 4,053 entries, 450 projects; folder/category pagination from 200 to 400, global sort reset, and treemap. No Trash action confirmed.
+- New DOM assertions check Open Settings, Best, the chart-local segmented control, ring tooltip label/size/percentage, rule/score details, icon copy action and Copied feedback.
+- `ui-capture.cjs` now defines a light/dark × 1440/900/390px matrix across every page, maps, details, confirmation, access/options, and presentation fixtures for scanning/empty/error. It asserts cursor coverage, horizontal/page overflow, footer separation and stability when lists scroll. The state fixtures exercise rendering only; native bridge smoke separately drives real UI scan/cancel/completion and error transitions with stubbed native methods.
+- Rendered matrix execution remains blocked before page load: sandboxed Chromium aborts (`SIGABRT`, crashpad permission errors), browser access host is unavailable, and native Chrome fallback was denied because Computer Use was not approved for Chrome. These checks are prepared, **not passed**. Actual rendered light/dark layout, window geometry, and native hit-target appearance still need a permitted browser/native run. Static CSS/DOM inspection is not a substitute for pixel QA.
+- Logs: `.build/polish-{check,cli,app,codesign,web-smoke,native-smoke,empty-smoke,large-smoke,capture}.log`.
+- Delivery: branch `polish`, base `4d846c1`, side Git directory `.build/polish-git`, bundle `.build/polish.bundle`. Primary `.git` is untouched; icon.icns is excluded.
