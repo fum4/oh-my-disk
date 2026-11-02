@@ -94,7 +94,8 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 	wg.Wait()
 	for id := t.Count - 1; id > 0; id-- {
 		s := states[id]
-		if s.rule >= 0 || s.below {
+		// Split aggregates around personal folders, even without a matching rule.
+		if s.rule >= 0 || s.below || PersonalData(t.Name(id)) {
 			states[t.At(id).Parent].below = true
 		}
 	}
@@ -105,6 +106,7 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 	type candidate struct {
 		id, rule, project int32
 		score             float64
+		priority          int
 	}
 	candidates := []candidate{}
 	type visit struct {
@@ -153,11 +155,12 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 			if stale < 0 {
 				stale = 0
 			}
-			age := float64(stale) / 180
-			if age > 1 {
-				age = 1
+			rule := "big-unknown"
+			if r >= 0 {
+				rule = e.Rules[r].ID
 			}
-			candidates = append(candidates, candidate{v.id, r, s.project, float64(t.Bytes(v.id)) * safetyWeight[safety] * (1 + age)})
+			path := t.Path(v.id)
+			candidates = append(candidates, candidate{v.id, r, s.project, rankScore(path, t.Bytes(v.id), safety, rule, stale, n.Flags&scanner.Incomplete != 0), rankPriority(path, safety, n.Flags&scanner.Incomplete != 0)})
 		}
 		// Without a descendant override, category accounting takes the subtree's
 		// aggregate. Set compact category bytes in a cheap linear subtree walk for UI.
@@ -184,6 +187,9 @@ func (e *Engine) AnalyzeTree(t *scanner.Tree, now time.Time, min int64) ([]Sugge
 	}
 
 	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].priority != candidates[j].priority {
+			return candidates[i].priority > candidates[j].priority
+		}
 		if candidates[i].score == candidates[j].score {
 			return t.LessPath(candidates[i].id, candidates[j].id)
 		}

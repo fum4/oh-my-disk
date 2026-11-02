@@ -33,9 +33,7 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 		scan.Root = visible(t, 0, 2, 0, 200, &budget, "bytes", false)
 		out := *s
 		out.Scan = &scan
-		if len(out.Suggestions) > 100 {
-			out.Suggestions = out.Suggestions[:100]
-		}
+		out.Suggestions, _ = rules.Select(s.Suggestions, "score", "", "", 100)
 		if len(scan.Skipped) > 500 {
 			scan.Skipped = scan.Skipped[:500]
 		}

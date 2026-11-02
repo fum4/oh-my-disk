@@ -3,6 +3,7 @@ package rules
 import (
 	_ "embed"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -271,10 +272,52 @@ func (e *Engine) Explain(root *scanner.Node, path string, now time.Time) (*Sugge
 	if s.StaleDays < 0 {
 		s.StaleDays = 0
 	}
-	age := float64(s.StaleDays) / 180
-	if age > 1 {
-		age = 1
-	}
-	s.Score = float64(s.Bytes) * safetyWeight[s.Safety] * (1 + age)
+	s.Score = rankScore(s.Path, s.Bytes, s.Safety, s.Rule, s.StaleDays, s.Incomplete)
 	return &s, nil
+}
+
+// PersonalData recognizes personal folders at any scan root, including synced
+// containers and photo libraries. Nested caches there are still personal data.
+func PersonalData(path string) bool {
+	for _, part := range strings.Split(filepath.ToSlash(filepath.Clean(path)), "/") {
+		switch strings.ToLower(part) {
+		case "mobile documents", "cloudstorage", "music", "pictures", "movies", "documents", "desktop", "photos", "downloads":
+			return true
+		}
+		if strings.HasSuffix(strings.ToLower(part), ".photoslibrary") {
+			return true
+		}
+	}
+	return false
+}
+
+func rankScore(path string, bytes int64, safety, rule string, stale int, incomplete bool) float64 {
+	age := math.Min(1, math.Max(0, float64(stale)/180))
+	if PersonalData(path) || safety == "user-data" {
+		age = 0
+	}
+	raw := float64(bytes) * safetyWeight[safety] * (1 + age)
+	// Caps are expressed on the existing raw scale so CLI, JSON and sorting agree.
+	cap := 100.0
+	if safety == "unknown" || rule == "big-unknown" || incomplete {
+		cap = 40
+	}
+	if safety == "user-data" || PersonalData(path) {
+		cap = 30
+	}
+	if cap < 100 {
+		raw = math.Min(raw, math.Nextafter(1e9*cap/(100-cap), 0))
+	}
+	return raw
+}
+
+// Best favors complete regenerable data before unrecognized or personal content.
+func rankPriority(path, safety string, incomplete bool) int {
+	if PersonalData(path) || safety == "user-data" {
+		return 0
+	}
+	if !incomplete && (safety == "cache" || safety == "reinstallable") {
+		return 2
+	}
+	return 1
 }

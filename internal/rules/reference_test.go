@@ -23,7 +23,7 @@ func (e *Engine) analyzeReference(root *scanner.Node, now time.Time, min int64) 
 			below = index(c, project) || below
 		}
 		hasMatchBelow[n] = below
-		return below || e.referenceMatch(n.Path, project) != nil
+		return below || e.referenceMatch(n.Path, project) != nil || PersonalData(n.Name)
 	}
 	index(root, false)
 	var walk func(*scanner.Node, *scanner.Node, *Rule, bool)
@@ -65,11 +65,7 @@ func (e *Engine) analyzeReference(root *scanner.Node, now time.Time, min int64) 
 				if s.StaleDays < 0 {
 					s.StaleDays = 0
 				}
-				age := float64(s.StaleDays) / 180
-				if age > 1 {
-					age = 1
-				}
-				s.Score = float64(s.Bytes) * safetyWeight[s.Safety] * (1 + age)
+				s.Score = rankScore(s.Path, s.Bytes, s.Safety, s.Rule, s.StaleDays, s.Incomplete)
 				// The scan root is context, never itself a cleanup candidate.
 				if n != root {
 					candidates = append(candidates, s)
@@ -82,6 +78,10 @@ func (e *Engine) analyzeReference(root *scanner.Node, now time.Time, min int64) 
 	}
 	walk(root, nil, nil, false)
 	sort.Slice(candidates, func(i, j int) bool {
+		pa, pb := rankPriority(candidates[i].Path, candidates[i].Safety, candidates[i].Incomplete), rankPriority(candidates[j].Path, candidates[j].Safety, candidates[j].Incomplete)
+		if pa != pb {
+			return pa > pb
+		}
 		if candidates[i].Score == candidates[j].Score {
 			return candidates[i].Path < candidates[j].Path
 		}

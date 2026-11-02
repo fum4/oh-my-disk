@@ -56,10 +56,6 @@ func (e *Engine) ExplainTree(t *scanner.Tree, path string, now time.Time) (*Sugg
 	if s.StaleDays < 0 {
 		s.StaleDays = 0
 	}
-	age := float64(s.StaleDays) / 180
-	if age > 1 {
-		age = 1
-	}
-	s.Score = float64(s.Bytes) * safetyWeight[s.Safety] * (1 + age)
+	s.Score = rankScore(s.Path, s.Bytes, s.Safety, s.Rule, s.StaleDays, s.Incomplete)
 	return s, nil
 }

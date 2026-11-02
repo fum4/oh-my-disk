@@ -95,7 +95,7 @@ func TestRankingSafetyStalenessAndDisjointCategories(t *testing.T) {
 	if len(got) != 4 {
 		t.Fatalf("%+v", got)
 	}
-	for i, want := range []string{"npm", "ollama", "downloads", "big-unknown"} {
+	for i, want := range []string{"npm", "ollama", "big-unknown", "downloads"} {
 		if got[i].Rule != want {
 			t.Fatalf("ranking %d=%s want %s", i, got[i].Rule, want)
 		}
@@ -205,5 +205,68 @@ func TestSizeAndFutureActivity(t *testing.T) {
 	got, _ := e.Analyze(root, now, 0)
 	if len(got) != 2 || got[0].Bytes != 200 || got[0].Score != 200 || got[0].StaleDays != 0 {
 		t.Fatalf("size/future scoring: %+v", got)
+	}
+}
+
+func TestPersonalAndUnknownRanking(t *testing.T) {
+	now := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	e, _ := Load("", "/h")
+	cases := []struct {
+		path, safety, rule string
+		bytes              int64
+		days               int
+		old, want          int
+	}{
+		{"/h/Library/Mobile Documents/com~apple~CloudDocs/DEEP", "unknown", "big-unknown", 79_100_000_000, 314, 86, 30},
+		{"/h/Library/Mobile Documents/com~apple~CloudDocs/Phone", "unknown", "big-unknown", 28_500_000_000, 314, 70, 30},
+		{"/h/Pictures", "user-data", "media", 20_200_000_000, 0, 71, 30},
+		{"/h/.npm/_cacache", "cache", "cache-folders", 8_100_000_000, 0, 89, 89},
+		{"/h/mystery", "unknown", "big-unknown", 1_000_000_000_000, 365, 99, 40},
+	}
+	for _, tc := range cases {
+		t.Run(tc.path, func(t *testing.T) {
+			score := CleanupScore(rankScore(tc.path, tc.bytes, tc.safety, tc.rule, tc.days, false))
+			if int(score+.5) != tc.want {
+				t.Fatalf("got %.2f want %d", score, tc.want)
+			}
+			t.Logf("old %d, new %.2f", tc.old, score)
+			if PersonalData(tc.path) && rankScore(tc.path, tc.bytes, tc.safety, tc.rule, 0, false) != rankScore(tc.path, tc.bytes, tc.safety, tc.rule, 365, false) {
+				t.Fatal("personal age boost")
+			}
+		})
+	}
+	for _, path := range []string{"/h/Music/song", "/h/Movies/movie", "/h/Documents/tax", "/h/Desktop/work", "/external/Family.photoslibrary/originals", "/h/Library/CloudStorage/Dropbox/file"} {
+		if !PersonalData(path) {
+			t.Fatal("unprotected personal path", path)
+		}
+	}
+	// Analyze and both Explain entry points must agree, including partial cloud nodes.
+	cloud := node(cases[0].path, 4096, now.Add(-314*24*time.Hour))
+	cloud.Dataless, cloud.Incomplete = true, true
+	root := node(filepath.Dir(cloud.Path), 0, now, cloud)
+	got, _ := e.Analyze(root, now, 0)
+	if len(got) != 1 || got[0].Path != cloud.Path {
+		t.Fatalf("best ranking: %+v", got)
+	}
+	for _, s := range got {
+		a, err := e.Explain(root, s.Path, now)
+		b, err2 := e.ExplainTree(scanner.Compact(root), s.Path, now)
+		if err != nil || err2 != nil || a.Score != s.Score || b.Score != s.Score || a.Bytes != s.Bytes {
+			t.Fatalf("inconsistent analyze/explain: %+v %+v %+v", s, a, b)
+		}
+		if s.Path == cloud.Path && s.Bytes != 4096 {
+			t.Fatal("logical bytes leaked into suggestion")
+		}
+	}
+}
+
+func TestUnknownAncestorCannotHidePersonalData(t *testing.T) {
+	e, _ := Load("", "/h")
+	now := time.Now()
+	cloud := node("/h/Library/Mobile Documents", 79_000_000_000, now)
+	root := node("/h", 0, now, node("/h/Library", 4096, now, cloud))
+	got, _ := e.Analyze(root, now, 0)
+	if len(got) != 1 || got[0].Path != cloud.Path || CleanupScore(got[0].Score) > 30 {
+		t.Fatalf("personal data hidden in aggregate: %+v", got)
 	}
 }
