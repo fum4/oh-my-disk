@@ -10,3 +10,5 @@ func accessTime(info os.FileInfo) time.Time {
 	s := info.Sys().(*syscall.Stat_t)
 	return time.Unix(s.Atim.Sec, s.Atim.Nsec)
 }
+
+func isDataless(info os.FileInfo) bool { return false }

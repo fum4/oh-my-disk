@@ -3,18 +3,16 @@
 package scanner
 
 import (
-	"context"
-	"fmt"
 	"os"
-	"path/filepath"
-	"runtime"
 	"sort"
-	"sync"
-	"syscall"
+	"strings"
 	"time"
 )
 
 type Node struct {
+	ID                int32     `json:"id"`
+	ChildCount        int       `json:"child_count,omitempty"`
+	ChildOffset       int       `json:"child_offset,omitempty"`
 	Name              string    `json:"name"`
 	Path              string    `json:"path"`
 	Kind              string    `json:"kind"`
@@ -29,6 +27,9 @@ type Node struct {
 	Children          []*Node   `json:"children,omitempty"`
 	HardlinkDuplicate bool      `json:"hardlink_duplicate,omitempty"`
 	Incomplete        bool      `json:"incomplete,omitempty"`
+	Dataless          bool      `json:"dataless,omitempty"`
+	tree              *Tree
+	index             int32
 	id                identity
 	links             uint64
 }
@@ -37,23 +38,29 @@ type Skipped struct {
 	Reason string `json:"reason"`
 }
 type Result struct {
-	Root        *Node     `json:"root"`
-	Started     time.Time `json:"started"`
-	Finished    time.Time `json:"finished"`
-	Skipped     []Skipped `json:"skipped"`
-	Entries     int64     `json:"entries"`
-	CrossMounts bool      `json:"cross_mounts"`
+	WalkDuration      time.Duration `json:"-"`
+	AggregateDuration time.Duration `json:"-"`
+	Tree              *Tree         `json:"-"`
+	Root              *Node         `json:"root"`
+	Started           time.Time     `json:"started"`
+	Finished          time.Time     `json:"finished"`
+	Skipped           []Skipped     `json:"skipped"`
+	Entries           int64         `json:"entries"`
+	CrossMounts       bool          `json:"cross_mounts"`
 }
 type Progress struct {
 	Entries     int64
 	Directories int64
 	Pending     int
+	Phase       string
+	Path        string
 }
 type Options struct {
 	Workers     int
 	CrossMounts bool
 	Exclude     []string
 	Progress    func(Progress)
+	Fallback    bool // force portable metadata reader (equivalence/debugging)
 }
 type batch struct {
 	parent   *Node
@@ -72,171 +79,7 @@ func fromInfo(path string, info os.FileInfo) *Node {
 	} else if !info.Mode().IsRegular() {
 		kind = "special"
 	}
-	return &Node{Name: info.Name(), Path: path, Kind: kind, OwnBytes: b, Modified: info.ModTime(), Accessed: accessTime(info), id: id, links: l}
-}
-
-func Scan(ctx context.Context, root string, opts Options) (*Result, error) {
-	root, err := filepath.Abs(root)
-	if err != nil {
-		return nil, err
-	}
-	info, err := os.Lstat(root)
-	if err != nil {
-		return nil, err
-	}
-	if !info.IsDir() {
-		return nil, fmt.Errorf("scan root must be a real directory (symlinks are not followed): %s", root)
-	}
-	n := fromInfo(root, info)
-	result := &Result{Root: n, Started: time.Now(), CrossMounts: opts.CrossMounts, Skipped: []Skipped{}}
-	excludes := map[string]bool{}
-	for _, p := range opts.Exclude {
-		p, e := filepath.Abs(p)
-		if e != nil {
-			return nil, e
-		}
-		excludes[filepath.Clean(p)] = true
-	}
-	if excludes[root] {
-		return nil, fmt.Errorf("scan root is excluded: %s", root)
-	}
-
-	allowedDevices, skipData := devicePolicy(runtime.GOOS, root, n.id.dev, func() (uint64, error) {
-		data, e := os.Lstat("/System/Volumes/Data")
-		if e != nil {
-			return 0, e
-		}
-		_, id, _ := diskInfo(data)
-		return id.dev, nil
-	})
-	if skipData {
-		excludes["/System/Volumes/Data"] = true
-	}
-
-	workers := opts.Workers
-	if workers <= 0 {
-		workers = runtime.NumCPU()
-	}
-	if workers > 64 {
-		workers = 64
-	}
-	jobs := make(chan *Node)
-	results := make(chan batch, workers)
-	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for dir := range jobs {
-				b := batch{parent: dir}
-				// O_NOFOLLOW rejects a directory replaced with a symlink since Lstat.
-				var entries []os.DirEntry
-				f, e := os.OpenFile(dir.Path, os.O_RDONLY|syscall.O_NOFOLLOW|syscall.O_DIRECTORY, 0)
-				if e == nil {
-					fi, se := f.Stat()
-					if se != nil {
-						e = se
-					} else {
-						_, id, _ := diskInfo(fi)
-						if id != dir.id {
-							e = fmt.Errorf("directory changed during scan")
-						} else {
-							entries, e = f.ReadDir(-1)
-						}
-					}
-					f.Close()
-				}
-				if e != nil {
-					b.err = e
-				}
-				for _, entry := range entries {
-					if ctx.Err() != nil {
-						break
-					}
-					p := filepath.Join(dir.Path, entry.Name())
-					if excludes[p] {
-						b.skipped = append(b.skipped, Skipped{p, "excluded application state/output or macOS Data firmlink alias"})
-						continue
-					}
-					fi, e := os.Lstat(p)
-					if e != nil {
-						b.skipped = append(b.skipped, Skipped{p, e.Error()})
-						continue
-					}
-					child := fromInfo(p, fi)
-					if !opts.CrossMounts && !allowedDevices[child.id.dev] {
-						b.skipped = append(b.skipped, Skipped{p, "different filesystem device"})
-						continue
-					}
-					b.children = append(b.children, child)
-				}
-				results <- b
-			}
-		}()
-	}
-	queue := []*Node{n}
-	active := 0
-	dirs := int64(0)
-	seenDirs := map[identity]bool{n.id: true}
-	// A coordinator owns the unbounded directory queue. Workers never enqueue into
-	// their own bounded work channel (which can deadlock on broad trees).
-	for len(queue) > 0 || active > 0 {
-		if ctx.Err() != nil {
-			close(jobs)
-			for active > 0 {
-				<-results
-				active--
-			}
-			wg.Wait()
-			return nil, ctx.Err()
-		}
-		var send chan *Node
-		var next *Node
-		if len(queue) > 0 {
-			send = jobs
-			next = queue[0]
-		}
-		select {
-		case send <- next:
-			queue = queue[1:]
-			active++
-		case b := <-results:
-			active--
-			dirs++
-			b.parent.Children = b.children
-			if b.err != nil {
-				b.parent.Incomplete = true
-				result.Skipped = append(result.Skipped, Skipped{b.parent.Path, b.err.Error()})
-			}
-			if len(b.skipped) > 0 {
-				b.parent.Incomplete = true
-			}
-			result.Skipped = append(result.Skipped, b.skipped...)
-			result.Entries += int64(len(b.children))
-			for _, c := range b.children {
-				if c.Kind == "directory" {
-					if seenDirs[c.id] {
-						c.Incomplete = true
-						c.OwnBytes = 0
-						result.Skipped = append(result.Skipped, Skipped{c.Path, "directory inode already visited (mount/firmlink alias)"})
-					} else {
-						seenDirs[c.id] = true
-						queue = append(queue, c)
-					}
-				}
-			}
-			if opts.Progress != nil {
-				opts.Progress(Progress{result.Entries, dirs, len(queue) + active})
-			}
-		case <-ctx.Done():
-		}
-	}
-	close(jobs)
-	wg.Wait()
-	aggregate(n, map[identity]bool{})
-	sort.Slice(result.Skipped, func(i, j int) bool { return result.Skipped[i].Path < result.Skipped[j].Path })
-	result.Finished = time.Now()
-	return result, nil
+	return &Node{Dataless: isDataless(info), Name: info.Name(), Path: path, Kind: kind, OwnBytes: b, Modified: info.ModTime(), Accessed: accessTime(info), id: id, links: l}
 }
 
 func aggregate(n *Node, seen map[identity]bool) {
@@ -274,12 +117,39 @@ func aggregate(n *Node, seen map[identity]bool) {
 	}
 }
 func Walk(n *Node, fn func(*Node)) {
+	if n.tree != nil {
+		stack := []int32{n.ID}
+		for len(stack) > 0 {
+			id := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			fn(n.tree.View(id, 1, 0))
+			var children []int32
+			for c := n.tree.At(id).First; c >= 0; c = n.tree.At(c).Next {
+				children = append(children, c)
+			}
+			for i := len(children) - 1; i >= 0; i-- {
+				stack = append(stack, children[i])
+			}
+		}
+		return
+	}
+
 	fn(n)
 	for _, c := range n.Children {
 		Walk(c, fn)
 	}
 }
 func Find(n *Node, path string) *Node {
+	if n.tree != nil {
+		if path != n.Path && n.Path != "/" && !strings.HasPrefix(path, n.Path+"/") {
+			return nil
+		}
+		id := n.tree.Find(path)
+		if id < 0 {
+			return nil
+		}
+		return n.tree.View(id, 1, 0)
+	}
 	if n.Path == path {
 		return n
 	}

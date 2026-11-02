@@ -12,7 +12,7 @@ import (
 	"github.com/fum4/oh-my-disk/internal/scanner"
 )
 
-const Note = "Read-only analysis. Commands are suggestions for a human; never executed. Allocated blocks are not guaranteed reclaimable space (APFS clones, snapshots, compression, hardlinks, sparse images). Access times may be disabled or affected by reading directories. Skipped paths make totals incomplete."
+const Note = "Read-only analysis. Commands are suggestions for a human; never executed. Dataless cloud placeholders contribute logical bytes without opening file contents; other entries use allocated blocks. Allocated blocks are not guaranteed reclaimable space (APFS clones, snapshots, compression, hardlinks, sparse images). Access times may be disabled or affected by reading directories. Skipped paths make totals incomplete."
 
 type Snapshot struct {
 	Version     int                `json:"version"`
@@ -23,11 +23,18 @@ type Snapshot struct {
 }
 
 func New(scan *scanner.Result, e *rules.Engine, min int64) *Snapshot {
-	s, c := e.Analyze(scan.Root, time.Now(), min)
+	var s []rules.Suggestion
+	var c map[string]int64
+	if scan.Tree != nil {
+		s, c = e.AnalyzeTree(scan.Tree, time.Now(), min)
+		scan.Root = scan.Tree.View(0, 1, 0)
+	} else {
+		s, c = e.Analyze(scan.Root, time.Now(), min)
+	}
 	return &Snapshot{1, scan, s, c, Note}
 }
 func CachePath() string {
-	return filepath.Join(os.TempDir(), fmt.Sprintf("oh-my-disk-%d", os.Getuid()), "latest.json")
+	return filepath.Join(os.TempDir(), fmt.Sprintf("oh-my-disk-%d", os.Getuid()), "latest.bin")
 }
 func SaveCache(path string, s *Snapshot) error {
 	dir := filepath.Dir(path)
@@ -45,23 +52,19 @@ func SaveCache(path string, s *Snapshot) error {
 		if !existing.Mode().IsRegular() {
 			return fmt.Errorf("refusing to replace non-regular cache: %s", path)
 		}
-		if _, e = LoadCache(path); e != nil {
+		if e = validateExisting(path); e != nil {
 			return fmt.Errorf("refusing to overwrite a file that is not an oh-my-disk cache: %w", e)
 		}
 	} else if !os.IsNotExist(e) {
 		return e
 	}
-	data, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-	f, err := os.CreateTemp(dir, ".scan-*.json")
+	f, err := os.CreateTemp(dir, ".scan-*.bin")
 	if err != nil {
 		return err
 	}
 	name := f.Name()
 	defer os.Remove(name) // Only removes the application's own temporary report.
-	if _, err = f.Write(data); err != nil {
+	if err = writeCache(f, s); err != nil {
 		f.Close()
 		return err
 	}
@@ -76,18 +79,14 @@ func LoadCache(path string) (*Snapshot, error) {
 		return nil, err
 	}
 	defer f.Close()
-	var s Snapshot
-	if err = json.NewDecoder(f).Decode(&s); err != nil {
-		return nil, err
-	}
-	if s.Version != 1 || s.Scan == nil || s.Scan.Root == nil {
-		return nil, fmt.Errorf("invalid or unsupported scan cache")
-	}
-	return &s, nil
+	return readCache(f)
 }
 
 // Prune copies the tree, preserving aggregated totals even when children are omitted.
 func Prune(n *scanner.Node, depth int, min int64) *scanner.Node {
+	if t := n.CompactTree(); t != nil {
+		return t.View(n.ID, depth, min)
+	}
 	c := *n
 	c.Children = nil
 	if depth != 0 {
@@ -103,14 +102,19 @@ func Prune(n *scanner.Node, depth int, min int64) *scanner.Node {
 	}
 	return &c
 }
-func Export(s *Snapshot, depth int, min int64) *Snapshot {
-	c := *s
-	scan := *s.Scan
-	scan.Root = Prune(s.Scan.Root, depth, min)
-	c.Scan = &scan
-	return &c
+
+type ExportView struct {
+	Snapshot *Snapshot
+	Depth    int
+	Min      int64
 }
+
+func Export(s *Snapshot, depth int, min int64) ExportView { return ExportView{s, depth, min} }
+
 func Top(root *scanner.Node, limit int) []*scanner.Node {
+	if t := root.CompactTree(); t != nil {
+		return topCompact(t, limit)
+	}
 	nodes := []*scanner.Node{}
 	scanner.Walk(root, func(n *scanner.Node) {
 		if n != root && n.Bytes > 0 {
@@ -173,7 +177,7 @@ func WriteJSON(path string, v any) error {
 	if path == "-" {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
-		return enc.Encode(v)
+		return encodeOutput(os.Stdout, enc, v)
 	}
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
@@ -182,5 +186,5 @@ func WriteJSON(path string, v any) error {
 	defer f.Close()
 	enc := json.NewEncoder(f)
 	enc.SetIndent("", "  ")
-	return enc.Encode(v)
+	return encodeOutput(f, enc, v)
 }

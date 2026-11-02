@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -29,7 +28,12 @@ type Rule struct {
 	Project     bool     `yaml:"project" json:"project"`
 	matchers    []*regexp.Regexp
 }
-type Engine struct{ Rules []Rule }
+type Engine struct {
+	Rules       []Rule
+	byName      map[string][]fastPattern
+	wildParents map[string][]int
+	generic     []fastPattern
+}
 type Suggestion struct {
 	Path         string    `json:"path"`
 	Bytes        int64     `json:"bytes"`
@@ -113,21 +117,26 @@ func Load(config, home string) (*Engine, error) {
 		}
 		eng.Rules = append(eng.Rules, r)
 	}
+	eng.compileFast(home)
 	return eng, nil
 }
 func (e *Engine) Match(path string, project bool) *Rule {
-	for i := range e.Rules {
-		r := &e.Rules[i]
-		if r.Project && !project {
-			continue
+	path = filepath.ToSlash(path)
+	i := strings.LastIndexByte(path, '/')
+	parent := ""
+	name := path
+	if i >= 0 {
+		parent = path[:i]
+		if parent == "" {
+			parent = "/"
 		}
-		for _, re := range r.matchers {
-			if re.MatchString(filepath.ToSlash(path)) {
-				return r
-			}
-		}
+		name = path[i+1:]
 	}
-	return nil
+	idx := e.matchName(name, project, e.parentMatch(parent, project), func() string { return path })
+	if idx < 0 {
+		return nil
+	}
+	return &e.Rules[idx]
 }
 
 var markers = map[string]bool{"package.json": true, "Cargo.toml": true, "pyproject.toml": true, "go.mod": true, "pom.xml": true, "build.gradle": true, "build.gradle.kts": true, "Package.swift": true, "requirements.txt": true, "CMakeLists.txt": true, ".git": true}
@@ -152,96 +161,24 @@ func Quote(path string) string { return "'" + strings.ReplaceAll(path, "'", `'"'
 // Analyze attributes each inode's allocated bytes to exactly one category, and
 // returns disjoint contenders so their reported sizes can safely be summed.
 func (e *Engine) Analyze(root *scanner.Node, now time.Time, min int64) ([]Suggestion, map[string]int64) {
-	categories := map[string]int64{}
-	for _, c := range Categories {
-		categories[c] = 0
+	if t := root.CompactTree(); t != nil {
+		return e.AnalyzeTree(t, now, min)
 	}
-	candidates := []Suggestion{}
-	// Never recommend an aggregate that hides a more specific recognized location.
-	hasMatchBelow := map[*scanner.Node]bool{}
-	var index func(*scanner.Node, bool) bool
-	index = func(n *scanner.Node, project bool) bool {
-		project = project || isProject(n)
-		below := false
+	t := scanner.Compact(root)
+	s, c := e.AnalyzeTree(t, now, min)
+	var assign func(*scanner.Node, int32)
+	assign = func(n *scanner.Node, id int32) {
+		n.Category = Categories[t.At(id).Category]
+		child := t.At(id).First
 		for _, c := range n.Children {
-			below = index(c, project) || below
-		}
-		hasMatchBelow[n] = below
-		return below || e.Match(n.Path, project) != nil
-	}
-	index(root, false)
-	var walk func(*scanner.Node, *scanner.Node, *Rule, bool)
-	walk = func(n, project *scanner.Node, inherited *Rule, split bool) {
-		if isProject(n) {
-			project = n
-		}
-		r := e.Match(n.Path, project != nil)
-		effective := r
-		if effective == nil {
-			effective = inherited
-		}
-		category := "unknown"
-		if effective != nil {
-			category = effective.Category
-		}
-		categories[category] += n.OwnBytes
-		n.Category = category
-		if n.Bytes >= min && n.Bytes > 0 && n.Kind != "symlink" && n.Kind != "special" {
-			// Unknown candidates are immediate branches/files, not every descendant of
-			// an already recognized cache. The score pass selects disjoint paths.
-			if !hasMatchBelow[n] && (r != nil || inherited == nil || split) {
-				if r == nil && inherited != nil {
-					r = inherited
-				}
-				s := Suggestion{Path: n.Path, Bytes: n.Bytes, Category: "unknown", Safety: "unknown", Rule: "big-unknown", Explanation: "Big, check yourself: unrecognized content. Inspect and back up before making changes.", LastActivity: latest(n), Incomplete: n.Incomplete}
-				if r != nil {
-					s.Category = r.Category
-					s.Safety = r.Safety
-					s.Rule = r.ID
-					s.Explanation = r.Explanation
-					s.Command = strings.ReplaceAll(r.Command, "{path}", Quote(n.Path))
-					if r.Project && project != nil {
-						s.LastActivity = project.LatestModified
-						s.ProjectPath = project.Path
-					}
-				}
-				s.StaleDays = int(now.Sub(s.LastActivity).Hours() / 24)
-				if s.StaleDays < 0 {
-					s.StaleDays = 0
-				}
-				age := float64(s.StaleDays) / 180
-				if age > 1 {
-					age = 1
-				}
-				s.Score = float64(s.Bytes) * safetyWeight[s.Safety] * (1 + age)
-				// The scan root is context, never itself a cleanup candidate.
-				if n != root {
-					candidates = append(candidates, s)
-				}
-			}
-		}
-		for _, c := range n.Children {
-			walk(c, project, effective, hasMatchBelow[n])
+			assign(c, child)
+			child = t.At(child).Next
 		}
 	}
-	walk(root, nil, nil, false)
-	sort.Slice(candidates, func(i, j int) bool {
-		if candidates[i].Score == candidates[j].Score {
-			return candidates[i].Path < candidates[j].Path
-		}
-		return candidates[i].Score > candidates[j].Score
-	})
-
-	selected := []Suggestion{}
-	used := &pathSet{children: map[string]*pathSet{}}
-	for _, c := range candidates {
-		if used.add(c.Path) {
-			selected = append(selected, c)
-		}
-	}
-
-	return selected, categories
+	assign(root, 0)
+	return s, c
 }
+
 func contains(a, b string) bool {
 	return a == b || a == string(filepath.Separator) && filepath.IsAbs(b) || strings.HasPrefix(b, a+string(filepath.Separator))
 }
@@ -280,6 +217,9 @@ func (s *pathSet) add(path string) bool {
 	return true
 }
 func (e *Engine) Explain(root *scanner.Node, path string, now time.Time) (*Suggestion, error) {
+	if t := root.CompactTree(); t != nil {
+		return e.ExplainTree(t, path, now)
+	}
 	var target, project, matched *scanner.Node
 	var rule *Rule
 	var visit func(*scanner.Node) bool
