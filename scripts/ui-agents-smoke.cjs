@@ -134,7 +134,8 @@ const wait = async (fn) => {
     $(id).click();
     assert.equal($("ask-agent").hidden, true);
     assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
-    assert.equal($("launch-cards").hidden, false);
+    assert.equal($("launch-cards").hidden, id !== "overview");
+    assert.equal($("empty-actions").hidden, id === "overview");
   }
   if (process.argv.includes("--remembered") || process.argv.includes("--missing-remembered")) {
     assert.equal($("agent-choice").textContent, available ? "Claude" : "None");

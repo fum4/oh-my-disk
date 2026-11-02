@@ -475,38 +475,6 @@
         role="status"
         hidden
       ></div>
-      <section id="welcome" class="card empty" hidden>
-        <h2 id="empty-title" hidden>Your disk, a little clearer.</h2>
-        <p id="empty-description" hidden>
-          Scan Home to explore your disk, on your own or with an agent.
-        </p>
-        <div class="launch-cards" id="launch-cards">
-          <article class="launch-card">
-            <svg class="i" aria-hidden="true"><use href="#regular-hard-drive" /></svg>
-            <h3>Scan my disk</h3>
-            <div class="scan-actions">
-              <button id="plain-scan" class="btn pri">Scan</button>
-              <div id="scan-agent-slot"></div>
-            </div>
-            <aside id="agent-tip" hidden>
-              <span>Want help with results? Install an agent from the picker.</span>
-              <button id="agent-dismiss" class="link" aria-label="Dismiss agent tip">Dismiss</button>
-            </aside>
-          </article>
-        </div>
-        <button id="empty-scan" hidden>Scan</button>
-        <button id="welcome-scan" class="link">Choose Folder…</button>
-      </section>
-      <div id="agent-control" class="agent-control" hidden>
-        <button id="ask-agent" class="btn sec" hidden>Ask agent</button>
-        <details id="agent-picker">
-          <summary>Analyze with <span id="agent-choice">None</span></summary>
-          <div class="agent-menu">
-            <div id="agent-options" role="group" aria-label="Analyze with"></div>
-            <button id="agent-check" class="link">Check again</button>
-          </div>
-        </details>
-      </div>
       <aside id="access-banner" class="banner banner-warning" hidden>
         <strong
           ><svg class="i" aria-hidden="true">
@@ -518,7 +486,45 @@
           partial results.
         </p>
         <button id="full-disk-access" class="btn sec">Open settings</button>
+        <button id="dismiss-access" class="icon-action" aria-label="Dismiss Full Disk Access warning" title="Dismiss warning">×</button>
       </aside>
+      <section id="welcome" class="empty" hidden>
+        <h2 id="empty-title" hidden>Your disk, a little clearer.</h2>
+        <p id="empty-description" hidden>
+          Scan Home to explore your disk, on your own or with an agent.
+        </p>
+        <div class="launch-cards" id="launch-cards">
+          <article class="launch-card">
+            <svg class="i" aria-hidden="true"><use href="#regular-hard-drive" /></svg>
+            <h3>Scan my disk</h3>
+            <div class="scan-actions">
+              <div class="empty-actions">
+                <button id="landing-choose" class="btn sec">Choose Folder…</button>
+                <button id="plain-scan" class="btn pri">Scan</button>
+              </div>
+              <div id="scan-agent-slot"></div>
+            </div>
+            <aside id="agent-tip" hidden>
+              <span>Want help with results? Install an agent from the picker.</span>
+              <button id="agent-dismiss" class="link" aria-label="Dismiss agent tip">Dismiss</button>
+            </aside>
+          </article>
+        </div>
+        <div id="empty-actions" class="empty-actions" hidden>
+          <button id="welcome-scan" class="btn sec">Choose Folder…</button>
+          <button id="empty-scan" class="btn pri">Scan</button>
+        </div>
+      </section>
+      <div id="agent-control" class="agent-control" hidden>
+        <button id="ask-agent" class="btn sec" hidden>Ask agent</button>
+        <details id="agent-picker">
+          <summary>Analyze with <span id="agent-choice">None</span></summary>
+          <div class="agent-menu">
+            <div id="agent-options" role="group" aria-label="Analyze with"></div>
+            <button id="agent-check" class="link">Check again</button>
+          </div>
+        </details>
+      </div>
       <div id="content-grid" class="grid">
         <section id="suggestions" class="card right">
           <div class="ch">

@@ -536,8 +536,11 @@ function showMode(next) {
     $("empty-title").textContent = copy[0];
     $("empty-description").textContent =
       copy[1] + " Scan " + target + " to begin.";
-    $("launch-cards").hidden = false;
-    $("empty-scan").hidden = true;
+    const landing = mode === "overview";
+    $("empty-title").hidden = landing;
+    $("empty-description").hidden = landing;
+    $("launch-cards").hidden = !landing;
+    $("empty-actions").hidden = landing;
     window.agentViewChanged?.();
     document.querySelector(".view-switch").hidden = true;
     return;
@@ -1282,7 +1285,7 @@ $("toolbar-choose").onclick = () => {
   $("web-root").focus();
   $("web-root").select();
 };
-$("scan-another").onclick = $("welcome-scan").onclick = () =>
+$("scan-another").onclick = $("landing-choose").onclick = $("welcome-scan").onclick = () =>
   $("toolbar-choose").click();
 $("empty-scan").onclick = () => $("hub-scan").click();
 function setOptionsOpen(open) {
@@ -1334,7 +1337,7 @@ for (const [id, binary] of [
 // Reserve each button's layout box; only its painted surface grows by 2px.
 document.addEventListener("pointerover", (e) => {
   const b = e.target.closest("button");
-  if (!b || b.disabled) return;
+  if (!b || b.disabled || b.matches(".side .nv, .location-remove")) return;
   b.style.setProperty("--hover-x", 1 + 2 / Math.max(1, b.offsetWidth));
   b.style.setProperty("--hover-y", 1 + 2 / Math.max(1, b.offsetHeight));
 });

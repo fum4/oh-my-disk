@@ -1,5 +1,17 @@
 "use strict";
 const nativeApp = window.go?.main?.App;
+const accessDismissalKey = "omd-access-warning-dismissed";
+let accessDismissed = false;
+try {
+  accessDismissed = localStorage.getItem(accessDismissalKey) === "1";
+} catch (_) {}
+$("dismiss-access").onclick = () => {
+  accessDismissed = true;
+  $("access-banner").hidden = true;
+  try {
+    localStorage.setItem(accessDismissalKey, "1");
+  } catch (_) {}
+};
 function itemActions(path, command) {
   const group = dom("div", "item-actions");
   const action = (label, fn, glyph) => {
@@ -152,6 +164,8 @@ if (nativeApp) {
         "toolbar-choose",
         "scan-another",
         "empty-scan",
+        "welcome-scan",
+        "landing-choose",
       ])
         $(id).disabled = s.busy;
       document
@@ -171,7 +185,7 @@ if (nativeApp) {
         : s.phase;
       $("progress").title = s.path || "";
       if (s.error) reportError(s.error);
-      $("access-banner").hidden = !s.protected.length;
+      $("access-banner").hidden = accessDismissed || !s.protected.length;
       if (s.revision !== revision && !loading) {
         if (opened || s.phase === "Complete") {
           loading = true;

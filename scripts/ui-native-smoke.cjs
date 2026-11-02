@@ -39,6 +39,8 @@ const wait = async (fn) => {
     pretendToBeVisual: true,
     virtualConsole: vc,
     beforeParse(w) {
+      if (process.argv.includes("--dismissed-access"))
+        w.localStorage.setItem("omd-access-warning-dismissed", "1");
       w.fetch = (path, options = {}) =>
         fetch(new URL(path, url), {
           ...options,
@@ -98,6 +100,16 @@ const wait = async (fn) => {
     assert.equal($("scan-feedback").hidden, true);
     assert.equal(d.querySelector("details.scan-options"), null);
     assert.match($("empty-description").textContent, /folders.*Home/);
+    assert.equal($("empty-description").hidden, false);
+    assert.equal($("empty-title").hidden, false);
+    assert.equal($("launch-cards").hidden, true);
+    assert.equal($("empty-actions").hidden, false);
+    assert.deepEqual(
+      [...$("empty-actions").children].map((b) => b.id),
+      ["welcome-scan", "empty-scan"],
+    );
+    assert.equal($("welcome").classList.contains("card"), false);
+    assert($("access-banner").compareDocumentPosition($("welcome")) & w.Node.DOCUMENT_POSITION_FOLLOWING);
     for (const id of ["categories", "cleanup-tab", "overview"]) {
       $(id).click();
       assert.equal($(id).getAttribute("aria-current"), "page");
@@ -234,9 +246,22 @@ const wait = async (fn) => {
     ],
   );
   state.protected = ["Library"];
-  await wait(() => !$("access-banner").hidden);
-  await $("full-disk-access").onclick();
-  assert.equal(calls.at(-1)[0], "access");
+  if (process.argv.includes("--dismissed-access")) {
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal($("access-banner").hidden, true);
+  } else {
+    await wait(() => !$("access-banner").hidden);
+    await $("full-disk-access").onclick();
+    assert.equal(calls.at(-1)[0], "access");
+    $("dismiss-access").click();
+    assert.equal($("access-banner").hidden, true);
+    assert.equal(w.localStorage.getItem("omd-access-warning-dismissed"), "1");
+    state.protected = [];
+    await new Promise((r) => setTimeout(r, 450));
+    state.protected = ["Library"];
+    await new Promise((r) => setTimeout(r, 450));
+    assert.equal($("access-banner").hidden, true);
+  }
   assert.equal(errors.length, 0, errors.join("\n"));
   console.log(
     "PASS: native welcome/cache, navigation before scan, folder picker, hub scan, progress, cancel, completion, Reveal, copy path/command, both exports, Full Disk Access. Native methods stubbed.",

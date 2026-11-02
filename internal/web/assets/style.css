@@ -2463,7 +2463,7 @@ button {
     box-shadow 140ms ease;
   transform-origin: center;
 }
-button:not(:disabled):hover {
+button:not(:disabled):not(.nv):not(.location-remove):hover {
   transform: scale(var(--hover-x, 1.02), var(--hover-y, 1.06));
 }
 button:not(:disabled):active {
@@ -2836,7 +2836,8 @@ body:has(#welcome:not([hidden])) #toolbar-choose {
 .location-remove {
   position: absolute;
   right: 4px;
-  top: 4px;
+  top: 50%;
+  translate: 0 -50%;
   width: 24px;
   height: 24px;
   display: grid;
@@ -3238,3 +3239,63 @@ body:has(#welcome:not([hidden])) footer { visibility: hidden; }
 #welcome { background: transparent; box-shadow: none; }
 #welcome .launch-card { background: var(--card); box-shadow: var(--shadow-card); border-radius: 16px; }
 .agent-option-label { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Round 4b: quiet navigation, unwrapped landing, and paired empty actions. */
+.side nav.group,
+#locations {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.side .nv + .nv { margin-top: 0; }
+#scan-another { margin-top: 3px; }
+.side .nv:hover,
+.location-remove:hover { transform: none; }
+.location-row { border-radius: var(--r-ctl); }
+.location-row:hover,
+.location-row:focus-within { background: var(--fill); }
+.location-row:hover .location-open,
+.location-row:focus-within .location-open { background: transparent; }
+.location-remove:hover {
+  background: color-mix(in srgb, var(--fill) 88%, white);
+}
+#welcome {
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+}
+#welcome > p {
+  width: 100%;
+  max-width: 440px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+.empty-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+#welcome .empty-actions .btn {
+  height: 34px;
+  min-height: 34px;
+  margin: 0;
+  white-space: nowrap;
+}
+#access-banner {
+  position: relative;
+  padding-right: 52px;
+}
+#dismiss-access {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}

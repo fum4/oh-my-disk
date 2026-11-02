@@ -106,6 +106,26 @@ fs.mkdirSync(".build/screens", { recursive: true });
         showMode("overview");
       });
       await shot(`${prefix}-empty`);
+      for (const id of ["folders", "categories", "cleanup-tab"]) {
+        await page.locator(`#${id}`).click();
+        await page.evaluate(() => {
+          const description = document.querySelector("#empty-description");
+          const bounds = description.getBoundingClientRect();
+          const welcome = document.querySelector("#welcome").getBoundingClientRect();
+          assertLayout(bounds.left >= welcome.left && bounds.right <= welcome.right,
+            "Empty description exceeds its page");
+          assertLayout(description.scrollWidth <= description.clientWidth,
+            "Empty description overflows");
+          const secondary = document.querySelector("#welcome-scan").getBoundingClientRect();
+          const primary = document.querySelector("#empty-scan").getBoundingClientRect();
+          assertLayout(secondary.left < primary.left && secondary.y === primary.y && secondary.height === primary.height,
+            "Empty actions must be secondary left and primary right, at equal height");
+          assertLayout(primary.left - secondary.right >= 8 && primary.left - secondary.right <= 12,
+            "Empty action gap");
+          function assertLayout(ok, message) { if (!ok) throw Error(message); }
+        });
+        await shot(`${prefix}-empty-${id}`);
+      }
       await page.evaluate(() =>
         showFeedback("Unable to load scan. Choose a folder or scan again."),
       );
