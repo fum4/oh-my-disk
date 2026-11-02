@@ -1747,3 +1747,20 @@ dialog pre {
     right: calc(50% - 72px);
   }
 }
+#children td {
+  padding: 8px 4px;
+}
+#children td:first-child > button {
+  padding: 0;
+  min-height: 20px;
+}
+#children .item-actions {
+  display: none;
+}
+#children tr:hover .item-actions,
+#children tr:focus-within .item-actions {
+  display: flex;
+}
+.suggestion-controls {
+  flex-wrap: wrap;
+}

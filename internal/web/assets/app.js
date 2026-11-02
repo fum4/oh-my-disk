@@ -684,11 +684,22 @@ function loadSnapshot() {
       renderVolume();
       index(s.scan.root);
       $("total").textContent = fmt(s.scan.root.bytes);
+      const finished = new Date(s.scan.finished),
+        started = new Date(s.scan.started);
+      const age = Math.max(0, Math.floor((Date.now() - finished) / 60000));
+      const ago =
+        age < 1
+          ? "just now"
+          : age < 60
+            ? `${age} ${age === 1 ? "minute" : "minutes"} ago`
+            : age < 1440
+              ? `${Math.floor(age / 60)} hours ago`
+              : finished.toLocaleDateString();
+      const seconds = Math.max(1, Math.round((finished - started) / 1000));
       $("scan-info").textContent =
-        s.scan.root.path +
-        ", last scan " +
-        new Date(s.scan.finished).toLocaleString();
-      $("scan-info").title = $("scan-info").textContent;
+        `Last scan ${ago}, took ${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+      $("scan-info").title =
+        s.scan.root.path + ", " + finished.toLocaleString();
       $("web-root").value = s.scan.root.path;
       $("welcome").hidden = true;
       $("content-grid").hidden = false;
@@ -963,6 +974,13 @@ function renderOverview() {
   const C = 2 * Math.PI * 88;
   let offset = 0;
   const svg = $("ringsvg");
+  if (
+    svg.dataset.finished !== snapshot.scan.finished &&
+    svg.animate &&
+    !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  )
+    svg.animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: 150 });
+  svg.dataset.finished = snapshot.scan.finished;
   svg.replaceChildren();
   function circle(value, color, start, base = false) {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
