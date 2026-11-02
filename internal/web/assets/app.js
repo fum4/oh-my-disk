@@ -1342,6 +1342,7 @@ document.addEventListener("pointerover", (e) => {
   b.style.setProperty("--hover-y", 1 + 2 / Math.max(1, b.offsetHeight));
 });
 document.addEventListener("keydown", (e) => {
+  if (e.target.closest?.("#terminal-screen")) return;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {
     e.preventDefault();
     if (!$("hub-scan").disabled) $("hub-scan").click();

@@ -48,6 +48,23 @@ fs.mkdirSync(".build/screens", { recursive: true });
             if (main.scrollHeight > main.clientHeight + 1)
               throw Error("Page overflow");
           }
+          for (const node of document.querySelectorAll("th, th button, .ch, summary")) {
+            const style = getComputedStyle(node);
+            if (style.userSelect !== "none" && style.webkitUserSelect !== "none")
+              throw Error("Selectable UI chrome: " + node.tagName);
+          }
+          const gain = document.querySelector("#suggestions > .gain");
+          if (gain.getBoundingClientRect().height) {
+            const gap = document.querySelector("#results-agent-slot").getBoundingClientRect().top - gain.getBoundingClientRect().bottom;
+            if (gap < 16 || gap > 20) throw Error("Cleanup banner spacing: " + gap);
+          }
+          const control = document.querySelector("#agent-control");
+          if (!control.hidden && control.classList.contains("has-results")) {
+            const ask = document.querySelector("#ask-agent").getBoundingClientRect();
+            const picker = document.querySelector("#agent-picker summary").getBoundingClientRect();
+            if (Math.abs(ask.height - picker.height) > 1 || Math.abs(ask.y - picker.y) > 1)
+              throw Error("Uneven agent control segments");
+          }
           for (const node of document.querySelectorAll(
             "button:not(:disabled), summary, select:not(:disabled), input[type=checkbox]:not(:disabled)",
           )) {

@@ -16,7 +16,8 @@ const wait = async (fn) => {
   let available = process.argv.includes("--remembered"),
     launched = [],
     trashCalls = 0,
-    closed = 0;
+    closed = 0,
+    terminal, webgl, sessionEnded = false, resized = [], written = [], copied = [], reads = 0;
   const errors = [],
     state = {
       home: process.cwd() + "/.fixtures/home",
@@ -70,19 +71,25 @@ const wait = async (fn) => {
             },
           );
         w.Terminal = class {
-          constructor() {
+          constructor(options) {
+            terminal = this;
+            this.options = options;
+            this.unicode = {};
             this.cols = 90;
             this.rows = 22;
           }
           loadAddon() {}
           open() {}
-          onData() {}
-          attachCustomKeyEventHandler() {}
-          write() {}
+          onData(fn) { this.input = fn; }
+          onResize(fn) { this.resized = fn; }
+          attachCustomKeyEventHandler(fn) { this.key = fn; }
+          paste(text) { this.pasted = text; this.input("\x1b[200~" + text + "\x1b[201~"); }
+          hasSelection() { return true; }
+          write(data) { this.output = data; }
           focus() {}
           dispose() {}
           getSelection() {
-            return "";
+            return "selected output";
           }
         };
         w.FitAddon = {
@@ -91,6 +98,15 @@ const wait = async (fn) => {
           },
         };
         w.WebLinksAddon = { WebLinksAddon: class {} };
+        w.Unicode11Addon = { Unicode11Addon: class {} };
+        w.WebglAddon = { WebglAddon: class {
+          constructor() {
+            if (process.argv.includes("--no-webgl")) throw Error("WebGL unavailable for smoke");
+            webgl = this;
+          }
+          onContextLoss(fn) { this.lost = fn; }
+          dispose() { this.disposed = true; }
+        } };
         w.go = {
           main: {
             App: {
@@ -104,14 +120,18 @@ const wait = async (fn) => {
                 state.busy = false;
                 state.phase = "Cancelled";
               },
-              StartAgent: async (...args) => launched.push(args),
-              ReadAgent: async () => ({ data: "", exited: true }),
+              StartAgent: async (...args) => { sessionEnded = false; launched.push(args); },
+              ReadAgent: async () => {
+                reads++;
+                return { data: Buffer.from("\x1b[38;2;120;180;240m╭─ Advisor ─╮\x1b[0m").toString("base64"), exited: sessionEnded };
+              },
               CloseAgent: async () => {
                 closed++;
               },
-              ResizeAgent: async () => {},
-              Copy: async () => {},
-              Paste: async () => "",
+              ResizeAgent: async (...size) => resized.push(size),
+              WriteAgent: async data => written.push(data),
+              Copy: async text => copied.push(text),
+              Paste: async () => "first line\nsecond line",
               PickFolder: async () => state.home,
             },
           },
@@ -156,7 +176,7 @@ const wait = async (fn) => {
   available = true;
   await $("agent-check").onclick();
   assert.ok(option("Claude"));
-  assert.equal(option("Claude").querySelector("use").getAttribute("href"), "#regular-magnifying-glass");
+  assert.equal(option("Claude").querySelector("use").getAttribute("href"), "#agent-claude");
   assert.equal(option("Codex"), undefined);
   option("Claude").click();
   assert.equal(w.document.activeElement, $("agent-picker").querySelector("summary"));
@@ -172,6 +192,61 @@ const wait = async (fn) => {
   await wait(() => launched.length === 1);
   assert.equal(launched[0][0], "claude");
   assert.equal($("agent-terminal").hidden, false);
+  await wait(() => $("terminal-status").textContent === "Read-only disk advisor");
+  assert.match(terminal.options.fontFamily, /SF Mono.*Menlo/);
+  assert.equal(terminal.options.theme.background, "#15181e");
+  assert.equal(terminal.options.cursorBlink, true);
+  assert.equal(terminal.options.macOptionIsMeta, true);
+  assert.equal(terminal.unicode.activeVersion, "11");
+  assert.match(Buffer.from(terminal.output).toString(), /╭─ Advisor ─╮/);
+  assert.ok($("ask-agent").contains($("agent-choice")));
+  assert.equal($("agent-picker").querySelector("summary").textContent.trim(), "Analyze with"); // hidden label, visible chevron only
+  terminal.resized({ cols: 112, rows: 35 });
+  assert.deepEqual(resized.at(-1), [112, 35]);
+  // Collapse keeps the same terminal, PTY, and polling loop alive; restore remembers height.
+  const panel = $("agent-terminal"), handle = $("terminal-resize");
+  panel.getBoundingClientRect = () => ({ height: 340 });
+  const closes = closed, instance = terminal, beforeReads = reads;
+  handle.click();
+  assert.equal(handle.getAttribute("aria-expanded"), "false");
+  assert.equal(panel.classList.contains("collapsed"), true);
+  await wait(() => reads > beforeReads);
+  assert.equal(closed, closes);
+  assert.equal(terminal, instance);
+  handle.click();
+  assert.equal(handle.getAttribute("aria-expanded"), "true");
+  assert.equal(panel.style.height, "340px");
+  assert.equal(launched.length, 1);
+  // Preserve terminal control keys; only desktop copy/paste shortcuts are intercepted.
+  for (const e of [
+    { key: "c", ctrlKey: true }, { key: "v", ctrlKey: true },
+    { key: "ArrowUp" }, { key: "ArrowLeft", altKey: true },
+    { key: "r", ctrlKey: true },
+  ]) assert.equal(terminal.key({ type: "keydown", ...e }), true);
+  for (const input of ["\x03", "\x1b[A", "\x1bb", "\x1b[1;5D"]) {
+    terminal.input(input);
+    assert.equal(written.at(-1), input);
+  }
+  await $("terminal-paste").onclick();
+  assert.equal(terminal.pasted, "first line\nsecond line");
+  assert.equal(written.at(-1), "\x1b[200~first line\nsecond line\x1b[201~");
+  await $("terminal-copy").onclick();
+  assert.equal(copied.at(-1), "selected output");
+  let prevented = false;
+  assert.equal(terminal.key({ type: "keydown", key: "c", metaKey: true,
+    preventDefault() { prevented = true; } }), false);
+  assert.equal(prevented, true);
+  const input = w.document.createElement("textarea");
+  $("terminal-screen").append(input);
+  const ctrlR = new w.KeyboardEvent("keydown", { key: "r", ctrlKey: true, bubbles: true, cancelable: true });
+  input.dispatchEvent(ctrlR);
+  assert.equal(ctrlR.defaultPrevented, false);
+  if (webgl) {
+    webgl.lost();
+    assert.equal(webgl.disposed, true);
+    assert.equal(closed, closes);
+  }
+  sessionEnded = true;
   await wait(() => $("terminal-status").textContent === "Session ended");
   await $("terminal-close").onclick();
   assert.equal($("agent-terminal").hidden, true);
@@ -216,7 +291,7 @@ const wait = async (fn) => {
   assert.deepEqual(errors, []);
   w.close();
   console.log(
-    "PASS: install states, check again, dismissal persistence, scan-to-agent handoff, terminal close/reopen, cancelled scan never launches. Native terminal mocked.",
+    "PASS: install states, check again, dismissal persistence, scan-to-agent handoff, terminal collapse/restore keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, close/reopen, cancelled scan never launches. Native terminal mocked.",
   );
 })().catch((e) => {
   console.error(e);

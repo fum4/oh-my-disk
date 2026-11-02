@@ -12,7 +12,11 @@
     fit,
     timer,
     opening = false,
-    generation = 0;
+    generation = 0,
+    sessionRunning = false,
+    collapsed = false,
+    expandedHeight = "",
+    dragged = false;
   const tipKey = "omd-agent-tip-dismissed";
   const dismissed = () => {
     try {
@@ -43,6 +47,18 @@
     $("ask-agent").disabled = !app || opening;
     $("ask-agent").title = app ? "Chat about these results" : "Available in the desktop app";
     $("agent-choice").textContent = names[selected] || "None";
+    $("agent-ask-label").textContent = selected ? "Ask" : "Ask agent";
+    $("agent-selection").hidden = ready && !selected;
+    const summary = $("agent-picker").querySelector("summary");
+    $("agent-analyze").hidden = ready;
+    control.classList.toggle("has-results", ready);
+    if (ready) $("ask-agent").append($("agent-selection"));
+    else summary.insertBefore($("agent-selection"), summary.querySelector(".agent-chevron"));
+    $("agent-mark").replaceChildren();
+    const definition = definitions.find(d => d.name === selected);
+    if (definition) $("agent-mark").append(icon(definition.icon));
+    summary.setAttribute("aria-label", "Choose agent, current: " + (names[selected] || "None"));
+    $("ask-agent").setAttribute("aria-label", selected ? "Ask " + names[selected] : "Choose an agent to ask");
     $("agent-picker").querySelector("summary").title = app ? "" : "Agents run in the desktop app";
     const signature = JSON.stringify([definitions, installed, selected]);
     const options = $("agent-options");
@@ -100,18 +116,31 @@
     } finally { $("agent-check").disabled = false; }
   }
   function theme() {
-    const c = getComputedStyle(document.documentElement);
     return {
-      background: c.getPropertyValue("--card").trim(),
-      foreground: c.getPropertyValue("--label").trim(),
-      cursor: c.getPropertyValue("--blue").trim(),
-      selectionBackground: "#0a66e84d",
+      background: "#15181e", foreground: "#e4e7ed", cursor: "#e4e7ed",
+      cursorAccent: "#15181e", selectionBackground: "#637da666",
+      black: "#242933", red: "#f08080", green: "#a3be8c", yellow: "#ebcb8b",
+      blue: "#81a9df", magenta: "#b99aca", cyan: "#88c0d0", white: "#d8dee9",
+      brightBlack: "#687487", brightRed: "#ff9a9a", brightGreen: "#b8d5a0",
+      brightYellow: "#f7dfa4", brightBlue: "#a5c7f4", brightMagenta: "#d2b5e2",
+      brightCyan: "#a4dce8", brightWhite: "#ffffff",
     };
   }
   function resize() {
-    if (!term || $("agent-terminal").hidden) return;
+    if (!term || $("agent-terminal").hidden || collapsed) return;
     fit.fit();
-    app.ResizeAgent(term.cols, term.rows).catch(error);
+  }
+  function setCollapsed(value) {
+    if (value === collapsed) return;
+    if (value) expandedHeight = $("agent-terminal").getBoundingClientRect().height + "px";
+    collapsed = value;
+    const panel = $("agent-terminal"), handle = $("terminal-resize");
+    panel.classList.toggle("collapsed", value);
+    panel.style.height = value ? "28px" : expandedHeight;
+    handle.setAttribute("aria-expanded", String(!value));
+    handle.setAttribute("aria-label", value ? "Expand terminal" : "Collapse terminal");
+    handle.title = value ? "Expand terminal" : "Collapse terminal · drag to resize";
+    if (!value) { resize(); term?.focus(); }
   }
   async function launch(n, prompt = "") {
     if (opening || !snapshot || state.busy || !installed[n]) return;
@@ -120,29 +149,45 @@
     try {
       await close(false);
       const gen = ++generation;
+      setCollapsed(false);
       $("agent-terminal").hidden = false;
       $("terminal-title").textContent = names[n];
       $("terminal-status").textContent = "Starting…";
       term = new Terminal({
-        fontFamily: '"JetBrains Mono", monospace',
+        fontFamily: '"SF Mono", Menlo, Monaco, "JetBrains Mono", monospace',
         fontSize: 13,
         scrollback: 10000,
         theme: theme(),
-        allowProposedApi: false,
+        cursorBlink: true,
+        macOptionIsMeta: true,
+        allowProposedApi: true,
       });
       fit = new FitAddon.FitAddon();
       term.loadAddon(fit);
+      term.loadAddon(new Unicode11Addon.Unicode11Addon());
+      term.unicode.activeVersion = "11";
       term.loadAddon(
         new WebLinksAddon.WebLinksAddon((event, url) => {
           if (/^https?:\/\//i.test(url)) window.runtime.BrowserOpenURL(url);
         }),
       );
       term.open($("terminal-screen"));
+      // WebGL gives box drawing and full-screen TUIs a crisp, fast canvas.
+      // xterm's built-in DOM renderer remains available on GPU context loss.
+      let renderer;
+      try {
+        renderer = new WebglAddon.WebglAddon();
+        renderer.onContextLoss(() => renderer.dispose());
+        term.loadAddon(renderer);
+      } catch { renderer?.dispose(); }
       fit.fit();
+      term.onResize(({ cols, rows }) => {
+        if (sessionRunning) app.ResizeAgent(cols, rows).catch(error);
+      });
       term.attachCustomKeyEventHandler((e) => {
         if (
           e.type === "keydown" &&
-          (e.metaKey || e.ctrlKey) &&
+          (e.metaKey || (e.ctrlKey && e.shiftKey)) &&
           e.key.toLowerCase() === "v"
         ) {
           e.preventDefault();
@@ -151,7 +196,7 @@
         }
         if (
           e.type === "keydown" &&
-          e.metaKey &&
+          (e.metaKey || (e.ctrlKey && e.shiftKey)) &&
           e.key.toLowerCase() === "c" &&
           term.hasSelection()
         ) {
@@ -166,7 +211,9 @@
         await app.CloseAgent();
         return;
       }
+      sessionRunning = true;
       term.onData((data) => app.WriteAgent(data).catch(error));
+      document.fonts?.ready.then(() => { if (gen === generation) resize(); });
       $("terminal-status").textContent = "Read-only disk advisor";
       term.focus();
       async function poll() {
@@ -176,6 +223,7 @@
           if (out.data)
             term.write(Uint8Array.from(atob(out.data), (c) => c.charCodeAt(0)));
           if (out.exited) {
+            sessionRunning = false;
             $("terminal-status").textContent = "Session ended";
             return;
           }
@@ -195,6 +243,7 @@
   }
   async function close(restore = true) {
     generation++;
+    sessionRunning = false;
     clearTimeout(timer);
     if (app) await app.CloseAgent();
     term?.dispose();
@@ -258,7 +307,9 @@
     app.Copy(term?.getSelection() || "").catch(error);
   $("terminal-paste").onclick = async () => {
     try {
-      await app.WriteAgent(await app.Paste());
+      const target = term;
+      const text = await app.Paste();
+      if (target && target === term) target.paste(text);
       term?.focus();
     } catch (e) {
       error(e);
@@ -267,18 +318,26 @@
   const handle = $("terminal-resize"),
     panel = $("agent-terminal");
   function setHeight(h) {
-    panel.style.height = Math.max(180, Math.min(innerHeight - 100, h)) + "px";
+    if (collapsed) setCollapsed(false);
+    panel.style.height = Math.max(180, Math.min(innerHeight * .65, h)) + "px";
     resize();
   }
+  handle.onclick = () => { if (!dragged) setCollapsed(!collapsed); };
   handle.onpointerdown = (e) => {
+    if (e.button !== 0) return;
+    dragged = false;
+    const start = e.clientY, height = panel.getBoundingClientRect().height;
     handle.setPointerCapture(e.pointerId);
-    handle.onpointermove = (ev) =>
-      setHeight(panel.getBoundingClientRect().bottom - ev.clientY);
-    handle.onpointerup = () => {
+    handle.onpointermove = (ev) => {
+      if (Math.abs(ev.clientY - start) > 4) dragged = true;
+      if (dragged) setHeight(height + start - ev.clientY);
+    };
+    handle.onpointerup = handle.onpointercancel = () => {
       handle.onpointermove = null;
     };
   };
   handle.onkeydown = (e) => {
+    dragged = false;
     if (e.key === "ArrowUp" || e.key === "ArrowDown") {
       e.preventDefault();
       setHeight(panel.offsetHeight + (e.key === "ArrowUp" ? 24 : -24));
@@ -286,10 +345,5 @@
   };
   if (window.ResizeObserver)
     new ResizeObserver(resize).observe($("terminal-screen"));
-  window
-    .matchMedia?.("(prefers-color-scheme: dark)")
-    .addEventListener("change", () => {
-      if (term) term.options.theme = theme();
-    });
   detect().catch(error);
 })();

@@ -3122,24 +3122,24 @@ body:has(#welcome:not([hidden])) #toolbar-choose {
 }
 
 @media (max-height: 760px) {
-  .main-content:has(#agent-terminal:not([hidden]))
+  .main-content:has(#agent-terminal:not([hidden]):not(.collapsed))
     .overview-left
     > .card:first-child {
     padding: 12px;
   }
-  .main-content:has(#agent-terminal:not([hidden])) .ring {
+  .main-content:has(#agent-terminal:not([hidden]):not(.collapsed)) .ring {
     display: none;
   }
-  .main-content:has(#agent-terminal:not([hidden])) .gain .ba {
+  .main-content:has(#agent-terminal:not([hidden]):not(.collapsed)) .gain .ba {
     display: none;
   }
-  .main-content:has(#agent-terminal:not([hidden])) .map-panel {
+  .main-content:has(#agent-terminal:not([hidden]):not(.collapsed)) .map-panel {
     display: none;
   }
-  .main-content:has(#agent-terminal:not([hidden])) .workspace {
+  .main-content:has(#agent-terminal:not([hidden]):not(.collapsed)) .workspace {
     display: flex;
   }
-  .main-content:has(#agent-terminal:not([hidden])) .files-panel {
+  .main-content:has(#agent-terminal:not([hidden]):not(.collapsed)) .files-panel {
     flex: 1;
   }
 }
@@ -3299,3 +3299,125 @@ body:has(#welcome:not([hidden])) footer { visibility: hidden; }
   display: grid;
   place-items: center;
 }
+
+/* Round 5: one quiet agent control and a terminal surface of its own. */
+button, summary, label, nav, .bar, .ch, .tools, thead, th,
+.terminal-heading, #terminal-resize {
+  -webkit-user-select: none;
+  user-select: none;
+}
+th button { cursor: pointer; }
+#suggestions > .gain { margin-bottom: 18px; }
+.agent-control {
+  --wails-draggable: no-drag;
+  width: fit-content;
+  gap: 0;
+  border: 1px solid var(--hair-2);
+  border-radius: 10px;
+  background: var(--card);
+}
+#agent-picker summary, #ask-agent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--label-2);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+  cursor: pointer;
+  list-style: none;
+  transform: none;
+}
+#agent-picker summary::-webkit-details-marker { display: none; }
+#agent-picker summary::marker { content: ""; }
+#agent-picker summary:hover, #ask-agent:hover,
+#agent-picker[open] summary { background: var(--fill); transform: none; }
+#agent-control.has-results #ask-agent { border-radius: 9px 0 0 9px; }
+#agent-control.has-results summary {
+  border-left: 1px solid var(--hair-2);
+  border-radius: 0 9px 9px 0;
+  width: 36px;
+  padding: 0;
+}
+#agent-selection { display: inline-flex; align-items: center; gap: 6px; }
+#agent-choice { margin: 0; }
+#agent-mark { display: inline-flex; color: var(--label-2); }
+#agent-mark:empty { display: none; }
+#agent-mark .i { width: 16px; height: 16px; }
+.agent-chevron { width: 12px; height: 12px; transition: transform .15s; }
+#agent-picker[open] .agent-chevron { transform: rotate(180deg); }
+.agent-menu { top: calc(100% + 8px); }
+#scan-agent-slot .agent-menu { right: auto; left: 0; }
+#agent-control.has-results .agent-menu { right: 0; left: auto; }
+
+#agent-terminal {
+  background: #15181e;
+  color: #e4e7ed;
+  padding: 28px 0 0;
+  min-height: 180px;
+  max-height: 65vh;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #ffffff14, 0 -4px 20px #0002;
+}
+#terminal-resize {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 8px 8px;
+  background: #ffffff0a;
+  color: #9ca7b8;
+  cursor: pointer;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+}
+#terminal-resize::after { content: none; }
+#terminal-resize:hover, #terminal-resize:active {
+  transform: translateX(-50%);
+  background: #ffffff18;
+  color: #e4e7ed;
+}
+#terminal-resize .i { width: 16px; height: 16px; }
+#agent-terminal.collapsed {
+  min-height: 28px;
+  padding: 0;
+}
+#agent-terminal.collapsed #terminal-resize .i { transform: rotate(180deg); }
+#agent-terminal.collapsed .terminal-heading,
+#agent-terminal.collapsed #terminal-screen { display: none; }
+.terminal-heading { padding: 0 14px 10px; gap: 10px; }
+#terminal-status { color: #9ca7b8; }
+#agent-terminal .terminal-heading .btn {
+  min-height: 26px;
+  height: 26px;
+  padding: 0 8px;
+  background: #ffffff0a;
+  color: #bac3d1;
+  border: 1px solid #ffffff14;
+  box-shadow: none;
+  font-size: 11px;
+  transform: none;
+}
+#agent-terminal .terminal-heading .btn:hover { background: #ffffff18; color: #e4e7ed; transform: none; }
+#terminal-screen {
+  padding: 2px 14px 12px;
+  background: #15181e;
+  color: #e4e7ed;
+  text-align: left;
+  line-height: normal;
+  letter-spacing: normal;
+}
+#terminal-screen .xterm-viewport { background: #15181e; }
+#terminal-screen .xterm { cursor: text; }

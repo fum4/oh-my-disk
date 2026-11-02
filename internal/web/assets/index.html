@@ -12,10 +12,18 @@
     <script src="/vendor/xterm.js" defer></script>
     <script src="/vendor/addon-fit.js" defer></script>
     <script src="/vendor/addon-web-links.js" defer></script>
+    <script src="/vendor/addon-unicode11.js" defer></script>
+    <script src="/vendor/addon-webgl.js" defer></script>
     <script src="/agents.js" defer></script>
   </head>
   <body>
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="agent-claude" viewBox="0 0 24 24">
+        <path d="M12 2v20M2 12h20M5 5l14 14M5 19L19 5M8 3l8 18M3 8l18 8M3 16l18-8M8 21l8-18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="agent-codex" viewBox="0 0 24 24">
+        <path d="m9 5-7 7 7 7m6-14 7 7-7 7m-2-13-2 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </symbol>
       <symbol id="fill-android-logo" viewBox="0 0 256 256">
         <path
           d="M207.06,80.67c-.74-.74-1.49-1.46-2.24-2.17l24.84-24.84a8,8,0,0,0-11.32-11.32l-26,26a111.43,111.43,0,0,0-128.55.19L37.66,42.34A8,8,0,0,0,26.34,53.66L51.4,78.72A113.38,113.38,0,0,0,16,161.13V184a16,16,0,0,0,16,16H224a16,16,0,0,0,16-16V160A111.25,111.25,0,0,0,207.06,80.67ZM92,160a12,12,0,1,1,12-12A12,12,0,0,1,92,160Zm72,0a12,12,0,1,1,12-12A12,12,0,0,1,164,160Z"
@@ -516,9 +524,9 @@
         </div>
       </section>
       <div id="agent-control" class="agent-control" hidden>
-        <button id="ask-agent" class="btn sec" hidden>Ask agent</button>
+        <button id="ask-agent" class="btn sec" hidden><span id="agent-ask-label">Ask agent</span></button>
         <details id="agent-picker">
-          <summary>Analyze with <span id="agent-choice">None</span></summary>
+          <summary aria-label="Choose agent"><span id="agent-analyze">Analyze with</span><span id="agent-selection"><span id="agent-mark" aria-hidden="true"></span><span id="agent-choice">None</span></span><svg class="i agent-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></summary>
           <div class="agent-menu">
             <div id="agent-options" role="group" aria-label="Analyze with"></div>
             <button id="agent-check" class="link">Check again</button>
@@ -767,13 +775,10 @@
         </div>
       </section>
       <section id="agent-terminal" aria-label="Agent terminal" hidden>
-        <div
-          id="terminal-resize"
-          role="separator"
-          aria-label="Resize terminal"
-          aria-orientation="horizontal"
-          tabindex="0"
-        ></div>
+        <button id="terminal-resize" type="button" aria-label="Collapse terminal"
+          aria-expanded="true" aria-controls="terminal-screen" title="Collapse terminal · drag to resize">
+          <svg class="i" aria-hidden="true"><use href="#regular-caret-down"/></svg>
+        </button>
         <div class="terminal-heading">
           <strong
             id="terminal-title"

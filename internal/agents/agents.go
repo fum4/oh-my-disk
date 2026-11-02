@@ -32,10 +32,10 @@ type Definition struct {
 }
 
 var registry = []Definition{
-	{Name: "claude", Label: "Claude", Icon: "regular-magnifying-glass", InstallURL: "https://code.claude.com/docs/en/setup", Command: "claude", Launch: func(binary, dir, prompt string) []string {
+	{Name: "claude", Label: "Claude", Icon: "agent-claude", InstallURL: "https://code.claude.com/docs/en/setup", Command: "claude", Launch: func(binary, dir, prompt string) []string {
 		return []string{"--mcp-config", filepath.Join(dir, "mcp.json"), "--strict-mcp-config", "--tools", "", "--append-system-prompt", Context, "--", prompt}
 	}},
-	{Name: "codex", Label: "Codex", Icon: "regular-magnifying-glass", InstallURL: "https://developers.openai.com/codex/cli", Command: "codex", Fallback: BundledCodex, Launch: func(binary, dir, prompt string) []string {
+	{Name: "codex", Label: "Codex", Icon: "agent-codex", InstallURL: "https://developers.openai.com/codex/cli", Command: "codex", Fallback: BundledCodex, Launch: func(binary, dir, prompt string) []string {
 		q := func(s string) string { b, _ := json.Marshal(s); return string(b) }
 		return []string{"--no-daemon", "--sandbox", "read-only", "-c", "mcp_servers={}", "-c", "mcp_servers.oh-my-disk.command=" + q(binary), "-c", `mcp_servers.oh-my-disk.args=["mcp"]`, "-c", "mcp_servers.oh-my-disk.env.OMD_SESSION_SCAN=" + q(filepath.Join(dir, "scan.bin")), "-c", "developer_instructions=" + q(Context), "--", prompt}
 	}},
