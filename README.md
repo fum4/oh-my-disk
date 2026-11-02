@@ -287,3 +287,30 @@ Generate a metadata-scale fixture separately from the realistic small fixture:
 python3 scripts/synthetic.py .fixtures/large --large
 # roughly two million entries: add --projects 2000
 ```
+
+### Chat about a scan in the desktop app
+
+The welcome screen offers **Scan My Disk**, **Scan with Claude**, and **Scan with Codex**. Agent scans open a resizable terminal after successful completion; cancelling or failing a scan never launches an agent. After a scan, **Ask Claude** / **Ask Codex** opens an interactive session. Close ends its process group and removes the app's private session workspace. One session is supported at a time. Drag the drawer handle (or focus it and use arrow keys) to resize; selection, Copy/Paste, terminal colors, scrollback and HTTP(S) links are supported. Terminal assets are bundled locally, including xterm.js 5.5.0, fit 0.10.0 and web-links 0.11.0 (MIT).
+
+Install [Claude Code](https://code.claude.com/docs/en/setup) or [Codex CLI](https://developers.openai.com/codex/cli), sign in using the CLI, then use **Check Again**. Missing agents have install links; the small install tip can be dismissed and remembers that choice locally. Browser UI shows **Available in the desktop app** and exposes no PTY HTTP/WebSocket endpoint.
+
+Detection checks executable files on PATH, `~/.local/bin`, Homebrew, `/usr/local/bin`, common npm global locations, mise shims, and Codex inside `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`. A bounded `$SHELL -lc 'command -v claude'` / `command -v codex` lookup also resolves installations exposed by login-shell PATH setup. The terminal environment adds the resolved CLI directory and standard binary paths for GUI launches.
+
+`make app` bundles `oh-my-disk-cli` alongside the desktop executable. Each launch creates a private temporary workspace containing a copy of the displayed scan, MCP JSON, and AGENTS.md / CLAUDE.md context. MCP receives `OMD_SESSION_SCAN` pointing to that copy, so it does not accidentally analyze another window's cached scan. No user MCP configuration is edited. The reusable advisor context lives at `internal/agents/context.md`; it can later be packaged as a skill. Session working directory is deliberately the private workspace, avoiding scanned-folder instructions and hooks. Agent authentication and normal conversation persistence remain managed by the installed CLI.
+
+Launch argv (paths below are placeholders; these are arguments passed directly, without a shell):
+
+```sh
+claude --mcp-config <session>/mcp.json --strict-mcp-config --tools '' \
+  --append-system-prompt '<contents of internal/agents/context.md>' -- \
+  "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
+
+codex --no-daemon --sandbox read-only -c 'mcp_servers={}' \
+  -c 'mcp_servers.oh-my-disk.command="<app>/Contents/MacOS/oh-my-disk-cli"' \
+  -c 'mcp_servers.oh-my-disk.args=["mcp"]' \
+  -c 'mcp_servers.oh-my-disk.env.OMD_SESSION_SCAN="<session>/scan.bin"' \
+  -c 'developer_instructions="<escaped advisor context>"' -- \
+  "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
+```
+
+Flags were verified against the installed CLIs' `--help`. Claude's built-in tools are disabled and its MCP list is isolated. Codex uses its read-only sandbox and replaces the session MCP table before configuring the six read-only disk tools. The advisor never deletes or runs cleanup commands, keeps personal/iCloud/Photos/Music/Documents data off-limits, and tells users to review candidates in the app and use **Move to Trash**. These rules guide recommendations; existing app Trash checks and confirmation remain unchanged. Starting an agent sends the metadata it requests to your configured AI provider under that CLI's account and settings; ordinary scanning remains local. No terminal content or credentials are logged by the app.

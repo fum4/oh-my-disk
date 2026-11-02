@@ -78,3 +78,13 @@ See [POLISH_REPORT.md](POLISH_REPORT.md) for all thirteen feedback items, extra 
 - Rendered matrix execution remains blocked before page load: sandboxed Chromium aborts (`SIGABRT`, crashpad permission errors), browser access host is unavailable, and native Chrome fallback was denied because Computer Use was not approved for Chrome. These checks are prepared, **not passed**. Actual rendered light/dark layout, window geometry, and native hit-target appearance still need a permitted browser/native run. Static CSS/DOM inspection is not a substitute for pixel QA.
 - Logs: `.build/polish-{check,cli,app,codesign,web-smoke,native-smoke,empty-smoke,large-smoke,capture}.log`.
 - Delivery: branch `polish`, base `4d846c1`, side Git directory `.build/polish-git`, bundle `.build/polish.bundle`. Primary `.git` is untouched; icon.icns is excluded.
+
+## Embedded agent terminal verification (2026-11-02)
+
+- Three equal welcome options, persistent post-scan Ask buttons, missing-agent install links, Check Again, and remembered dismissal. Browser mode disables agent actions and says “Available in the desktop app.”
+- Desktop terminal uses local xterm.js plus fit/web-links addons and a Go PTY through Wails bindings. No network terminal service. Drawer resize is pointer/keyboard accessible; theme uses Calm light/dark tokens. Closing terminates the process group; app shutdown also closes it. One session, private workspace rather than scanned-root cwd; optional row context actions are deferred.
+- `go test ./...`: detection including GUI fallback, command/config escaping, private MCP snapshot selection, and real PTY I/O/resize/close tests added. Existing tests retained.
+- Existing web, native bridge, and native empty-start smoke scripts pass. `scripts/ui-agents-smoke.cjs <fixture-url>` adds missing CLI/check/dismiss, successful scan handoff, cancelled scan, terminal close/reopen checks. Its terminal/CLI are mocked; it uses real fixture APIs and local UI sources.
+- `go vet ./...`, `go test ./...`, `make app`, deep/strict codesign verification, and `go test -race ./app ./internal/agents`: passed (see `.build/agents-*.log`). Desktop bundle includes the CLI MCP helper.
+- Rendered QA remains blocked: Chrome/Playwright aborts during startup under this sandbox; the computer-use in-app browser reports “browser access host is unavailable.” Light/dark pixel rendering, actual WebKit terminal interactions, and authenticated agent conversations were not verified. The automated PTY test uses `/bin/sh` without calling a provider; no account/auth settings are changed.
+- Side git branch `agents` is stored in `.build/agents-git` with bundle `.build/agents.bundle`, based on the original v1 HEAD. No icon changes are included; `make app` regenerates the build icon.
