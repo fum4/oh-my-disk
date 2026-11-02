@@ -1,10 +1,115 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>oh-my-disk · Space, understood.</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
-<body><div class="app">
-<header><a class="brand" href="/" aria-label="oh-my-disk home"><span class="logo">◉</span> oh-my-disk<span class="version">v1</span></a><span class="readonly">● READ-ONLY BY DESIGN</span></header>
-<section class="intro"><div><div class="eyebrow">YOUR DISK, A LITTLE CLEARER</div><h1>Make room for what’s next.</h1><p id="scan-info">Loading your disk map…</p></div><div class="stats"><span class="stat-value" id="total">—</span><span>allocated on disk</span></div></section>
-<nav class="toolbar"><div class="tabs" aria-label="Organization"><button id="folders" class="active">Folders</button><button id="categories">By category</button><button id="contenders">Free-space contenders</button></div><div class="view-switch" aria-label="Visualization"><button id="sunburst" class="active">◉ Sunburst</button><button id="treemap">▦ Treemap</button></div></nav>
-<main id="explorer"><div id="breadcrumbs" class="breadcrumbs" aria-label="Breadcrumb navigation"></div><div class="workspace"><section class="map-panel"><div class="panel-top"><span id="map-label">SPACE MAP</span><span>Click to explore · center to go back</span></div><div id="chart" role="img" aria-label="Interactive disk allocation map"></div><div id="legend" class="legend"></div></section><section class="files-panel"><div class="folder-heading"><div><span class="eyebrow">CURRENT FOLDER</span><h2 id="folder-name">—</h2></div><span id="folder-size">—</span></div><div class="table-scroll"><table><thead><tr><th><button data-sort="name">Name ↕</button></th><th><button data-sort="bytes">Size ↕</button></th><th><button data-sort="files">Files ↕</button></th><th><button data-sort="modified">Modified ↕</button></th></tr></thead><tbody id="children"></tbody></table></div><p class="hint">Ring widths show depth. Segment areas show allocated bytes.<br>Small entries remain accessible in the table.</p></section></div></main>
-<section id="suggestions" hidden><div class="suggestion-intro"><div><span class="eyebrow">START WITH THE LOWEST RISK</span><h2>Your free-space contenders</h2></div><p>Ranked by size × safety × staleness.<br>Commands are for your review. Nothing runs here.</p></div><div id="suggestion-list"></div></section>
-<footer><span id="scan-status">Local scan · no data leaves this device</span><span>Allocated ≠ guaranteed reclaimable · <button id="details-toggle">Accounting notes</button></span></footer><aside id="notes" hidden><p id="accounting"></p><div id="skipped"></div></aside>
-</div><div id="tooltip" role="tooltip" hidden></div></body></html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>oh-my-disk · Space, understood.</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <a class="brand" href="/" aria-label="oh-my-disk home"
+          ><span class="logo">◉</span> oh-my-disk<span class="version"
+            >v1</span
+          ></a
+        ><span class="readonly">● READ-ONLY BY DESIGN</span>
+      </header>
+      <section class="intro">
+        <div>
+          <div class="eyebrow">YOUR DISK, A LITTLE CLEARER</div>
+          <h1>Make room for what’s next.</h1>
+          <p id="scan-info">Loading your disk map…</p>
+        </div>
+        <div class="stats">
+          <span class="stat-value" id="total">—</span
+          ><span>allocated on disk</span>
+        </div>
+      </section>
+      <nav class="toolbar">
+        <div class="tabs" aria-label="Organization">
+          <button id="folders" class="active">Folders</button
+          ><button id="categories">By category</button
+          ><button id="contenders">Free-space contenders</button>
+        </div>
+        <div class="view-switch" aria-label="Visualization">
+          <button id="sunburst" class="active">◉ Sunburst</button
+          ><button id="treemap">▦ Treemap</button>
+        </div>
+      </nav>
+      <main id="explorer">
+        <div
+          id="breadcrumbs"
+          class="breadcrumbs"
+          aria-label="Breadcrumb navigation"
+        ></div>
+        <div class="workspace">
+          <section class="map-panel">
+            <div class="panel-top">
+              <span id="map-label">SPACE MAP</span
+              ><span>Click to explore · center to go back</span>
+            </div>
+            <div
+              id="chart"
+              role="img"
+              aria-label="Interactive disk allocation map"
+            ></div>
+            <div id="legend" class="legend"></div>
+          </section>
+          <section class="files-panel">
+            <div class="folder-heading">
+              <div>
+                <span class="eyebrow">CURRENT FOLDER</span>
+                <h2 id="folder-name">—</h2>
+              </div>
+              <span id="folder-size">—</span>
+            </div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button data-sort="name">Name ↕</button></th>
+                    <th><button data-sort="bytes">Size ↕</button></th>
+                    <th><button data-sort="files">Files ↕</button></th>
+                    <th><button data-sort="modified">Modified ↕</button></th>
+                  </tr>
+                </thead>
+                <tbody id="children"></tbody>
+              </table>
+            </div>
+            <p class="hint">
+              Ring widths show depth. Segment areas show allocated bytes.<br />Small
+              entries remain accessible in the table.
+            </p>
+          </section>
+        </div>
+      </main>
+      <section id="suggestions" hidden>
+        <div class="suggestion-intro">
+          <div>
+            <span class="eyebrow">START WITH THE LOWEST RISK</span>
+            <h2>Your free-space contenders</h2>
+          </div>
+          <p>
+            Ranked by size × safety × staleness.<br />Commands are for your
+            review. Nothing runs here.
+          </p>
+        </div>
+        <div id="suggestion-list"></div>
+      </section>
+      <footer>
+        <span id="scan-status">Local scan · no data leaves this device</span
+        ><span
+          >Allocated ≠ guaranteed reclaimable ·
+          <button id="details-toggle">Accounting notes</button></span
+        >
+      </footer>
+      <aside id="notes" hidden>
+        <p id="accounting"></p>
+        <div id="skipped"></div>
+      </aside>
+    </div>
+    <div id="tooltip" role="tooltip" hidden></div>
+  </body>
+</html>

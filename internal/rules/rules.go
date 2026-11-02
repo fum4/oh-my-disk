@@ -201,7 +201,7 @@ func (e *Engine) Analyze(root *scanner.Node, now time.Time, min int64) ([]Sugges
 					s.Explanation = r.Explanation
 					s.Command = strings.ReplaceAll(r.Command, "{path}", Quote(n.Path))
 					if r.Project && project != nil {
-						s.LastActivity = latest(project)
+						s.LastActivity = project.LatestModified
 						s.ProjectPath = project.Path
 					}
 				}
@@ -320,7 +320,7 @@ func (e *Engine) Explain(root *scanner.Node, path string, now time.Time) (*Sugge
 			s.Explanation += " (Inherited from " + matched.Path + "; suggested command applies to that location.)"
 		}
 		if rule.Project && project != nil {
-			s.LastActivity = latest(project)
+			s.LastActivity = project.LatestModified
 			s.ProjectPath = project.Path
 		}
 	}

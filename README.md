@@ -1,2 +1,149 @@
 # oh-my-disk
-Scan your disk, see where space goes, rank what to free up. Never deletes anything.
+
+A local, read-only disk-space analyzer for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a DaisyDisk-inspired web explorer embedded in one binary.
+
+**It never deletes, moves, or edits scanned content.** There is no cleanup subcommand, execution hook, cleanup API, or generated cleanup script. Suggested commands are plain text for a human to review. The only executable launched is the platform browser opener when starting the UI.
+
+## Install
+
+Requires Go 1.23.3 or newer. No Node, frontend build, CDN, database or runtime dependencies are needed.
+
+```sh
+git clone https://github.com/fum4/oh-my-disk.git
+cd oh-my-disk
+go build -o oh-my-disk .
+./oh-my-disk --help
+```
+
+Or install with `go install github.com/fum4/oh-my-disk@latest` after this version is published. To cross-compile:
+
+```sh
+GOOS=darwin GOARCH=arm64 go build -o oh-my-disk-macos .
+GOOS=linux GOARCH=amd64 go build -o oh-my-disk-linux .
+```
+
+## Start here
+
+```sh
+./oh-my-disk scan                      # home directory, progress on stderr
+./oh-my-disk top --limit 25            # largest entries in the latest scan
+./oh-my-disk suggest --limit 20        # ranked, disjoint free-space contenders
+./oh-my-disk explain "$HOME/.npm"      # rule, safety, age, size, human-only command
+./oh-my-disk ui                        # reuse the scan and open a local browser
+```
+
+`ui`, `top`, `suggest`, and `explain` reuse the latest cached scan. If there is no cache, they scan the home directory first. Use `--refresh` to rescan; supplying a different `--root` also triggers a scan. The UI displays the scan timestamp rather than implying a live view. Suggestions are recalculated with the current rules and current date when loading a cache.
+
+```sh
+./oh-my-disk scan /                    # whole-disk namespace; no sudo required
+./oh-my-disk scan ~/Library --workers 12
+./oh-my-disk ui --root "$HOME" --refresh
+./oh-my-disk ui --no-open --port 8787   # prints a private local URL
+```
+
+Permission errors are reported with skipped paths, and the scan continues. Terminal may need macOS Full Disk Access to inspect protected Mail/Messages/backups. Partial totals are clearly marked; the tool never changes permissions or requests elevated privileges. Other filesystem devices are skipped unless `--cross-mounts` is set.
+
+The UI has a clickable, zoomable sunburst, a squarified treemap toggle, breadcrumbs, a sortable child table, category breakdowns and ranked contenders. Click a segment or folder to drill in; click the sunburst center to go back. Small segments and entries beyond the chart’s display budget remain in the paginated table. Category drill-down attributes each entry’s own allocated blocks, so it does not count parent totals a second time.
+
+## JSON and LLM exports
+
+Every subcommand accepts `--json` (stdout) or `--json NEW-FILE.json`. Progress goes to stderr. Existing export files are **never overwritten**. JSON uses integer bytes and RFC 3339 timestamps.
+
+```sh
+./oh-my-disk scan --json scan.json --depth 5 --min-size 1MiB
+./oh-my-disk scan ~/Library --json full-library.json --min-size 0 --depth -1
+./oh-my-disk top --json --limit 30
+./oh-my-disk suggest --json suggestions.json --limit 15
+./oh-my-disk explain "$HOME/.npm" --json
+./oh-my-disk suggest --summary brief.json --limit 8
+./oh-my-disk ui --no-open --json       # prints URL JSON, then serves until Ctrl-C
+```
+
+`scan` JSON contains `version`, `scan` (tree, timestamps, skips, entry count), `suggestions`, `categories`, and an accounting note. Nodes include allocated `bytes` for the subtree, `own_bytes`, regular-file entry count, type, category, metadata timestamps, latest subtree activity and incomplete/hardlink flags. File counts include all regular-file directory entries, including hardlink aliases; their allocated blocks are counted once.
+
+`--depth` and `--min-size` prune the exported tree without changing its aggregate totals or the full cached scan. Defaults: unlimited depth and 1 MiB minimum for tree entries and contenders. Use `--min-size 0` for a full file-level export. `top` includes overlapping parent/child totals and explicitly labels them. `suggest` outputs only disjoint contenders. `explain` also resolves inherited rules for files inside known locations. `ui --json` outputs connection information, not the tree.
+
+`--summary FILE` emits compact, bounded JSON with the root, scan time, totals, category totals, top N entries, top N disjoint suggestions and an accounting note. The sample fixture’s eight-item summary is about 7 KB. Paths and explanations affect length; lower `--limit` to fit a smaller context. Summary generation never needs an LLM, API key or network connection.
+
+## Ranking and rules
+
+The embedded YAML lives in [internal/rules/rules.yaml](internal/rules/rules.yaml). It covers npm, Yarn, pnpm, Bun, pip/uv, Go module/build caches, Gradle, Android SDK/images/AVDs, Xcode DerivedData/Archives/DeviceSupport/caches, simulators and runtimes, CocoaPods, Carthage, SwiftPM, Homebrew, Docker Desktop, Hugging Face, LM Studio, Ollama, generic macOS/Linux caches, Expo, browser test downloads, AI editor caches/state, project artifacts, Trash, Downloads, media, Mail/Messages and iOS backups. Unknown large branches appear as **“Big, check yourself.”**
+
+The score is:
+
+```text
+allocated_bytes × safety_weight × (1 + min(stale_days / 180, 1))
+
+cache:         1.00  (regenerable; still review first)
+reinstallable: 0.55  (SDKs, downloaded models, applications)
+user-data:     0.12  (archives, backups, Docker volumes, sessions, downloads)
+unknown:       0.04  (inspect yourself)
+```
+
+**Effort is never part of the score.** Staleness uses the later of latest subtree mtime/regular-file atime and clamps future timestamps to zero days. Project artifacts use the enclosing project’s latest subtree mtime, so old `target` files in an active project are not treated as an abandoned project. Projects are recognized by markers including `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, Gradle/Maven/Swift/CMake manifests and `.git`. Generic `build`, `dist`, `target`, `.venv`, `.next` and `.turbo` names outside a recognized project are not assumed safe.
+
+More specific locations take precedence over enclosing aggregates: Hugging Face models are not mislabeled as expendable generic `.cache` contents. The final score pass selects disjoint paths. Category totals attribute each entry’s own blocks to its nearest matching rule and sum to the scan total. Ranking measures candidates, not a promise that every allocated byte can be freed.
+
+Extend or override rules:
+
+```yaml
+# my-rules.yaml
+rules:
+  - id: my-project-cache
+    patterns: ['~/_work/**/.generated-cache']
+    category: project build artifacts
+    safety: cache
+    project: true
+    explanation: Generated output; verify the source and lockfiles are backed up.
+    command: 'du -sh {path}/*'  # human-only text, never executed
+```
+
+```sh
+./oh-my-disk suggest --config my-rules.yaml
+```
+
+Patterns are anchored, case-sensitive paths: `~/` expands using the current home; `*` matches within one path component; `**` spans components. Absolute patterns and `**/name` anywhere patterns are supported. Rules are tested in order, custom rules first. Reusing a built-in `id` overrides it. Allowed categories are `caches`, `dev tooling`, `AI models`, `media`, `apps`, `downloads`, `project build artifacts`, `unknown`; allowed safety values are shown above. Unknown fields and invalid categories/safety levels fail clearly. `{path}` is replaced with a shell-quoted path in command text. `--home PATH` lets you classify another user’s home or a fixture without accessing your own home.
+
+## Read-only behavior, privacy and accounting
+
+- Scanner operations are metadata reads (`Lstat`, directory reads); it never opens regular file contents. Symlinks are recorded but not traversed, including loop/broken links. A symlink root is rejected. Directory opens use `O_NOFOLLOW` and verify inode identity; changing trees can still produce partial, non-atomic snapshots.
+- Sizes use `st_blocks × 512`, including directory metadata, rather than logical file length. Sparse files therefore reflect allocated storage. Hardlinks are deduplicated by `(device, inode)` and charged to the first lexical path, deterministically after the parallel walk. A category can inherit those blocks even when another hardlink appears elsewhere.
+- Other devices are skipped by default. For macOS `/`, both the sealed System device and firmlinked Data device are included through the normal namespace, while `/System/Volumes/Data` is omitted. Repeated directory identities are skipped to prevent alias loops. `--cross-mounts` does not re-enable the duplicate Data subtree.
+- APFS clones, snapshots, compression, purgeable storage and filesystem accounting can make these totals differ from Finder or actual reclaimable space. APFS clone-aware accounting is not implemented. A scan never represents a transactionally consistent snapshot.
+- atime may be disabled, coarse, or updated by directory reads; it is only a conservative activity hint. Directory atimes are recorded but excluded from subtree activity for ranking, so scanning does not make an old cache look newly used. File metadata and mtime are not changed by the tool. OS-managed access-time updates can occur from reading directories.
+- The private scan cache defaults to `$TMPDIR/oh-my-disk-<uid>/latest.json` (via Go’s OS temp directory), outside the usual home scan. It survives normal command runs but may be cleared by OS temp housekeeping. `--cache /private/path/state/latest.json` selects a different cache; its directory must have mode `0700`. Only valid application caches may be replaced. Use a dedicated state directory. `--no-cache` performs a fresh scan without loading or saving state.
+- The application’s cache path/directory and requested export files are excluded before scanning. New reports are created with mode `0600`; an existing report is never replaced. The cache writer uses a private temporary report and atomic rename. It removes only its own temporary report on completion.
+- The server listens on `127.0.0.1`, uses a random per-launch token and SameSite HTTP-only cookie, validates Host, accepts GET/HEAD only, and serves no external assets. No analytics or remote calls. The token URL and JSON reports expose private filenames; share them deliberately.
+
+## Development and verification
+
+```sh
+go build ./...
+go test ./...
+go test -race ./...
+go vet ./...
+```
+
+Tests cover allocated bytes, sparse files, deterministic hardlinks, non-followed symlinks, denied permissions, exclusions, cancellation, wide worker queues, macOS Data-device policy, built-in matching, custom overrides, conservative project detection, project staleness, ranking, disjointness, category totals, cache reuse, report protection, export pruning and the read-only local server. CI runs tests on macOS and Linux.
+
+Create and scan a realistic synthetic developer home without touching real user data:
+
+```sh
+python3 scripts/synthetic.py .fixtures/home
+./oh-my-disk scan .fixtures/home --home "$PWD/.fixtures/home" \
+  --cache "$PWD/.fixtures/state/latest.json" --min-size 0 \
+  --json .fixtures/scan.json --summary .fixtures/summary.json --limit 8
+./oh-my-disk ui --home "$PWD/.fixtures/home" \
+  --cache "$PWD/.fixtures/state/latest.json"
+```
+
+The fixture generator refuses to reuse an existing directory. It creates approximately 103 MiB of nonzero cache/model/tool data, 300 package folders, hardlinks, symlink loops and a 2 GiB logical sparse image. `.fixtures/` and build artifacts are gitignored. All development scans use fixtures or test temp directories.
+
+## v2
+
+- Diff between scans
+- Duplicate finder
+- APFS clone-aware accounting
+- Generated cleanup scripts (explicit human review; the analyzer stays read-only)
+
+Other v1 limits: the full tree is held in memory and the browser loads the full cached snapshot; millions of tiny files can use substantial RAM. Charts cap very small segments and treemap entries for responsiveness, while the folder table provides all children. There is one latest cached scan, no live rescan endpoint and no filesystem watcher.
