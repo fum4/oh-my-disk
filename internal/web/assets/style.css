@@ -2260,17 +2260,6 @@ dialog {
   margin-top: 4px;
   white-space: nowrap;
 }
-#agent-tip {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--label-2);
-  font-size: 12px;
-  flex: none;
-}
-#agent-tip > span {
-  flex: 1;
-}
 #agent-terminal {
   position: fixed;
   bottom: 8px;
@@ -2326,9 +2315,6 @@ dialog {
   cursor: pointer;
 }
 #agent-terminal[hidden],
-#agent-tip[hidden] {
-  display: none;
-}
 #ask-claude,
 #ask-codex {
   flex: none;
@@ -2350,10 +2336,6 @@ dialog {
     display: none;
   }
 }
-#agent-tip a {
-  color: var(--blue);
-  white-space: nowrap;
-}
 .launch-card .btn {
   margin-top: 4px;
 }
@@ -2363,9 +2345,6 @@ dialog {
   }
   #agent-terminal {
     left: 8px;
-  }
-  #agent-tip {
-    flex-wrap: wrap;
   }
 }
 /* Keep action baselines aligned when only some agents need installation. */
@@ -3139,10 +3118,6 @@ body:has(#welcome:not([hidden])) #toolbar-choose {
     flex: 1;
   }
 }
-/* The landing cards already contain the agent installation guidance. */
-body:has(#welcome:not([hidden])) #agent-tip {
-  display: none;
-}
 @media (min-width: 701px) and (max-height: 760px) {
   .launch-card > .i,
   .launch-card > p {
@@ -3170,7 +3145,6 @@ body:has(#welcome:not([hidden])) #agent-tip {
 }
 #welcome .launch-card h3 { font-size: 17px; margin: 0; }
 #welcome .launch-card > .i { display: none; }
-.scan-actions { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
 #welcome .launch-card .btn { margin: 0; }
 .agent-control { display: flex; align-items: center; gap: 12px; font-size: 12px; }
 .agent-control[hidden], #ask-agent[hidden] { display: none; }
@@ -3195,8 +3169,6 @@ button.agent-option:hover, .agent-option[aria-pressed="true"] { background: var(
 .agent-option.unavailable { color: var(--label-2); }
 .agent-option a { color: var(--blue); font-size: 12px; }
 #agent-check { margin: 8px 10px; }
-#welcome #agent-tip { display: flex; gap: 12px; font-size: 12px; margin: 0; }
-#welcome #agent-tip[hidden] { display: none; }
 #results-agent-slot { order: 2; margin: 0 0 12px; }
 #suggestions > .ch { order: 0; }
 #suggestions > .gain { order: 1; }
@@ -3429,3 +3401,110 @@ th button { cursor: pointer; }
 }
 #terminal-screen .xterm-viewport { background: #15181e; }
 #terminal-screen .xterm { cursor: text; }
+
+/* Round 7, variant C: a single command bar under the landing heading. */
+#welcome .launch-cards { max-width: 100%; margin: 0; }
+#welcome .launch-card {
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 40px;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+#welcome .launch-card h3 {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+}
+#welcome .launch-card > p {
+  display: block;
+  flex: none;
+  margin: 0 0 20px;
+  color: var(--label-2);
+}
+.scan-command-bar {
+  --wails-draggable: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 56px;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-card), 0 0 0 .5px var(--hair-2);
+  white-space: nowrap;
+  text-align: left;
+}
+#folder-picker { position: relative; }
+#folder-picker summary,
+.scan-command-bar #agent-picker summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--label);
+  font: inherit;
+  cursor: pointer;
+  list-style: none;
+  transform: none;
+  transition: background-color .15s;
+}
+#folder-picker summary::-webkit-details-marker { display: none; }
+#folder-picker summary::marker { content: ""; }
+#folder-picker summary > .i { color: var(--label-2); }
+#folder-choice {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.segment-label, .scan-command-bar #agent-analyze {
+  color: var(--label-3);
+  font-size: 12px;
+}
+.command-chevron { width: 12px; height: 12px; }
+.command-divider {
+  width: .5px;
+  height: 24px;
+  background: var(--hair-2);
+  margin: 0 2px;
+  flex: none;
+}
+.scan-command-bar #agent-control { border: 0; border-radius: 0; background: transparent; }
+.scan-command-bar #agent-choice { font-size: 13px; }
+#welcome .scan-command-bar #plain-scan {
+  height: 44px;
+  min-height: 44px;
+  border-radius: 11px;
+  padding: 0 22px;
+  margin: 0 0 0 8px;
+  font-size: 14px;
+}
+#folder-picker summary:hover, #folder-picker[open] summary,
+.scan-command-bar #agent-picker summary:hover,
+.scan-command-bar #agent-picker[open] summary { background: var(--fill); }
+.scan-command-bar button:hover, .scan-command-bar button:active,
+.scan-command-bar summary:hover, .scan-command-bar summary:active { transform: none; scale: none; }
+.scan-command-bar button::before, .scan-command-bar button::after { transform: none; }
+.scan-command-bar :is(button, summary, a):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blue) 40%, transparent);
+  outline-offset: 1px;
+}
+.folder-menu { left: 0; right: auto; }
+.folder-menu #landing-choose { border-top: .5px solid var(--hair-2); border-radius: 0 0 6px 6px; margin-top: 4px; }
+@media (max-width: 700px) {
+  #scan-agent-slot .agent-menu { left: auto; right: 0; }
+  .scan-command-bar .segment-label,
+  .scan-command-bar #agent-analyze,
+  #folder-picker summary > .i:first-child { display: none; }
+  #folder-picker summary, .scan-command-bar #agent-picker summary { padding: 0 8px; }
+  #folder-choice { max-width: 80px; }
+  #welcome .scan-command-bar #plain-scan { padding: 0 12px; margin-left: 0; }
+}
+.folder-menu .agent-option { display: block; overflow: hidden; text-overflow: ellipsis; }

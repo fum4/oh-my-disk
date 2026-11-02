@@ -68,6 +68,42 @@ require("node:fs").mkdirSync(".build/screens", { recursive: true });
         }
       }
     }
-    console.log("PASS: transparent warning close, hover/focus fill, centered stable bounds; unchanged button text/icons across light/dark and three widths.");
+    // Render the actual landing DOM without a saved snapshot.
+    await page.evaluate(() => { snapshot = undefined; showMode("overview"); });
+    for (const theme of ["light", "dark"]) {
+      await page.emulateMedia({ colorScheme: theme });
+      for (const width of [1200, 900, 390]) {
+        await page.setViewportSize({ width, height: 700 });
+        const segments = ["#folder-picker summary", "#scan-agent-slot summary", "#plain-scan"];
+        const boxes = await Promise.all(segments.map(s => page.locator(s).boundingBox()));
+        for (const box of boxes) {
+          assert.equal(box.height, 44);
+          assert.equal(box.y, boxes[0].y);
+        }
+        const bar = await page.locator(".scan-command-bar").boundingBox();
+        assert.equal(bar.height, 56);
+        assert.ok(bar.x >= 0 && bar.x + bar.width <= width, "Command bar fits viewport");
+        for (const selector of segments) {
+          const segment = page.locator(selector);
+          await page.mouse.move(0, 0);
+          await segment.evaluate(n => n.blur());
+          const before = await geometry(segment);
+          await segment.hover();
+          await page.waitForTimeout(180);
+          assert.deepEqual(await geometry(segment), before, selector);
+          assert.equal(await segment.evaluate(n => getComputedStyle(n).cursor), "pointer");
+          await segment.focus();
+          await page.keyboard.press("Tab");
+          await page.keyboard.press("Shift+Tab");
+          assert.equal(await segment.evaluate(n => n.matches(":focus-visible")), true);
+        }
+        await page.locator("#folder-picker summary").click();
+        await page.keyboard.press("Escape");
+        assert.equal(await page.locator("#folder-picker").evaluate(n => n.open), false);
+        assert.equal(await page.locator("#folder-picker summary").evaluate(n => n.matches(":focus-visible")), true);
+        await page.screenshot({ path: `.build/screens/round7-${theme}-${width}-landing.png` });
+      }
+    }
+    console.log("PASS: transparent warning close, hover/focus fill, centered stable bounds; unchanged button text/icons; command bar height, fit, hover stability and keyboard focus across light/dark and three widths.");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });

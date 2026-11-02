@@ -2,7 +2,7 @@
 (() => {
   const app = window.go?.main?.App;
   const names = {};
-  let definitions = [], choice = "", showNudge = false, detected = false, optionState = "";
+  let definitions = [], choice = "", optionState = "";
   try { choice = localStorage.getItem("omd-agent-choice") || ""; } catch {}
   let installed = {},
     state = {},
@@ -17,14 +17,6 @@
     collapsed = false,
     expandedHeight = "",
     dragged = false;
-  const tipKey = "omd-agent-tip-dismissed";
-  const dismissed = () => {
-    try {
-      return localStorage.getItem(tipKey) === "1";
-    } catch {
-      return false;
-    }
-  };
   const error = (e) => showFeedback(String(e));
   function select(name) {
     choice = name;
@@ -36,7 +28,6 @@
   function render() {
     const busy = !!state.busy || document.body.classList.contains("is-scanning");
     const ready = !!snapshot;
-    const available = definitions.some(d => installed[d.name]);
     if (busy) $("agent-picker").open = false;
     const selected = installed[choice] ? choice : "";
     const slot = !ready ? "scan-agent-slot" : ["overview", "cleanup-tab"].includes(mode) ? "results-agent-slot" : "toolbar-agent-slot";
@@ -96,7 +87,6 @@
     }
     $("agent-check").hidden = !app;
     $("plain-scan").disabled = busy || opening;
-    $("agent-tip").hidden = !app || ready || busy || available || !showNudge || !definitions.length;
   }
   async function detect() {
     $("agent-check").disabled = true;
@@ -110,14 +100,7 @@
         choice = "";
         try { localStorage.setItem("omd-agent-choice", ""); } catch {}
       }
-      if (!detected) {
-        showNudge = !!app && !definitions.some(d => installed[d.name]) && !dismissed();
-        detected = true;
-      }
       render();
-      if (!$("agent-tip").hidden) {
-        try { localStorage.setItem(tipKey, "1"); } catch {}
-      }
     } finally { $("agent-check").disabled = false; }
   }
   function theme() {
@@ -299,14 +282,10 @@
       $("agent-picker").querySelector("summary").focus();
     }
   });
+  $("agent-picker").addEventListener("toggle", () => {
+    if ($("agent-picker").open) $("folder-picker").open = false;
+  });
   $("agent-check").onclick = () => detect().catch(error);
-  $("agent-dismiss").onclick = () => {
-    showNudge = false;
-    try {
-      localStorage.setItem(tipKey, "1");
-    } catch {}
-    $("agent-tip").hidden = true;
-  };
   $("terminal-close").onclick = () => close().catch(error);
   $("terminal-copy").onclick = () =>
     app.Copy(term?.getSelection() || "").catch(error);

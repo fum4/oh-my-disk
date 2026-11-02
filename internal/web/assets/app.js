@@ -533,6 +533,8 @@ function showMode(next) {
     $("scan-info").textContent =
       "Scan " + target + " to see what’s taking space.";
     $("disk-caption").textContent = target + " is ready to scan";
+    $("folder-choice").textContent = target;
+    $("folder-picker").querySelector("summary").setAttribute("aria-label", "Choose scan folder, current: " + target);
     $("empty-title").textContent = copy[0];
     $("empty-description").textContent =
       copy[1] + " Scan " + target + " to begin.";
@@ -1254,6 +1256,7 @@ function showFeedback(message) {
 }
 function scanState(busy, message = "Scanning…") {
   document.body.classList.toggle("is-scanning", busy);
+  if (busy) $("folder-picker").open = false;
   $("hub-scan").disabled = busy;
   $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"),
@@ -1285,8 +1288,13 @@ $("toolbar-choose").onclick = () => {
   $("web-root").focus();
   $("web-root").select();
 };
-$("scan-another").onclick = $("landing-choose").onclick = $("welcome-scan").onclick = () =>
+$("scan-another").onclick = $("welcome-scan").onclick = () =>
   $("toolbar-choose").click();
+$("landing-choose").onclick = () => {
+  $("folder-picker").open = false;
+  if (window.go?.main?.App) return $("choose-folder").onclick();
+  return $("toolbar-choose").click();
+};
 $("empty-scan").onclick = () => $("hub-scan").click();
 function setOptionsOpen(open) {
   $("scan-options").hidden = !open;

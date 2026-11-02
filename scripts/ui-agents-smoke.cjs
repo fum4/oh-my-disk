@@ -14,7 +14,7 @@ const wait = async (fn) => {
 (async () => {
   const registry = await (await fetch(new URL("/api/agents", url), { headers: { Cookie: "omd=" + token } })).json();
   let available = ["--remembered", "--remembered-none", "--fresh-installed"].some(flag => process.argv.includes(flag)),
-    launched = [],
+    launched = [], scanned = [],
     trashCalls = 0,
     closed = 0,
     terminal, webgl, sessionEnded = false, resized = [], written = [], copied = [], reads = 0;
@@ -44,7 +44,6 @@ const wait = async (fn) => {
       beforeParse(w) {
         if (process.argv.includes("--remembered") || process.argv.includes("--missing-remembered")) {
           w.localStorage.setItem("omd-agent-choice", "claude");
-          w.localStorage.setItem("omd-agent-tip-dismissed", "1");
         }
         if (process.argv.includes("--remembered-none")) w.localStorage.setItem("omd-agent-choice", "");
         w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
@@ -113,7 +112,8 @@ const wait = async (fn) => {
             App: {
               State: async () => ({ ...state }),
               Agents: async () => registry.map(d => ({ ...d, path: d.name === "claude" && available ? "/mock/claude" : "" })),
-              Scan: async () => {
+              Scan: async target => {
+                scanned.push(target);
                 state.busy = true;
                 state.phase = "walking";
               },
@@ -160,7 +160,7 @@ const wait = async (fn) => {
   }
   if (process.argv.includes("--remembered") || process.argv.includes("--missing-remembered")) {
     assert.equal($("agent-choice").textContent, available ? "Claude" : "None");
-    assert.equal($("agent-tip").hidden, true);
+    assert.equal($("agent-tip"), null);
     assert.equal(w.localStorage.getItem("omd-agent-choice"), available ? "claude" : "");
     if (!available) {
       available = true;
@@ -168,7 +168,7 @@ const wait = async (fn) => {
       assert.equal($("agent-choice").textContent, "None");
     }
     w.close();
-    console.log("PASS: remembered choice, unavailable fallback, once-only nudge, pre-scan visibility on every page.");
+    console.log("PASS: remembered choice, unavailable fallback, minimal landing, pre-scan visibility on every page.");
     return;
   }
   assert.equal($("agent-choice").textContent, "None");
@@ -191,9 +191,29 @@ const wait = async (fn) => {
   assert.equal(w.document.querySelectorAll(".launch-card").length, 1);
   assert.equal(option("Claude"), undefined);
   assert.ok($("agent-options").querySelector('a[aria-label="Install Claude"]'));
-  assert.equal($("agent-tip").hidden, false);
-  $("agent-dismiss").click();
-  assert.equal(w.localStorage.getItem("omd-agent-tip-dismissed"), "1");
+  assert.equal($("agent-tip"), null);
+  assert.equal($("folder-choice").textContent, "Home");
+  const folderOptions = () => [...$("folder-options").querySelectorAll("button")];
+  assert.deepEqual(folderOptions().map(b => b.textContent), [...$("locations").querySelectorAll(".location-name")].map(b => b.textContent));
+  folderOptions().find(b => b.textContent === "Macintosh HD").click();
+  assert.equal($("folder-choice").textContent, "Macintosh HD");
+  assert.equal($("scan-root").value, "/");
+  assert.equal(state.busy, false); // Selecting a target never starts a scan.
+  folderOptions().find(b => b.textContent === "Home").click();
+  await $("landing-choose").onclick();
+  assert.equal($("folder-choice").textContent, "home");
+  assert.equal($("scan-options").hidden, true); // Native picker leaves Options closed.
+  folderOptions().find(b => b.textContent === "Home").click();
+  w.addLocation("/tmp/Command bar sample");
+  assert.ok(folderOptions().some(b => b.textContent === "Command bar sample"));
+  w.document.querySelector('[aria-label="Remove Command bar sample from Locations"]').click();
+  assert.ok(!folderOptions().some(b => b.textContent === "Command bar sample"));
+  $("undo-location").click();
+  assert.ok(folderOptions().some(b => b.textContent === "Command bar sample"));
+  $("folder-picker").open = true;
+  w.document.dispatchEvent(new w.KeyboardEvent("keydown", {key: "Escape"}));
+  assert.equal($("folder-picker").open, false);
+  assert.equal(w.document.activeElement, $("folder-picker").querySelector("summary"));
   available = true;
   await $("agent-check").onclick();
   assert.ok(option("Claude"));
@@ -204,6 +224,7 @@ const wait = async (fn) => {
   assert.equal(w.localStorage.getItem("omd-agent-choice"), "claude");
   await $("plain-scan").onclick();
   await wait(() => $("plain-scan").disabled);
+  assert.equal(scanned[0], state.home);
   assert.equal($("agent-control").hidden, true);
   assert.equal(launched.length, 0);
   state.busy = false;
@@ -313,7 +334,7 @@ const wait = async (fn) => {
   assert.deepEqual(errors, []);
   w.close();
   console.log(
-    "PASS: install states, check again, dismissal persistence, scan-to-agent handoff, terminal collapse/restore keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, close/reopen, cancelled scan never launches. Native terminal mocked.",
+    "PASS: install states, check again, command-bar folder selection, scan-to-agent handoff, terminal collapse/restore keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, close/reopen, cancelled scan never launches. Native terminal mocked.",
   );
 })().catch((e) => {
   console.error(e);

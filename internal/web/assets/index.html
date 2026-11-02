@@ -503,19 +503,21 @@
         </p>
         <div class="launch-cards" id="launch-cards">
           <article class="launch-card">
-            <svg class="i" aria-hidden="true"><use href="#regular-hard-drive" /></svg>
-            <h3>Scan my disk</h3>
-            <div class="scan-actions">
-              <div class="empty-actions">
-                <button id="landing-choose" class="btn sec">Choose Folder…</button>
-                <button id="plain-scan" class="btn pri">Scan</button>
-              </div>
+            <h3>A place for every byte.</h3>
+            <p>Scan a folder to see what’s taking space.</p>
+            <div class="scan-command-bar" role="group" aria-label="Scan options">
+              <details id="folder-picker">
+                <summary aria-label="Choose scan folder"><svg class="i" aria-hidden="true"><use href="#regular-folder-open"/></svg><span class="segment-label">Folder</span><b id="folder-choice">Home</b><svg class="i command-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></summary>
+                <div class="agent-menu folder-menu">
+                  <div id="folder-options" role="group" aria-label="Locations"></div>
+                  <button id="landing-choose" class="agent-option">Choose Folder…</button>
+                </div>
+              </details>
+              <span class="command-divider" aria-hidden="true"></span>
               <div id="scan-agent-slot"></div>
+              <span class="command-divider" aria-hidden="true"></span>
+              <button id="plain-scan" class="btn pri">Scan<span class="kbd">⌘R</span></button>
             </div>
-            <aside id="agent-tip" hidden>
-              <span>Want help with results? Install an agent from the picker.</span>
-              <button id="agent-dismiss" class="link" aria-label="Dismiss agent tip">Dismiss</button>
-            </aside>
           </article>
         </div>
         <div id="empty-actions" class="empty-actions" hidden>

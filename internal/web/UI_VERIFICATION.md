@@ -121,3 +121,19 @@ Trash confirmation reports allocated bytes **moved to Trash**, not a claim that 
 - Rendered verification remains blocked: Chrome aborts before page load with crashpad/bootstrap sandbox permission errors; the computer-use in-app browser reports “browser access host is unavailable.” Actual light/dark pixels, responsive geometry and native WebKit terminal behavior remain unverified. The DOM checks do not establish visual fidelity.
 - Logs: `.build/round4-{check,cli,app,codesign,web-smoke,native-smoke,empty-smoke,agents-smoke,remembered-smoke,missing-smoke,capture}.log`.
 - Delivery: branch `round4`, based on v1 HEAD `3fc76b5`, in `.build/round4-git`; bundle `.build/round4.bundle`. Primary `.git` is not written; generated icon artifacts are excluded from the commit.
+
+## Round 7, job G: command bar (variant C)
+
+The landing card is now the heading and copy from `.build/design/scan-card-C.html`, followed by one 56px command bar with 44px segments: **Folder Home**, **Analyze with None**, **Scan ⌘R**. The bar uses the reference padding/radii, Calm theme tokens, hairline dividers, stationary text/icons on hover, and visible keyboard focus. Only Scan is primary. Folder names truncate without moving the bar beyond the available space; compact widths hide segment labels and keep menus within the viewport.
+
+The Folder menu mirrors sidebar Locations, including add/remove/undo changes, and offers the native Choose Folder picker. Selecting a location or choosing a folder updates the scan target without starting a scan or opening Options. Escape and outside clicks dismiss the menus; only one picker is open at a time. Other empty pages retain their paired Choose Folder / Scan actions. The FDA banner and toolbar Options remain in place.
+
+The existing agent picker, real agent marks, remembered choice, missing-CLI fallback to None, install links, Check again, and successful-scan handoff remain. The old standalone installation tip and dismissal logic are removed; install hints live inside the picker.
+
+Validation:
+
+- `make check` (`go vet ./...`, `go test ./...`), `make app`, `make cli`, and strict/deep codesign verification passed.
+- Web, native, empty-start, dismissed-FDA, agent flow, remembered/missing/None/fresh-installed agent choice, and actual vendored terminal parser smoke scripts passed. New agent-flow assertions cover matching sidebar/menu Locations, selection without scanning, native picking with Options closed, add/remove/undo synchronization, Escape focus, and the target passed to Scan. Native bridge/provider processes are mocked; fixture APIs are real. No real Trash request is sent.
+- `ui-hover-smoke.cjs` now includes command-bar geometry, fit, hover stability, and keyboard focus checks at 1200/900/390px in both themes. It and `ui-capture.cjs` are blocked before page load: Chrome aborts with sandbox crashpad/bootstrap permission errors. The in-app browser fallback reports that its browser access host is unavailable. These rendered checks have **not passed**; actual light/dark pixels and native WebKit geometry remain unverified.
+- Logs: `.build/round7-{check,app,cli,codesign}.log`, `.build/round7-*-smoke.log`.
+- Delivery: branch `round7` in `.build/round7-git`, with `.build/round7.bundle`, based on v1 HEAD `358a43ea19acb7635980c5b7750410b69805d611`. Author and committer: fum4 <52106389+fum4@users.noreply.github.com>. No generated icons or application binaries are committed; the primary `.git` is untouched.

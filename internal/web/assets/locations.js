@@ -28,7 +28,20 @@
   }
   function render() {
     $("locations").replaceChildren();
+    $("folder-options").replaceChildren();
     for (const path of locations) {
+      const option = dom("button", "agent-option", label(path));
+      option.title = path === "home" ? "Home" : path;
+      option.onclick = () => {
+        if (window.selectScanTarget) window.selectScanTarget(path);
+        else {
+          $("web-root").value = path === "home" ? snapshot?.scan.root.path || "" : path;
+          $("folder-choice").textContent = label(path);
+        }
+        $("folder-picker").open = false;
+        $("folder-picker").querySelector("summary").focus();
+      };
+      $("folder-options").append(option);
       const row = dom("div", "location-row");
       row.setAttribute("role", "listitem");
       const b = dom("button", "nv location-open");
@@ -100,5 +113,18 @@
     removed = null;
     $("locations").querySelector("button")?.focus();
   };
+  const picker = $("folder-picker");
+  picker.addEventListener("toggle", () => {
+    if (picker.open) $("agent-picker").open = false;
+  });
+  document.addEventListener("click", e => {
+    if (!picker.contains(e.target)) picker.open = false;
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && picker.open) {
+      picker.open = false;
+      picker.querySelector("summary").focus();
+    }
+  });
   render();
 })();
