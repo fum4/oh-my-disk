@@ -12,7 +12,7 @@ import (
 	"github.com/fum4/oh-my-disk/internal/scanner"
 )
 
-const Note = "Read-only analysis. Commands are suggestions for a human; never executed. Dataless cloud placeholders contribute logical bytes without opening file contents; other entries use allocated blocks. Allocated blocks are not guaranteed reclaimable space (APFS clones, snapshots, compression, hardlinks, sparse images). Access times may be disabled or affected by reading directories. Skipped paths make totals incomplete."
+const Note = "Read-only scanning. Suggested commands are never executed. Only explicitly confirmed selections can be moved to restorable Trash; MCP remains read-only. Dataless cloud placeholders contribute logical bytes without opening file contents; other entries use allocated blocks. Allocated blocks are not guaranteed reclaimable space (APFS clones, snapshots, compression, hardlinks, sparse images). Access times may be disabled or affected by reading directories. Skipped paths make totals incomplete."
 
 type Snapshot struct {
 	Version     int                `json:"version"`

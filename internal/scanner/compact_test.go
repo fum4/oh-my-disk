@@ -85,7 +85,7 @@ func TestCompactScannerEquivalence(t *testing.T) {
 	}
 }
 func TestCompactChunksAndDeepAggregate(t *testing.T) {
-	if unsafe.Sizeof(Entry{}) > 64 {
+	if unsafe.Sizeof(Entry{}) > 80 {
 		t.Fatalf("entry grew to %d bytes", unsafe.Sizeof(Entry{}))
 	}
 	tr := &Tree{Names: []string{"n"}, RootPath: "/n"}

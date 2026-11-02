@@ -26,9 +26,11 @@ const (
 
 var kinds = [...]string{"file", "directory", "symlink", "special"}
 
+// Entry retains device/inode for Trash revalidation (16 bytes per scanned entry).
 // Entry has no pointers. Chunks never move or copy during growth. Timestamps
 // retain seconds AND nanoseconds, including dates outside UnixNano's range.
 type Entry struct {
+	Device, Inode                 uint64
 	OwnBytes                      int64
 	Seconds                       [2]int64
 	Nanos                         [2]uint32
@@ -96,7 +98,7 @@ func (e *Entry) SetTime(which int, v time.Time) {
 	}
 }
 func entryFromNode(n *Node, parent int32) Entry {
-	e := Entry{OwnBytes: n.OwnBytes, Parent: parent, First: -1, Next: -1}
+	e := Entry{Device: n.Device, Inode: n.Inode, OwnBytes: n.OwnBytes, Parent: parent, First: -1, Next: -1}
 	for k, s := range kinds {
 		if n.Kind == s {
 			e.Kind = uint8(k)
@@ -173,7 +175,7 @@ func Compact(root *Node) *Tree {
 // View materializes only requested levels. Aggregate totals are never pruned.
 func (t *Tree) View(id int32, depth int, min int64) *Node {
 	e := t.At(id)
-	n := &Node{ID: id, Name: t.Name(id), Path: t.Path(id), Kind: kinds[e.Kind], OwnBytes: e.OwnBytes, Bytes: t.Bytes(id), Files: t.Files(id), Modified: e.Time(0), Accessed: e.Time(1), LatestModified: t.Time(id, 2), LatestAccessed: t.Time(id, 3), HardlinkDuplicate: e.Flags&Duplicate != 0, Incomplete: e.Flags&Incomplete != 0, Dataless: e.Flags&Dataless != 0, tree: t, index: id}
+	n := &Node{Device: e.Device, Inode: e.Inode, ID: id, Name: t.Name(id), Path: t.Path(id), Kind: kinds[e.Kind], OwnBytes: e.OwnBytes, Bytes: t.Bytes(id), Files: t.Files(id), Modified: e.Time(0), Accessed: e.Time(1), LatestModified: t.Time(id, 2), LatestAccessed: t.Time(id, 3), HardlinkDuplicate: e.Flags&Duplicate != 0, Incomplete: e.Flags&Incomplete != 0, Dataless: e.Flags&Dataless != 0, tree: t, index: id}
 	if int(e.Category) < len(t.Categories) {
 		n.Category = t.Categories[e.Category]
 	}

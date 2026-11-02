@@ -10,6 +10,8 @@ import (
 )
 
 type Node struct {
+	Device            uint64    `json:"-"`
+	Inode             uint64    `json:"-"`
 	ID                int32     `json:"id"`
 	ChildCount        int       `json:"child_count,omitempty"`
 	ChildOffset       int       `json:"child_offset,omitempty"`
@@ -79,7 +81,7 @@ func fromInfo(path string, info os.FileInfo) *Node {
 	} else if !info.Mode().IsRegular() {
 		kind = "special"
 	}
-	return &Node{Dataless: isDataless(info), Name: info.Name(), Path: path, Kind: kind, OwnBytes: b, Modified: info.ModTime(), Accessed: accessTime(info), id: id, links: l}
+	return &Node{Device: id.dev, Inode: id.ino, Dataless: isDataless(info), Name: info.Name(), Path: path, Kind: kind, OwnBytes: b, Modified: info.ModTime(), Accessed: accessTime(info), id: id, links: l}
 }
 
 func aggregate(n *Node, seen map[identity]bool) {

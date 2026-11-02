@@ -163,6 +163,7 @@ func Scan(ctx context.Context, root string, opts Options) (*Result, error) {
 			prev := int32(-1)
 			for _, m := range b.entries {
 				e := m.entry
+				e.Device, e.Inode = m.id.dev, m.id.ino
 				e.Parent = b.job.id
 				e.NameBlock = block
 				e.NameStart = offset

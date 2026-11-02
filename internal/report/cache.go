@@ -11,7 +11,7 @@ import (
 	"os"
 )
 
-const cacheMagic = "OMDCACH4"
+const cacheMagic = "OMDCACH5"
 const nodeChunk = 1 << 14
 
 type cacheHeader struct {
@@ -97,6 +97,9 @@ func readCache(f *os.File) (*Snapshot, error) {
 		return nil, err
 	}
 	if string(magic[:]) != cacheMagic {
+		if string(magic[:7]) == "OMDCACH" {
+			return nil, fmt.Errorf("older cache format; rescan with --refresh")
+		}
 		var s Snapshot
 		if err := json.NewDecoder(f).Decode(&s); err != nil {
 			return nil, err
@@ -235,7 +238,7 @@ func validateExisting(path string) error {
 	if _, err = f.ReadAt(magic[:], 0); err != nil {
 		return err
 	}
-	if string(magic[:]) != cacheMagic {
+	if string(magic[:]) != cacheMagic && string(magic[:]) != "OMDCACH4" {
 		_, err = LoadCache(path)
 		return err
 	}
