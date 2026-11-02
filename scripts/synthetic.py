@@ -7,6 +7,46 @@ from pathlib import Path
 import sys
 import time
 
+# Large mode uses mostly empty files so metadata scale does not require GBs of data.
+if '--large' in sys.argv:
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument('root')
+    ap.add_argument('--large', action='store_true')
+    ap.add_argument('--projects', type=int, default=1000)
+    ap.add_argument('--packages', type=int, default=50)
+    ap.add_argument('--files', type=int, default=18)
+    args = ap.parse_args()
+    root = Path(args.root).absolute()
+    if '.fixtures' not in root.parts:
+        ap.error('large fixtures must be under .fixtures/')
+    root.mkdir(parents=True, exist_ok=False)
+    started = time.monotonic()
+    count = 1
+    for i in range(args.projects):
+        project = root / f'app-{i:05}'
+        project.mkdir()
+        (project / 'package.json').write_bytes(b'{}')
+        modules = project / 'node_modules'
+        modules.mkdir()
+        count += 3
+        for j in range(args.packages):
+            package = modules / f'package-{j:04}'
+            package.mkdir()
+            count += 1
+            for k in range(args.files):
+                with (package / ('package.json' if k == 0 else f'file-{k:03}.js')).open('xb') as f:
+                    if k == 0:
+                        f.write(b'{}')
+                count += 1
+        if i % 100 == 0:
+            print(f'{count:,} entries', file=sys.stderr)
+    os.link(root / 'app-00000/package.json', root / 'hardlink')
+    os.symlink(root, root / 'loop')
+    print(json.dumps({'fixture': str(root), 'entries': count + 2,
+                      'seconds': time.monotonic() - started}))
+    sys.exit(0)
+
 root = Path(sys.argv[1] if len(sys.argv) > 1 else '.fixtures/home').absolute()
 root.mkdir(parents=True, exist_ok=False)
 layout = {
