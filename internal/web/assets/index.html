@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>oh-my-disk · Space, understood.</title>
+    <title>oh-my-disk · Disk overview</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
     <script src="/desktop.js" defer></script>
@@ -15,116 +15,266 @@
           ><span class="logo">◉</span> oh-my-disk<span class="version"
             >v1</span
           ></a
-        ><span class="readonly">● READ-ONLY SCANS · EXPLICIT TRASH</span>
+        ><span class="readonly">LOCAL STORAGE / V1.0</span>
       </header>
-      <section id="desktop" hidden>
-        <div class="eyebrow">SPACE TO THINK</div>
-        <h1>Your disk, understood.</h1>
-        <p>Explore what takes up space. Scanning leaves files untouched. Move selected items to Trash only after confirmation.</p>
-        <div class="desktop-controls">
-          <label>Scan folder <select id="scan-root"><option value="home">Home</option><option value="/">Whole disk (/)</option><option value="custom">Choose folder…</option></select></label>
-          <span id="chosen-path"></span>
-          <button id="choose-folder">Choose folder…</button>
-          <button id="start-scan" class="primary">Scan</button>
-          <button id="cancel-scan" hidden>Cancel</button>
-          <button id="open-last" hidden>Open last cached scan</button>
-        </div>
-        <div id="progress" role="status" aria-live="polite"></div>
-        <progress id="scan-spinner" hidden></progress>
-        <p id="desktop-error" role="alert"></p>
-        <div class="desktop-controls"><button id="export-json" disabled>Export JSON…</button><button id="export-summary" disabled>Export LLM summary…</button></div>
-      </section>
-      <aside id="access-banner" hidden><strong>Some Library folders are protected by macOS.</strong><p>Enable oh-my-disk in Full Disk Access, then quit, reopen and rescan. You can continue with partial results.</p><button id="full-disk-access">Open Full Disk Access settings</button></aside>
-      <section id="web-scan" hidden><label>Scan root <input id="web-root" placeholder="Absolute folder path"></label> <button id="web-start-scan">Scan</button><span id="web-scan-status" role="status"></span></section>
-      <section id="volume" hidden><strong>Whole disk · containing volume</strong><p id="volume-values"></p><small id="volume-note"></small></section>
-      <label class="unit-setting" title="Decimal GB = 1,000,000,000 bytes (Finder). Binary GiB = 1,073,741,824 bytes."><input type="checkbox" id="binary-units"> Binary units (GiB)</label>
-      <section class="intro">
+      <section
+        id="volume"
+        class="volume-hud"
+        aria-label="Whole disk statistics"
+        hidden
+      >
         <div>
-          <div class="eyebrow">YOUR DISK, A LITTLE CLEARER</div>
-          <h1>Make room for what’s next.</h1>
-          <p id="scan-info">Loading your disk map…</p>
+          <span class="eyebrow">USED</span><strong id="hud-used">—</strong>
         </div>
-        <div class="stats">
-          <span class="stat-value" id="total">—</span
-          ><span>allocated on disk</span>
+        <div>
+          <span class="eyebrow">FREE</span><strong id="hud-free">—</strong>
+        </div>
+        <div>
+          <span class="eyebrow">SCANNED</span
+          ><strong id="hud-scanned">—</strong>
+        </div>
+        <div>
+          <span class="eyebrow">OUTSIDE SCAN</span
+          ><strong id="hud-outside">—</strong>
         </div>
       </section>
-      <nav class="toolbar">
-        <div class="tabs" aria-label="Organization">
-          <button id="folders" class="active">Folders</button
-          ><button id="categories">By category</button
-          ><button id="cleanup-tab">Cleanup suggestions</button>
-        </div>
-        <div class="view-switch" aria-label="Visualization">
-          <button id="sunburst" class="active">◉ Sunburst</button
-          ><button id="treemap">▦ Treemap</button>
-        </div>
-      </nav>
-      <main id="explorer">
-        <div
-          id="breadcrumbs"
-          class="breadcrumbs"
-          aria-label="Breadcrumb navigation"
-        ></div>
-        <div class="workspace">
-          <section class="map-panel">
-            <div class="panel-top">
-              <span id="map-label">SPACE MAP</span
-              ><span>Click to explore · center to go back</span>
+      <div class="app-layout">
+        <nav class="side-nav toolbar" aria-label="Main navigation">
+          <div class="nav-caption eyebrow">WORKSPACE</div>
+          <button id="overview" class="active" aria-current="page">
+            Overview
+          </button>
+          <button id="folders">Folders</button>
+          <button id="categories">Categories</button>
+          <button id="cleanup-tab">Cleanup</button>
+          <div class="nav-bottom">
+            <span class="status-dot"></span> ON DEVICE<br /><span
+              >Read-only scans</span
+            >
+          </div>
+        </nav>
+        <div class="main-content">
+          <section id="desktop" hidden>
+            <div class="eyebrow">SCAN CONTROL</div>
+            <div class="desktop-controls">
+              <label
+                >Scan folder
+                <select id="scan-root">
+                  <option value="home">Home</option>
+                  <option value="/">Whole disk (/)</option>
+                  <option value="custom">Choose folder…</option>
+                </select></label
+              >
+              <span id="chosen-path"></span>
+              <button id="choose-folder">Choose folder…</button>
+              <button id="start-scan" class="primary">Scan</button>
+              <button id="cancel-scan" hidden>Cancel</button>
+              <button id="open-last" hidden>Open last cached scan</button>
             </div>
-            <div
-              id="chart"
-              role="img"
-              aria-label="Interactive disk allocation map"
-            ></div>
-            <div id="legend" class="legend"></div>
+            <div id="progress" role="status" aria-live="polite"></div>
+            <progress id="scan-spinner" hidden></progress>
+            <p id="desktop-error" role="alert"></p>
+            <div class="desktop-controls">
+              <button id="export-json" disabled>Export JSON…</button
+              ><button id="export-summary" disabled>Export LLM summary…</button>
+            </div>
           </section>
-          <section class="files-panel">
-            <div class="folder-heading">
-              <div>
-                <span class="eyebrow">CURRENT FOLDER</span>
-                <h2 id="folder-name">—</h2>
-              </div>
-              <span id="folder-size">—</span>
+          <aside id="access-banner" hidden>
+            <strong>Some Library folders are protected by macOS.</strong>
+            <p>
+              Enable oh-my-disk in Full Disk Access, then quit, reopen and
+              rescan. You can continue with partial results.
+            </p>
+            <button id="full-disk-access">
+              Open Full Disk Access settings
+            </button>
+          </aside>
+          <section id="web-scan" hidden>
+            <label
+              >Scan root
+              <input id="web-root" placeholder="Absolute folder path"
+            /></label>
+            <button id="web-start-scan">Scan</button
+            ><span id="web-scan-status" role="status"></span>
+          </section>
+
+          <label
+            class="unit-setting"
+            title="Decimal GB = 1,000,000,000 bytes (Finder). Binary GiB = 1,073,741,824 bytes."
+            ><input type="checkbox" id="binary-units" /> Binary units
+            (GiB)</label
+          >
+          <section class="intro">
+            <div>
+              <div class="eyebrow">STORAGE INTELLIGENCE</div>
+              <h1 id="view-title">
+                Disk overview<span class="title-dot">.</span>
+              </h1>
+              <p id="scan-info">Loading your disk map…</p>
             </div>
-            <div id="folder-actions"></div>
+            <div class="stats">
+              <span class="stat-value" id="total">—</span
+              ><span>allocated on disk</span>
+            </div>
+          </section>
+          <section id="overview-panel" aria-label="Storage overview">
+            <div class="overview-heading">
+              <span class="eyebrow">ALLOCATION / BY CATEGORY</span
+              ><span class="eyebrow">WHITE TILES = CLEANUP SHARE</span>
+            </div>
+            <div class="hub-layout">
+              <svg
+                class="hub-lines"
+                viewBox="0 0 800 440"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M400 220 L160 75 M400 220 L640 75 M400 220 L160 220 M400 220 L640 220 M400 220 L160 365 M400 220 L640 365"
+                />
+              </svg>
+              <div id="category-clusters"></div>
+              <div class="scan-hub">
+                <button id="hub-scan" aria-label="Scan selected folder">
+                  <span class="hub-icon">↻</span><span>SCAN</span></button
+                ><span class="eyebrow">LOCAL · READ ONLY</span>
+              </div>
+            </div>
+            <div class="overview-bottom">
+              <div>
+                <span class="eyebrow">CLEANUP CANDIDATES</span
+                ><strong id="reclaim-total">—</strong>
+              </div>
+              <p>
+                Allocated bytes · review suggestions before cleaning.<br />Shared
+                blocks may reduce space actually reclaimed.
+              </p>
+            </div>
+          </section>
+          <div class="view-switch" aria-label="Visualization">
+            <button id="sunburst" class="active" aria-pressed="true">
+              Sunburst</button
+            ><button id="treemap" aria-pressed="false">Treemap</button>
+          </div>
+          <main id="explorer">
+            <div
+              id="breadcrumbs"
+              class="breadcrumbs"
+              aria-label="Breadcrumb navigation"
+            ></div>
+            <div class="workspace">
+              <section class="map-panel">
+                <div class="panel-top">
+                  <span id="map-label">SPACE MAP</span
+                  ><span>Click to explore · center to go back</span>
+                </div>
+                <div
+                  id="chart"
+                  role="img"
+                  aria-label="Interactive disk allocation map"
+                ></div>
+                <div id="legend" class="legend"></div>
+              </section>
+              <section class="files-panel">
+                <div class="folder-heading">
+                  <div>
+                    <span class="eyebrow">CURRENT FOLDER</span>
+                    <h2 id="folder-name">—</h2>
+                  </div>
+                  <span id="folder-size">—</span>
+                </div>
+                <div id="folder-actions"></div>
+                <div class="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th><button data-sort="name">Name ↕</button></th>
+                        <th><button data-sort="bytes">Size ↕</button></th>
+                        <th><button data-sort="files">Files ↕</button></th>
+                        <th>
+                          <button data-sort="modified">Modified ↕</button>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody id="children"></tbody>
+                  </table>
+                </div>
+                <p class="hint">
+                  Ring widths show depth. Segment areas show allocated bytes.<br />Small
+                  entries remain accessible in the table.
+                </p>
+              </section>
+            </div>
+          </main>
+          <section id="suggestions" hidden>
+            <div class="suggestion-intro">
+              <div>
+                <span class="eyebrow">REVIEW / SELECT / CLEAN</span>
+                <h2>Cleanup candidates</h2>
+              </div>
+              <p>
+                Cleanup score combines size, safety and staleness.<br />Select
+                items to move to Trash after review.
+              </p>
+            </div>
+            <div class="suggestion-controls">
+              <div class="tabs" aria-label="Suggestion sort">
+                <button data-suggest-sort="score" class="active">Score</button
+                ><button data-suggest-sort="size">Size</button
+                ><button data-suggest-sort="stale">
+                  Time since last activity
+                </button>
+              </div>
+              <label
+                >Category
+                <select id="suggest-category">
+                  <option value="">All categories</option>
+                </select></label
+              >
+              <label
+                >Safety
+                <select id="suggest-safety">
+                  <option value="">All safety levels</option>
+                </select></label
+              >
+            </div>
             <div class="table-scroll">
-              <table>
+              <table class="cleanup-table">
                 <thead>
                   <tr>
-                    <th><button data-sort="name">Name ↕</button></th>
-                    <th><button data-sort="bytes">Size ↕</button></th>
-                    <th><button data-sort="files">Files ↕</button></th>
-                    <th><button data-sort="modified">Modified ↕</button></th>
+                    <th>Selection / Path</th>
+                    <th>
+                      <button data-suggest-sort="score">Cleanup score ↕</button>
+                    </th>
+                    <th><button data-suggest-sort="size">Size ↕</button></th>
+                    <th>
+                      <button data-suggest-sort="stale">
+                        Time since last activity ↕
+                      </button>
+                    </th>
                   </tr>
                 </thead>
-                <tbody id="children"></tbody>
+                <tbody id="suggestion-list"></tbody>
               </table>
             </div>
-            <p class="hint">
-              Ring widths show depth. Segment areas show allocated bytes.<br />Small
-              entries remain accessible in the table.
-            </p>
           </section>
         </div>
-      </main>
-      <section id="suggestions" hidden>
-        <div class="suggestion-intro">
-          <div>
-            <span class="eyebrow">START WITH THE LOWEST RISK</span>
-            <h2>Your cleanup suggestions</h2>
+        <aside class="cleanup-rail" aria-label="Top cleanup suggestions">
+          <div class="rail-heading">
+            <span class="eyebrow">CLEANUP SUGGESTIONS</span
+            ><span id="rail-count">00</span>
           </div>
-          <p>
-            Cleanup score combines size, safety and staleness.<br />Select items to move to Trash after review.
+          <div id="rail-list">
+            <p class="empty">Scan a folder to see candidates.</p>
+          </div>
+          <button id="review-cleanup" class="rail-review">
+            Review all candidates ↗
+          </button>
+          <p class="rail-note">
+            Score combines size, safety and time since last activity.
           </p>
-        </div>
-        <div class="suggestion-controls">
- <div class="tabs" aria-label="Suggestion sort"><button data-suggest-sort="score" class="active">Score</button><button data-suggest-sort="size">Size</button><button data-suggest-sort="stale">Time since last activity</button></div>
- <label>Category <select id="suggest-category"><option value="">All categories</option></select></label>
- <label>Safety <select id="suggest-safety"><option value="">All safety levels</option></select></label>
- </div>
- <div class="table-scroll"><table class="cleanup-table"><thead><tr><th>Selection / Path</th><th><button data-suggest-sort="score">Cleanup score ↕</button></th><th><button data-suggest-sort="size">Size ↕</button></th><th><button data-suggest-sort="stale">Time since last activity ↕</button></th></tr></thead><tbody id="suggestion-list"></tbody></table></div>
-      </section>
+        </aside>
+      </div>
       <footer>
         <span id="scan-status">Local scan · no data leaves this device</span
         ><span
@@ -133,12 +283,26 @@
         >
       </footer>
       <aside id="notes" hidden>
+        <p id="volume-values"></p>
+        <p id="volume-note"></p>
         <p id="accounting"></p>
         <div id="skipped"></div>
       </aside>
     </div>
-    <div id="selection-bar" hidden><span id="selection-total"></span><button id="trash-selected">Move to Trash</button><button id="clear-selection">Clear</button><span id="trash-results" role="status"></span></div>
-    <dialog id="trash-confirm"><h2>Move to Trash?</h2><p id="confirm-total"></p><pre id="confirm-paths"></pre><p>Items can be restored from Trash.</p><button id="confirm-trash">Move to Trash</button><button id="cancel-trash">Cancel</button></dialog>
+    <div id="selection-bar" hidden>
+      <span id="selection-total"></span
+      ><button id="trash-selected">Move to Trash</button
+      ><button id="clear-selection">Clear</button
+      ><span id="trash-results" role="status"></span>
+    </div>
+    <dialog id="trash-confirm">
+      <h2>Move to Trash?</h2>
+      <p id="confirm-total"></p>
+      <pre id="confirm-paths"></pre>
+      <p>Items can be restored from Trash.</p>
+      <button id="confirm-trash">Move to Trash</button
+      ><button id="cancel-trash">Cancel</button>
+    </dialog>
     <div id="tooltip" role="tooltip" hidden></div>
   </body>
 </html>
