@@ -147,10 +147,12 @@ const wait = async (fn) => {
   await d.querySelector(".item-actions button").onclick();
   assert.equal(calls.at(-1)[0], "reveal");
   const copy = [...d.querySelectorAll(".item-actions button")].find(
-    (b) => b.textContent === "Copy path",
+    (b) => b.getAttribute("aria-label") === "Copy path",
   );
   await copy.onclick();
   assert.equal(calls.at(-1)[0], "copy");
+  assert.equal(copy.getAttribute("aria-label"), "Copied");
+  assert.ok(copy.querySelector("svg use"));
   $("cleanup-tab").click();
   await wait(() => d.querySelector(".suggestion-details .item-actions"));
   const cmd = [
@@ -159,6 +161,8 @@ const wait = async (fn) => {
   assert(cmd);
   await cmd.onclick();
   assert.equal(calls.at(-1)[0], "copy");
+  assert.equal(copy.getAttribute("aria-label"), "Copied");
+  assert.ok(copy.querySelector("svg use"));
   await $("export-json").onclick();
   await $("export-summary").onclick();
   assert.deepEqual(

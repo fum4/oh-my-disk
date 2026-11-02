@@ -281,6 +281,15 @@
           d="M224,144v64a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8V144a8,8,0,0,1,16,0v56H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"
         />
       </symbol>
+      <symbol id="regular-copy" viewBox="0 0 256 256">
+        <path
+          d="M96 56V24h136v136h-32M24 72h160v160H24Z"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="16"
+          stroke-linejoin="round"
+        />
+      </symbol>
       <symbol id="regular-eye" viewBox="0 0 256 256">
         <path
           d="M247.31,124.76c-.35-.79-8.82-19.58-27.65-38.41C194.57,61.26,162.88,48,128,48S61.43,61.26,36.34,86.35C17.51,105.18,9,124,8.69,124.76a8,8,0,0,0,0,6.5c.35.79,8.82,19.57,27.65,38.4C61.43,194.74,93.12,208,128,208s66.57-13.26,91.66-38.34c18.83-18.83,27.3-37.61,27.65-38.4A8,8,0,0,0,247.31,124.76ZM128,192c-30.78,0-57.67-11.19-79.93-33.25A133.47,133.47,0,0,1,25,128,133.33,133.33,0,0,1,48.07,97.25C70.33,75.19,97.22,64,128,64s57.67,11.19,79.93,33.25A133.46,133.46,0,0,1,231.05,128C223.84,141.46,192.43,192,128,192Zm0-112a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"
@@ -437,45 +446,6 @@
           >Scan Again<span class="kbd">⌘R</span>
         </button>
       </div>
-      <details class="scan-options">
-        <summary>Scan options and exports</summary>
-        <section id="desktop" hidden>
-          <div class="desktop-controls">
-            <label
-              >Scan folder
-              <select id="scan-root">
-                <option value="home">Home</option>
-                <option value="/">Whole disk (/)</option>
-                <option value="custom">Choose Folder…</option>
-              </select></label
-            ><span id="chosen-path"></span
-            ><button id="choose-folder" class="btn sec">Choose Folder…</button
-            ><button id="start-scan" class="btn pri">
-              <svg class="i" aria-hidden="true">
-                <use href="#regular-arrow-clockwise" /></svg
-              >Scan</button
-            ><button id="cancel-scan" hidden>Cancel</button
-            ><button id="open-last" hidden>Open Last Cached Scan</button>
-          </div>
-          <div id="progress" role="status" aria-live="polite"></div>
-          <progress id="scan-spinner" hidden></progress>
-          <p id="desktop-error" role="alert"></p>
-          <div class="desktop-controls">
-            <button id="export-json" disabled>Export JSON…</button
-            ><button id="export-summary" disabled>Export LLM Summary…</button>
-          </div>
-        </section>
-        <section id="web-scan" hidden>
-          <label
-            >Scan folder
-            <input id="web-root" placeholder="Absolute folder path" /></label
-          ><button id="web-start-scan">Scan</button
-          ><span id="web-scan-status" role="status"></span>
-        </section>
-        <label class="unit-setting"
-          ><input type="checkbox" id="binary-units" /> Binary units (GiB)</label
-        >
-      </details>
       <div id="scan-feedback" role="status" hidden></div>
       <section id="welcome" class="card empty" hidden>
         <h2>Your disk, a little clearer.</h2>
@@ -491,7 +461,7 @@
           Enable Full Disk Access, then reopen and scan again. You can explore
           partial results.
         </p>
-        <button id="full-disk-access">Open Full Disk Access Settings</button>
+        <button id="full-disk-access" class="btn sec">Open Settings</button>
       </aside>
       <div id="content-grid" class="grid">
         <div id="overview-panel" class="overview-left">
@@ -551,6 +521,11 @@
                 role="img"
                 aria-label="Interactive disk allocation map"
               ></div>
+              <div class="view-switch" hidden>
+                <button id="sunburst" class="active" aria-pressed="true">
+                  Sunburst</button
+                ><button id="treemap" aria-pressed="false">Treemap</button>
+              </div>
               <div id="legend" class="legend"></div>
             </section>
             <section class="files-panel">
@@ -609,15 +584,14 @@
           </div>
           <div class="tools">
             <div class="seg" aria-label="Suggestion sort">
-              <button data-suggest-sort="score" class="active">
-                Best First</button
+              <button data-suggest-sort="score" class="active">Best</button
               ><button data-suggest-sort="size" class="">Largest</button
               ><button data-suggest-sort="stale" class="">
                 Unused Longest
               </button>
             </div>
             <span class="cnt" id="sort-hint"
-              >Safest and biggest at the top</span
+              >Safest first; personal files in Largest</span
             >
           </div>
           <div class="suggestion-controls" id="cleanup-filters" hidden>
@@ -653,16 +627,50 @@
           <p id="trash-results" role="status"></p>
         </section>
       </div>
-      <div class="view-switch" hidden>
-        <button id="sunburst" class="active" aria-pressed="true">
-          Sunburst</button
-        ><button id="treemap" aria-pressed="false">Treemap</button>
-      </div>
       <section id="volume" hidden>
         <span id="hud-used"></span><span id="hud-free"></span
         ><span id="hud-scanned"></span><span id="hud-outside"></span
         ><span id="total"></span>
       </section>
+      <details class="scan-options">
+        <summary>Scan options and exports</summary>
+        <section id="desktop" hidden>
+          <div class="desktop-controls">
+            <label
+              >Scan folder
+              <select id="scan-root">
+                <option value="home">Home</option>
+                <option value="/">Whole disk (/)</option>
+                <option value="custom">Choose Folder…</option>
+              </select></label
+            ><span id="chosen-path"></span
+            ><button id="choose-folder" class="btn sec">Choose Folder…</button
+            ><button id="start-scan" class="btn pri">
+              <svg class="i" aria-hidden="true">
+                <use href="#regular-arrow-clockwise" /></svg
+              >Scan</button
+            ><button id="cancel-scan" hidden>Cancel</button
+            ><button id="open-last" hidden>Open Last Cached Scan</button>
+          </div>
+          <div id="progress" role="status" aria-live="polite"></div>
+          <progress id="scan-spinner" hidden></progress>
+          <p id="desktop-error" role="alert"></p>
+          <div class="desktop-controls">
+            <button id="export-json" disabled>Export JSON…</button
+            ><button id="export-summary" disabled>Export LLM Summary…</button>
+          </div>
+        </section>
+        <section id="web-scan" hidden>
+          <label
+            >Scan folder
+            <input id="web-root" placeholder="Absolute folder path" /></label
+          ><button id="web-start-scan">Scan</button
+          ><span id="web-scan-status" role="status"></span>
+        </section>
+        <label class="unit-setting"
+          ><input type="checkbox" id="binary-units" /> Binary units (GiB)</label
+        >
+      </details>
       <footer>
         <span id="scan-status">Local scan · no data leaves this device</span
         ><span

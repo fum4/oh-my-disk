@@ -56,10 +56,23 @@ function tooltip(e, n) {
   t.replaceChildren(
     document.createTextNode(n.path),
     dom("strong", "", fmt(n.bytes)),
+    dom(
+      "span",
+      "",
+      snapshot?.volume?.capacity
+        ? ((n.bytes / snapshot.volume.capacity) * 100).toFixed(1) + "% of disk"
+        : "Disk capacity unavailable",
+    ),
   );
   t.hidden = false;
   t.style.left = Math.max(8, Math.min(e.clientX + 15, innerWidth - 395)) + "px";
   t.style.top = Math.max(8, Math.min(e.clientY + 15, innerHeight - 100)) + "px";
+}
+function chartTooltip(node, label, bytes) {
+  const capacity = snapshot?.volume?.capacity;
+  node.title = `${label}: ${fmt(bytes)}, ${capacity ? ((bytes / capacity) * 100).toFixed(1) : "—"}% of disk`;
+  node.onpointermove = (e) => tooltip(e, { path: label, bytes });
+  node.onpointerleave = () => ($("tooltip").hidden = true);
 }
 let navigationVersion = 0;
 async function loadChildren(n, offset = 0) {
@@ -576,7 +589,15 @@ function renderSuggestions() {
       details.hidden = !details.hidden;
       name.setAttribute("aria-expanded", String(!details.hidden));
     };
-    details.append(dom("p", "", s.path), dom("p", "", s.explanation));
+    details.append(
+      dom("p", "", s.path),
+      dom("p", "", `Rule: ${s.rule}. ${s.explanation}`),
+      dom(
+        "p",
+        "",
+        `Score ${Math.round(s.score)}: ${s.personal ? "your files; age does not boost ranking" : s.safety === "cache" ? "safe cache" : s.safety === "reinstallable" ? "reinstallable data" : "review before deleting"}, ${fmt(s.bytes)} locally allocated, unused ${s.stale_days} days.${s.personal ? " Personal files are capped at 30. Synced changes can affect all devices." : s.rule === "big-unknown" || s.incomplete ? " Unrecognized or partial items are capped at 40." : ""}`,
+      ),
+    );
     if (s.incomplete)
       details.append(dom("p", "", "Partial scan: review before cleaning."));
     if (s.project_path)
@@ -589,11 +610,19 @@ function renderSuggestions() {
       name,
       dom("div", "d", `${s.category}, ${s.stale_days} days unused`),
     );
-    const safe = !s.incomplete && ["cache", "reinstallable"].includes(s.safety);
-    const badge = dom("span", "badge " + (safe ? "safe" : "rev"));
+    const safe =
+      !s.personal &&
+      !s.incomplete &&
+      ["cache", "reinstallable"].includes(s.safety);
+    const badge = dom(
+      "span",
+      "badge " + (s.personal ? "rev personal" : safe ? "safe" : "rev"),
+    );
     badge.append(
       icon(safe ? "fill-shield-check" : "fill-eye"),
-      document.createTextNode(safe ? "Safe" : "Review"),
+      document.createTextNode(
+        s.personal ? "Your files" : safe ? "Safe" : "Review",
+      ),
     );
     badge.title = s.safety + (s.badge ? ": " + s.badge : "");
     const score = dom("span", "sc num suggestion-score", Math.round(s.score));
@@ -616,7 +645,7 @@ function renderSuggestions() {
       dom(
         "p",
         "empty",
-        "No cleanup suggestions match these filters. Try another filter or scan again.",
+        "No cleanup suggestions match these filters. Try another filter or scan again. Personal files appear under Largest or Unused Longest.",
       ),
     );
   if (!overview && suggestionItems.length > suggestionsShown) {
@@ -671,7 +700,12 @@ document.querySelectorAll("[data-sort]").forEach(
       }
     }),
 );
-$("details-toggle").onclick = () => ($("notes").hidden = !$("notes").hidden);
+$("details-toggle").setAttribute("aria-expanded", "false");
+$("details-toggle").setAttribute("aria-controls", "notes");
+$("details-toggle").onclick = () => {
+  $("notes").hidden = !$("notes").hidden;
+  $("details-toggle").setAttribute("aria-expanded", String(!$("notes").hidden));
+};
 function loadSnapshot() {
   return fetch("/api/scan")
     .then((r) => {
@@ -817,7 +851,7 @@ for (const b of document.querySelectorAll("[data-suggest-sort]")) {
             stale: "Most recently used at the top",
           }
         : {
-            score: "Safest and biggest at the top",
+            score: "Safest first; personal files in Largest",
             size: "Largest items at the top",
             stale: "Longest unused at the top",
           }
@@ -946,7 +980,14 @@ function renderOverview() {
   const scan = snapshot.scan.root,
     v = snapshot.volume;
   const suggestions = snapshot.suggestions || [];
-  const reclaim = suggestions.reduce((sum, s) => sum + s.bytes, 0);
+  const reclaim = suggestions
+    .filter(
+      (s) =>
+        !s.personal &&
+        !s.incomplete &&
+        ["cache", "reinstallable"].includes(s.safety),
+    )
+    .reduce((sum, s) => sum + s.bytes, 0);
   const lowerBound = suggestions.length === 100;
   const capacity = v?.capacity || 0,
     free = v?.available || 0;
@@ -1001,6 +1042,21 @@ function renderOverview() {
       c.setAttribute("stroke-dashoffset", -start);
       c.setAttribute("transform", "rotate(-90 100 100)");
     }
+    const label = {
+      files: "Your files",
+      clean: "Can be cleaned",
+      sys: "System and apps",
+      free: "Free",
+    }[color];
+    const bytes = base ? free : value;
+    c.onpointermove = (e) => tooltip(e, { path: label, bytes });
+    c.onpointerleave = () => ($("tooltip").hidden = true);
+    const title = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "title",
+    );
+    title.textContent = `${label}: ${gb(bytes)}, ${capacity ? ((bytes / capacity) * 100).toFixed(1) : "—"}% of disk`;
+    c.append(title);
     svg.append(c);
   }
   circle(1, "free", 0, true);
@@ -1043,6 +1099,15 @@ function renderOverview() {
       const bar = dom("i");
       bar.style.width = (value / capacity) * 100 + "%";
       bar.style.background = `var(--c-${color})`;
+      chartTooltip(
+        bar,
+        {
+          files: "Your files",
+          clean: "Can be cleaned",
+          sys: "System and apps",
+        }[color],
+        value,
+      );
       $("disk-bar").append(bar);
     }
   $("disk-caption").textContent = v
@@ -1072,6 +1137,8 @@ function renderOverview() {
   $("bar-now").style.width = (capacity ? (free / capacity) * 100 : 0) + "%";
   $("bar-after").style.left = $("bar-now").style.width;
   $("bar-after").style.width = (capacity ? (clean / capacity) * 100 : 0) + "%";
+  chartTooltip($("bar-now"), "Free now", free);
+  chartTooltip($("bar-after"), "Potential cleanup", clean);
   const folders = ordered(scan),
     list = $("overview-folders");
   list.replaceChildren();

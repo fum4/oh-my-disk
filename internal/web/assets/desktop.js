@@ -2,19 +2,39 @@
 const nativeApp = window.go?.main?.App;
 function itemActions(path, command) {
   const group = dom("div", "item-actions");
-  const action = (label, fn) => {
-    const b = dom("button", "", label);
-    b.onclick = () =>
-      fn().catch((e) => {
+  const action = (label, fn, glyph) => {
+    const b = dom(
+      "button",
+      glyph ? "icon-action" : "",
+      glyph ? undefined : label,
+    );
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    if (glyph) b.append(icon(glyph));
+    b.onclick = async () => {
+      try {
+        await fn();
+        if (label.startsWith("Copy")) {
+          b.title = "Copied";
+          b.setAttribute("aria-label", "Copied");
+          b.dataset.copied = "true";
+          setTimeout(() => {
+            b.title = label;
+            b.setAttribute("aria-label", label);
+            delete b.dataset.copied;
+          }, 1600);
+        }
+      } catch (e) {
         $("desktop-error").textContent = /older cache format/i.test(String(e))
           ? "This saved scan uses an older format. Scan again to update it."
           : String(e);
         showFeedback(String(e));
-      });
+      }
+    };
     group.append(b);
   };
-  action("Reveal in Finder", () => nativeApp.Reveal(path));
-  action("Copy path", () => nativeApp.Copy(path));
+  action("Reveal in Finder", () => nativeApp.Reveal(path), "regular-eye");
+  action("Copy path", () => nativeApp.Copy(path), "regular-copy");
   if (command) action("Copy suggested command", () => nativeApp.Copy(command));
   return group;
 }

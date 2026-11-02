@@ -1,82 +1,125 @@
+// Render-only fixture sweep. Never confirms Trash or scans a real folder.
 const { chromium } = require("playwright");
 const fs = require("node:fs");
+const assert = require("node:assert/strict");
 const url = process.argv[2];
 if (!url) throw Error("Usage: node scripts/ui-capture.cjs <fixture-ui-url>");
 fs.mkdirSync(".build/screens", { recursive: true });
 (async () => {
-  const executablePath =
-    process.env.OMD_CHROME ||
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
   const browser = await chromium.launch({
-    executablePath,
+    executablePath:
+      process.env.OMD_CHROME ||
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     headless: true,
     args: ["--no-sandbox"],
     env: { ...process.env, HOME: process.cwd() + "/.build/chrome-home" },
   });
-  const page = await browser.newPage({
-      viewport: { width: 1440, height: 900 },
-    }),
+  const page = await browser.newPage(),
     errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
+  const shot = async (name) =>
+    page.screenshot({
+      path: `.build/screens/polish-${name}.png`,
+      fullPage: true,
+    });
   await page.goto(url);
   await page.waitForSelector("#overview-folders .fr");
   await page.evaluate(() => document.fonts.ready);
-  for (const id of ["overview", "folders", "categories", "cleanup-tab"]) {
-    await page.locator("#" + id).click();
-    await page.screenshot({
-      path:
-        ".build/screens/" + (id === "cleanup-tab" ? "cleanup" : id) + ".png",
-      fullPage: true,
-    });
+  for (const theme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: theme });
+    for (const width of [1440, 900, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      const prefix = `${theme}-${width}`;
+      for (const id of ["overview", "folders", "categories", "cleanup-tab"]) {
+        await page.locator(`#${id}`).click();
+        await page.evaluate(() => {
+          if (document.documentElement.scrollWidth > innerWidth)
+            throw Error("Horizontal overflow");
+          const footer = document
+            .querySelector("footer")
+            .getBoundingClientRect();
+          if (innerWidth > 700) {
+            const grid = document
+              .querySelector("#content-grid")
+              .getBoundingClientRect();
+            if (grid.bottom > footer.top)
+              throw Error("Footer overlaps content");
+            const main = document.querySelector("main");
+            if (main.scrollHeight > main.clientHeight + 1)
+              throw Error("Page overflow");
+          }
+          for (const node of document.querySelectorAll(
+            "button:not(:disabled), summary, select:not(:disabled), input[type=checkbox]:not(:disabled)",
+          )) {
+            if (getComputedStyle(node).cursor !== "pointer")
+              throw Error("Missing pointer cursor: " + node.id);
+          }
+        });
+        await shot(`${prefix}-${id}`);
+        // A scroll must leave the panel heading and footer still in place.
+        const list =
+          id === "overview"
+            ? "#overview-folders"
+            : id === "cleanup-tab"
+              ? "#suggestion-list"
+              : ".table-scroll";
+        const before = await page.locator("footer").boundingBox();
+        await page.locator(list).evaluate((n) => {
+          n.scrollTop = n.scrollHeight;
+        });
+        assert.deepEqual(await page.locator("footer").boundingBox(), before);
+        await page.locator(list).evaluate((n) => {
+          n.scrollTop = 0;
+        });
+      }
+      await page.locator("#folders").click();
+      await page.locator("#treemap").click();
+      await shot(`${prefix}-treemap`);
+      await page.locator("#sunburst").click();
+      await page.locator("#cleanup-tab").click();
+      await page.locator(".item-name").first().click();
+      await shot(`${prefix}-details`);
+      await page
+        .locator(".suggestion-card input:not(:disabled)")
+        .first()
+        .check();
+      await page.locator("#trash-selected").click();
+      await shot(`${prefix}-confirm`);
+      await page.locator("#cancel-trash").click();
+      await page.locator("#clear-selection").click();
+      // State fixtures exercise presentation without invoking native actions.
+      await page.locator("#overview").click();
+      await page.evaluate(() => {
+        document.querySelector("#access-banner").hidden = false;
+        document.querySelector(".scan-options").open = true;
+      });
+      await shot(`${prefix}-access-options`);
+      await page.evaluate(() => {
+        document.querySelector(".scan-options").open = false;
+        document.querySelector("#access-banner").hidden = true;
+        document.body.classList.add("is-scanning");
+      });
+      await shot(`${prefix}-scanning`);
+      await page.evaluate(() => {
+        document.body.classList.remove("is-scanning");
+        document.querySelector("#content-grid").hidden = true;
+        document.querySelector("#welcome").hidden = false;
+      });
+      await shot(`${prefix}-empty`);
+      await page.evaluate(() =>
+        showFeedback("Unable to load scan. Choose a folder or scan again."),
+      );
+      await shot(`${prefix}-error`);
+      await page.reload();
+      await page.waitForSelector("#overview-folders .fr");
+    }
   }
-  await page.locator("#folders").click();
-  await page.locator("#treemap").click();
-  await page.screenshot({ path: ".build/screens/treemap.png", fullPage: true });
-  await page.locator("#cleanup-tab").click();
-  await page.locator(".suggestion-card input:not(:disabled)").first().check();
-  await page.locator("#trash-selected").click();
-  await page.screenshot({
-    path: ".build/screens/confirmation.png",
-    fullPage: true,
-  });
-  await page.locator("#cancel-trash").click();
-  await page.locator("#clear-selection").click();
-  await page.setViewportSize({ width: 900, height: 900 });
-  for (const id of ["overview", "folders", "categories", "cleanup-tab"]) {
-    await page.locator("#" + id).click();
-    if (
-      await page.evaluate(
-        () => document.documentElement.scrollWidth > innerWidth,
-      )
-    )
-      throw Error("900px overflow: " + id);
-    await page.screenshot({
-      path: ".build/screens/" + id + "-900.png",
-      fullPage: true,
-    });
-  }
-  await page.emulateMedia({ colorScheme: "dark" });
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator("#overview").click();
-  await page.screenshot({
-    path: ".build/screens/overview-dark.png",
-    fullPage: true,
-  });
-  await page.emulateMedia({ colorScheme: "light" });
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.locator("#overview").click();
-  await page.screenshot({
-    path: ".build/screens/mobile-overview.png",
-    fullPage: true,
-  });
-  if (
-    await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)
-  )
-    throw Error("Mobile overflow");
-  if (errors.length) throw Error(errors.join("\n"));
+  assert.deepEqual(errors, []);
   await browser.close();
-  console.log("PASS: screenshots for all views, confirmation and mobile.");
+  console.log(
+    "PASS: light/dark × wide/narrow/mobile, all pages, maps, details, confirmation, access/options, scanning, empty/error, cursors and scroll boundaries.",
+  );
 })().catch((e) => {
-  console.error(e.message);
+  console.error(e);
   process.exit(1);
 });

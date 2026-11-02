@@ -101,6 +101,24 @@ const wait = async (fn) => {
   assert.equal($("explorer").hidden, true);
   assert.equal(d.querySelectorAll("#disk-legend .li").length, 4);
   assert.ok(d.querySelector("#ringsvg circle"));
+  assert.equal($("full-disk-access").textContent, "Open Settings");
+  assert.equal(
+    d.querySelector("[data-suggest-sort=score]").textContent.trim(),
+    "Best",
+  );
+  assert.ok(d.querySelector(".map-panel > .view-switch"));
+  assert.match(
+    d.querySelector("#ringsvg circle title").textContent,
+    /% of disk/,
+  );
+  d.querySelector("#ringsvg circle").onpointermove({
+    clientX: 100,
+    clientY: 100,
+  });
+  assert.equal($("tooltip").hidden, false);
+  assert.match($("tooltip").textContent, /% of disk/);
+  d.querySelector("#ringsvg circle").onpointerleave();
+  assert.equal($("tooltip").hidden, true);
   assert.match($("disk-free").textContent, /\d+\.\d GB/);
   assert.ok(d.querySelector(".badge svg use"));
   for (const use of d.querySelectorAll("use"))
@@ -117,6 +135,10 @@ const wait = async (fn) => {
   overviewName.click();
   assert.equal(overviewName.getAttribute("aria-expanded"), "true");
   assert.equal(d.querySelector(".suggestion-details").hidden, false);
+  assert.match(
+    d.querySelector(".suggestion-details").textContent,
+    /Rule: .+Score \d+:/,
+  );
   overviewName.click();
   const firstOverviewRow = d.querySelector("#overview-folders .fr");
   firstOverviewRow.focus();
