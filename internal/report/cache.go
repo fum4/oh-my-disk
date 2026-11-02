@@ -9,9 +9,11 @@ import (
 	"hash/crc32"
 	"io"
 	"os"
+	"strings"
 )
 
-const cacheMagic = "OMDCACH5"
+// Version 6 stores local allocation for dataless files; older totals need a rescan.
+const cacheMagic = "OMDCACH6"
 const nodeChunk = 1 << 14
 
 type cacheHeader struct {
@@ -106,6 +108,16 @@ func readCache(f *os.File) (*Snapshot, error) {
 		}
 		if err := validSnapshot(&s); err != nil {
 			return nil, err
+		}
+		// Legacy JSON caches used logical bytes for cloud placeholders too.
+		pending := []*scanner.Node{s.Scan.Root}
+		for len(pending) > 0 {
+			n := pending[len(pending)-1]
+			pending = pending[:len(pending)-1]
+			if n.Dataless {
+				return nil, fmt.Errorf("older cache format with cloud sizes; rescan with --refresh")
+			}
+			pending = append(pending, n.Children...)
 		}
 		s.Scan.Tree = scanner.Compact(s.Scan.Root)
 		s.Scan.Root = s.Scan.Tree.View(0, 1, 0)
@@ -238,7 +250,16 @@ func validateExisting(path string) error {
 	if _, err = f.ReadAt(magic[:], 0); err != nil {
 		return err
 	}
-	if string(magic[:]) != cacheMagic && string(magic[:]) != "OMDCACH4" {
+	// A structurally valid legacy JSON cache may be replaced after a fresh
+	// scan even when its old cloud allocation makes it unsuitable for loading.
+	if !strings.HasPrefix(string(magic[:]), "OMDCACH") {
+		var s Snapshot
+		if err := json.NewDecoder(f).Decode(&s); err != nil {
+			return err
+		}
+		return validSnapshot(&s)
+	}
+	if string(magic[:]) != cacheMagic && string(magic[:]) != "OMDCACH4" && string(magic[:]) != "OMDCACH5" {
 		_, err = LoadCache(path)
 		return err
 	}

@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"encoding/binary"
+	"golang.org/x/sys/unix"
 	"os"
 	"testing"
 )
@@ -55,8 +56,8 @@ func TestBulkDatalessAndCompressedMetadata(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if m.entry.OwnBytes != 123456 || m.entry.Flags&(Dataless|Compressed) != (Dataless|Compressed) {
-		t.Fatal("cloud logical size/flags lost")
+	if m.entry.OwnBytes != 4096 || m.entry.Flags&(Dataless|Compressed) != (Dataless|Compressed) {
+		t.Fatal("cloud allocation/flags lost")
 	}
 	for n := 0; n < 104; n++ {
 		if _, e = parseBulk(r[:n]); e == nil {
@@ -66,5 +67,15 @@ func TestBulkDatalessAndCompressedMetadata(t *testing.T) {
 	put(24, 0xffffffff)
 	if _, e = parseBulk(r); e == nil {
 		t.Fatal("accepted invalid name offset")
+	}
+}
+
+func TestDatalessStatUsesLocalBlocks(t *testing.T) {
+	for _, blocks := range []int64{0, 8} {
+		st := unix.Stat_t{Mode: unix.S_IFREG, Size: 79_000_000_000, Blocks: blocks, Flags: sfDataless}
+		m := statMetadata("cloud", &st)
+		if m.entry.OwnBytes != blocks*512 || m.entry.Flags&Dataless == 0 {
+			t.Fatalf("%+v", m)
+		}
 	}
 }

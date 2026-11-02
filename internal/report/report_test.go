@@ -2,6 +2,7 @@ package report
 
 import (
 	"encoding/binary"
+	"encoding/json"
 	"github.com/fum4/oh-my-disk/internal/scanner"
 	"hash/crc32"
 	"os"
@@ -56,29 +57,59 @@ func TestCacheAndExclusiveReports(t *testing.T) {
 // Previous identity-free binary caches can be replaced after a fresh scan,
 // but must never authorize Trash operations by being loaded as current caches.
 func TestPreviousCacheUpgrade(t *testing.T) {
+	for _, magic := range []string{"OMDCACH4", "OMDCACH5"} {
+		t.Run(magic, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.Chmod(dir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(dir, "latest.bin")
+			root := &scanner.Node{Path: dir, Name: "root", Kind: "directory"}
+			s := &Snapshot{Version: 1, Scan: &scanner.Result{Root: root}}
+			if err := SaveCache(path, s); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			copy(data[:8], magic)
+			binary.LittleEndian.PutUint32(data[len(data)-4:], crc32.ChecksumIEEE(data[:len(data)-4]))
+			if err = os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err = LoadCache(path); err == nil {
+				t.Fatal("accepted previous cache")
+			}
+			if err = SaveCache(path, s); err != nil {
+				t.Fatal("could not replace valid previous cache", err)
+			}
+		})
+	}
+}
+
+func TestLegacyCloudCacheRequiresRescanButCanBeReplaced(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.Chmod(dir, 0700); err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(dir, "latest.bin")
-	root := &scanner.Node{Path: dir, Name: "root", Kind: "directory"}
-	s := &Snapshot{Version: 1, Scan: &scanner.Result{Root: root}}
-	if err := SaveCache(path, s); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(path)
+	os.Chmod(dir, 0700)
+	path := filepath.Join(dir, "cloud.json")
+	root := &scanner.Node{Path: dir, Name: "cloud", Kind: "directory", Dataless: true, Bytes: 79_000_000_000}
+	old := &Snapshot{Version: 1, Scan: &scanner.Result{Root: root}}
+	data, err := json.Marshal(old)
 	if err != nil {
 		t.Fatal(err)
 	}
-	copy(data[:8], "OMDCACH4")
-	binary.LittleEndian.PutUint32(data[len(data)-4:], crc32.ChecksumIEEE(data[:len(data)-4]))
 	if err = os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = LoadCache(path); err == nil {
-		t.Fatal("accepted previous cache")
+		t.Fatal("accepted legacy logical cloud allocation")
 	}
-	if err = SaveCache(path, s); err != nil {
-		t.Fatal("could not replace valid previous cache", err)
+	fresh := &Snapshot{Version: 1, Scan: &scanner.Result{Root: &scanner.Node{Path: dir, Name: "cloud", Kind: "directory", Dataless: true, OwnBytes: 4096, Bytes: 4096}}}
+	if err = SaveCache(path, fresh); err != nil {
+		t.Fatal("cannot replace legacy cloud cache", err)
+	}
+	got, err := LoadCache(path)
+	if err != nil || got.Scan.Root.Bytes != 4096 {
+		t.Fatal("fresh local allocation", got, err)
 	}
 }

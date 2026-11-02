@@ -29,7 +29,6 @@ func statMetadata(name string, s *unix.Stat_t) metadata {
 	m.entry.SetTime(1, time.Unix(s.Atim.Sec, s.Atim.Nsec))
 	if s.Flags&sfDataless != 0 {
 		m.entry.Flags |= Dataless
-		m.entry.OwnBytes = s.Size
 	}
 	if s.Flags&ufCompressed != 0 {
 		m.entry.Flags |= Compressed
@@ -137,8 +136,6 @@ func parseBulk(r []byte) (metadata, error) {
 		m.entry.Flags |= Dataless
 		if m.entry.Kind == Directory {
 			m.refresh = true
-		} else {
-			m.entry.OwnBytes = int64(u64(96))
 		}
 	}
 	if u32(72)&ufCompressed != 0 {
