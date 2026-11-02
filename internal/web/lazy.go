@@ -40,8 +40,9 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 		}
 		respond(w, struct {
 			*report.Snapshot
-			SkippedCount int `json:"skipped_count"`
-		}{&out, len(s.Scan.Skipped)})
+			SkippedCount int            `json:"skipped_count"`
+			Volume       *report.Volume `json:"volume,omitempty"`
+		}{&out, len(s.Scan.Skipped), volume(s)})
 	})
 	mux.HandleFunc("/api/node", func(w http.ResponseWriter, r *http.Request) {
 		id, a := param(r, "id", 0, 0, int(t.Count)-1)
@@ -192,4 +193,12 @@ func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
 		}
 		return cmp > 0
 	})
+}
+
+func volume(s *report.Snapshot) *report.Volume {
+	v, err := report.VolumeFor(s.Scan.Root.Path, s.Scan.Root.Bytes)
+	if err != nil {
+		return nil
+	}
+	return &v
 }

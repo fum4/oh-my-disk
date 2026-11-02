@@ -593,3 +593,19 @@ aside {
     display: none;
   }
 }
+
+#desktop, #volume, #access-banner { margin: 20px 0; padding: 24px; border: 1px solid #34364f; border-radius: 18px; background: #191f2e; }
+#desktop h1 { margin: 10px 0; }
+.desktop-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0; }
+.desktop-controls button, #access-banner button { padding: 10px 16px; border: 1px solid #6f628e; border-radius: 8px; }
+.desktop-controls .primary { background: #b698f2; color: #141224; font-size: 20px; font-weight: 650; padding: 14px 36px; }
+select { background: #252c40; color: #eee7ff; border-radius: 6px; padding: 8px; }
+#progress, #chosen-path, #desktop-error { overflow-wrap: anywhere; }
+#progress { color: #b9accf; font-size: 13px; }
+#desktop-error { color: #efc176; }
+#access-banner { border-color: #a28651; }
+.unit-setting { display: block; margin: 16px 0; color: #a9a2bb; font-size: 13px; }
+.item-actions { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 8px; }
+.item-actions button { font-size: 11px; color: #c6b1ef; }
+button:disabled { opacity: .45; cursor: default; }
+[hidden] { display: none !important; }

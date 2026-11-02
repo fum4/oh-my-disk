@@ -24,14 +24,13 @@ const palette = [
   "#80b8a9",
   "#b4bf71",
 ];
+let binaryUnits = localStorage.getItem("binaryUnits") === "true";
 const fmt = (b) => {
-  if (b < 1024) return b + " B";
-  let i = -1;
-  do {
-    b /= 1024;
-    i++;
-  } while (b >= 1024 && i < 4);
-  return b.toFixed(1) + " " + ["KiB", "MiB", "GiB", "TiB", "PiB"][i];
+ const base = binaryUnits ? 1024 : 1000;
+ const units = binaryUnits ? ["KiB","MiB","GiB","TiB","PiB","EiB"] : ["kB","MB","GB","TB","PB","EB"];
+ if (b < base) return b + " B";
+ let i = -1; do { b /= base; i++; } while (b >= base && i < units.length-1);
+ return b.toFixed(1) + " " + units[i];
 };
 const dom = (tag, cls, text) => {
   const n = document.createElement(tag);
@@ -236,6 +235,8 @@ function render() {
   });
   $("folder-name").textContent = current.name || "/";
   $("folder-size").textContent = fmt(current.bytes);
+  $("folder-actions").replaceChildren();
+  if(window.go?.main?.App && !current.synthetic) $("folder-actions").append(itemActions(current.path));
   $("map-label").textContent =
     mode === "categories" ? "CATEGORY MAP" : "SPACE MAP";
   $("chart").replaceChildren(view === "sunburst" ? sunburst() : treemap());
@@ -284,6 +285,7 @@ function renderTable() {
     fill.style.background = dot.style.background;
     bar.append(fill);
     name.append(bar);
+    if (window.go?.main?.App) name.append(itemActions(n.path));
     tr.append(
       name,
       dom("td", "", fmt(n.bytes)),
@@ -367,6 +369,7 @@ function renderSuggestions() {
     if (s.project_path)
       body.append(dom("p", "", "Project activity: " + s.project_path));
     if (s.suggested_command) body.append(dom("code", "", s.suggested_command));
+    if (window.go?.main?.App) body.append(itemActions(s.path, s.suggested_command));
     const size = dom("div", "suggestion-size", fmt(s.bytes));
     size.append(
       dom("small", "", "score " + Math.round(s.score).toLocaleString()),
@@ -406,13 +409,15 @@ document.querySelectorAll("[data-sort]").forEach(
     }),
 );
 $("details-toggle").onclick = () => ($("notes").hidden = !$("notes").hidden);
-fetch("/api/scan")
+function loadSnapshot() { return fetch("/api/scan")
   .then((r) => {
     if (!r.ok) throw Error("Unable to load scan: " + r.status);
     return r.json();
   })
   .then((s) => {
     snapshot = s;
+    $("skipped").replaceChildren();
+    renderVolume();
     index(s.scan.root);
     $("total").textContent = fmt(s.scan.root.bytes);
     $("scan-info").textContent =
@@ -435,3 +440,18 @@ fetch("/api/scan")
   .catch((e) => {
     $("scan-info").textContent = e.message;
   });
+}
+
+function renderVolume() {
+ if (!snapshot?.volume) return;
+ const v = snapshot.volume;
+ $("volume").hidden = false;
+ $("volume-values").textContent = `${fmt(v.capacity)} capacity · ${fmt(v.used)} used · ${fmt(v.available)} available · ${fmt(v.outside)} outside scanned folder`;
+ $("volume-note").textContent = "Live volume totals. Outside includes inaccessible data, snapshots and filesystem overhead. APFS shared volumes, purgeable space and clones can differ from About This Mac." + (v.excess ? ` Scanned allocation exceeds used by ${fmt(v.excess)} (shared blocks or cloud placeholders).` : "");
+}
+$("binary-units").checked = binaryUnits;
+$("binary-units").onchange = (e) => {
+ binaryUnits = e.target.checked; localStorage.setItem("binaryUnits",String(binaryUnits));
+ if(snapshot){$("total").textContent=fmt(snapshot.scan.root.bytes);renderVolume();renderSuggestions();render();}
+};
+if (!window.go?.main?.App) loadSnapshot();

@@ -6,6 +6,7 @@
     <title>oh-my-disk · Space, understood.</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
+    <script src="/desktop.js" defer></script>
   </head>
   <body>
     <div class="app">
@@ -16,6 +17,26 @@
           ></a
         ><span class="readonly">● READ-ONLY BY DESIGN</span>
       </header>
+      <section id="desktop" hidden>
+        <div class="eyebrow">SPACE TO THINK</div>
+        <h1>Your disk, understood.</h1>
+        <p>Explore what takes up space. Your files stay untouched.</p>
+        <div class="desktop-controls">
+          <label>Scan folder <select id="scan-root"><option value="home">Home</option><option value="/">Whole disk (/)</option><option value="custom">Choose folder…</option></select></label>
+          <span id="chosen-path"></span>
+          <button id="choose-folder">Choose folder…</button>
+          <button id="start-scan" class="primary">Scan</button>
+          <button id="cancel-scan" hidden>Cancel</button>
+          <button id="open-last" hidden>Open last cached scan</button>
+        </div>
+        <div id="progress" role="status" aria-live="polite"></div>
+        <progress id="scan-spinner" hidden></progress>
+        <p id="desktop-error" role="alert"></p>
+        <div class="desktop-controls"><button id="export-json" disabled>Export JSON…</button><button id="export-summary" disabled>Export LLM summary…</button></div>
+      </section>
+      <aside id="access-banner" hidden><strong>Some Library folders are protected by macOS.</strong><p>Enable oh-my-disk in Full Disk Access, then quit, reopen and rescan. You can continue with partial results.</p><button id="full-disk-access">Open Full Disk Access settings</button></aside>
+      <section id="volume" hidden><strong>Whole disk · containing volume</strong><p id="volume-values"></p><small id="volume-note"></small></section>
+      <label class="unit-setting" title="Decimal GB = 1,000,000,000 bytes (Finder). Binary GiB = 1,073,741,824 bytes."><input type="checkbox" id="binary-units"> Binary units (GiB)</label>
       <section class="intro">
         <div>
           <div class="eyebrow">YOUR DISK, A LITTLE CLEARER</div>
@@ -65,6 +86,7 @@
               </div>
               <span id="folder-size">—</span>
             </div>
+            <div id="folder-actions"></div>
             <div class="table-scroll">
               <table>
                 <thead>

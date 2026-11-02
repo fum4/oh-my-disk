@@ -106,3 +106,12 @@ func Serve(ctx context.Context, s *report.Snapshot, o Options) error {
 	}
 	return err
 }
+
+// Assets and SnapshotHandler are shared by the native WebView. No TCP listener,
+// browser cookies or authentication token are needed within that process.
+func Assets() fs.FS { sub, _ := fs.Sub(assets, "assets"); return sub }
+func SnapshotHandler(s *report.Snapshot) http.Handler {
+	mux := http.NewServeMux()
+	installAPI(mux, s)
+	return mux
+}
