@@ -2291,3 +2291,34 @@ dialog {
     --label-3: #6c6e78;
   }
 }
+
+/* Agent entry points and dock use the same Calm tokens as the scan workspace. */
+.launch-cards { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:24px 0; text-align:left; }
+.launch-card { background:var(--fill); border-radius:12px; padding:20px; display:flex; flex-direction:column; align-items:flex-start; gap:12px; min-width:0; }
+.launch-card > .i { width:24px; height:24px; color:var(--blue); }
+.launch-card h3 { font-size:15px; font-weight:600; }
+.launch-card p { font-size:13px; color:var(--label-2); margin:0; flex:1; }
+.launch-card a { color:var(--blue); font-size:12px; }
+.launch-card .btn { margin-top:4px; white-space:nowrap; }
+#agent-tip {display:flex; align-items:center; gap:12px; color:var(--label-2); font-size:12px; flex:none;}
+#agent-tip > span {flex:1;}
+#agent-terminal { position:fixed; bottom:8px; left:256px; right:8px; height:360px; min-height:180px; background:var(--card); border-radius:16px; box-shadow:0 0 0 1px var(--hair-2),0 -8px 32px #0002; z-index:40; display:flex; flex-direction:column; padding:0 16px 12px; }
+#terminal-resize {height:12px; flex:none; cursor:ns-resize; touch-action:none; display:grid; place-items:center;}
+#terminal-resize::after {content:""; width:40px; height:4px; border-radius:4px; background:var(--hair-2);}
+.terminal-heading {display:flex; align-items:center; gap:12px; padding:4px 0 12px; flex:none;}
+#terminal-status {font-size:12px; color:var(--label-2);}
+#terminal-screen {flex:1; min-height:0; overflow:hidden;}
+#terminal-screen .xterm {height:100%;}
+#terminal-screen a {cursor:pointer;}
+#agent-terminal[hidden], #agent-tip[hidden] {display:none;}
+#ask-claude,#ask-codex {flex:none;}
+@media(max-width:1000px) {.bar.intro {gap:8px;} .bar.intro .title {min-width:100px;} .launch-card {padding:16px;} #agent-terminal {left:208px;} #terminal-status {display:none;}}
+#agent-tip a {color:var(--blue); white-space:nowrap;}
+.launch-card .btn {margin-top:4px;}
+@media(max-width:700px) {.launch-cards {grid-template-columns:1fr;} #agent-terminal {left:8px;} #agent-tip {flex-wrap:wrap;}}
+/* Keep action baselines aligned when only some agents need installation. */
+.launch-card {position:relative; padding-bottom:52px;}
+.launch-card > a {position:absolute; left:20px; bottom:20px;}
+.launch-card > .btn {width:100%;}
+@media(max-width:1000px) {.launch-card > a {left:16px;}}
+.agent-disclosure {font-size:12px; color:var(--label-2);}

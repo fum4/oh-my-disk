@@ -85,14 +85,16 @@ if (nativeApp) {
         if (!chosen) await pick();
         root = chosen;
       }
-      if (!root) return;
+      if (!root) { window.agentScanCancelled?.(); return; }
       $("desktop-error").textContent = "";
       await nativeApp.Scan(root);
+      window.agentScanStarted?.();
     } catch (e) {
+      window.agentScanCancelled?.();
       reportError(e);
     }
   };
-  $("cancel-scan").onclick = () => nativeApp.Cancel().catch(reportError);
+  $("cancel-scan").onclick = () => { window.agentScanCancelled?.(); nativeApp.Cancel().catch(reportError); };
   $("open-last").onclick = async () => {
     await loadSnapshot();
     opened = true;
@@ -117,6 +119,7 @@ if (nativeApp) {
     try {
       const s = await nativeApp.State();
       home = s.home;
+      window.agentStateChanged?.(s);
       $("start-scan").disabled = s.busy;
       $("hub-scan").disabled = s.busy;
       $("choose-folder").disabled = s.busy;
@@ -154,6 +157,7 @@ if (nativeApp) {
             revision = s.revision;
             opened = true;
             showResults(true);
+            window.agentScanComplete?.();
             document.querySelector(".scan-options").open = false;
           } finally {
             loading = false;

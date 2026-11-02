@@ -59,6 +59,7 @@ const wait = async (fn) => {
         main: {
           App: {
             State: async () => ({ ...state }),
+            Agents: async () => [{name:"claude",path:"/mock/claude"},{name:"codex",path:"/mock/codex"}],
             PickFolder: async () => fixture,
             Scan: async (root) => {
               calls.push(["scan", root]);

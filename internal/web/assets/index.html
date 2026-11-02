@@ -7,6 +7,11 @@
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
     <script src="/desktop.js" defer></script>
+    <link rel="stylesheet" href="/vendor/xterm.css" />
+    <script src="/vendor/xterm.js" defer></script>
+    <script src="/vendor/addon-fit.js" defer></script>
+    <script src="/vendor/addon-web-links.js" defer></script>
+    <script src="/agents.js" defer></script>
   </head>
   <body>
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">
@@ -436,6 +441,7 @@
           >
         </div>
         <div class="sp"></div>
+        <button id="ask-claude" class="btn sec" disabled>Ask Claude</button><button id="ask-codex" class="btn sec" disabled>Ask Codex</button>
         <button id="toolbar-choose" class="btn sec">
           <svg class="i" aria-hidden="true">
             <use href="#regular-folder-open" /></svg
@@ -449,12 +455,16 @@
       <div id="scan-feedback" role="status" hidden></div>
       <section id="welcome" class="card empty" hidden>
         <h2>Your disk, a little clearer.</h2>
-        <p>
-          Choose a folder, then scan to explore your files and find space you
-          can get back.
-        </p>
-        <button id="welcome-scan" class="btn pri">Choose Folder…</button>
+        <p>See what’s taking space, on your own or with an agent.</p>
+        <div class="launch-cards">
+          <article class="launch-card"><svg class="i"><use href="#regular-hard-drive" /></svg><h3>Scan my disk</h3><p>Explore your disk and review cleanup suggestions.</p><button id="plain-scan" class="btn pri">Scan My Disk</button></article>
+          <article class="launch-card"><svg class="i"><use href="#regular-magnifying-glass" /></svg><h3>Scan with Claude</h3><p>Scan, then chat about your biggest safe wins.</p><button id="scan-claude" class="btn sec" disabled>Checking…</button><a id="install-claude" hidden href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener">Install Claude Code ↗</a></article>
+          <article class="launch-card"><svg class="i"><use href="#regular-magnifying-glass" /></svg><h3>Scan with Codex</h3><p>Scan, then get help making sense of your disk.</p><button id="scan-codex" class="btn sec" disabled>Checking…</button><a id="install-codex" hidden href="https://developers.openai.com/codex/cli" target="_blank" rel="noopener">Install Codex CLI ↗</a></article>
+        </div>
+        <p class="agent-disclosure">Agent chats use your CLI account and share requested scan metadata with its provider.</p>
+        <button id="welcome-scan" class="btn sec">Choose Folder…</button>
       </section>
+      <aside id="agent-tip"><span id="agent-tip-text">Available in the desktop app</span><a id="tip-install-claude" href="https://code.claude.com/docs/en/setup" target="_blank" rel="noopener" hidden>Install Claude</a><a id="tip-install-codex" href="https://developers.openai.com/codex/cli" target="_blank" rel="noopener" hidden>Install Codex</a><button id="agent-check" class="btn sec" hidden>Check Again</button><button id="agent-dismiss" class="btn ghost" aria-label="Dismiss agent tip">Dismiss</button></aside>
       <aside id="access-banner" hidden>
         <strong>Some Library folders are protected by macOS.</strong>
         <p>
@@ -685,6 +695,11 @@
         <div id="skipped"></div>
       </aside>
     </main>
+    <section id="agent-terminal" aria-label="Agent terminal" hidden>
+      <div id="terminal-resize" role="separator" aria-label="Resize terminal" aria-orientation="horizontal" tabindex="0"></div>
+      <div class="terminal-heading"><strong id="terminal-title" title="Agent chats share requested scan metadata with your CLI provider">Agent</strong><span id="terminal-status" role="status"></span><div class="sp"></div><button id="terminal-copy" class="btn sec">Copy</button><button id="terminal-paste" class="btn sec">Paste</button><button id="terminal-close" class="btn sec">Close</button></div>
+      <div id="terminal-screen"></div>
+    </section>
     <dialog id="trash-confirm">
       <div class="dialog-icon">
         <svg class="i" aria-hidden="true"><use href="#regular-trash" /></svg>
