@@ -157,15 +157,24 @@ func Summary(s *Snapshot, limit int) any {
 		Note        string             `json:"note"`
 	}{s.Scan.Root.Path, s.Scan.Finished, s.Scan.Root.Bytes, len(s.Scan.Skipped), s.Categories, top, sug, Note}
 }
-func HumanBytes(b int64) string {
-	if b < 1024 {
+
+// HumanBytes uses decimal units, matching macOS Finder.
+func HumanBytes(b int64) string { return FormatBytes(b, false) }
+
+func FormatBytes(b int64, binary bool) string {
+	base := float64(1000)
+	units := []string{"kB", "MB", "GB", "TB", "PB", "EB"}
+	if binary {
+		base = 1024
+		units = []string{"KiB", "MiB", "GiB", "TiB", "PiB", "EiB"}
+	}
+	if float64(b) < base {
 		return fmt.Sprintf("%d B", b)
 	}
 	v := float64(b)
-	u := []string{"KiB", "MiB", "GiB", "TiB", "PiB"}
-	for _, unit := range u {
-		v /= 1024
-		if v < 1024 || unit == "PiB" {
+	for _, unit := range units {
+		v /= base
+		if v < base || unit == units[len(units)-1] {
 			return fmt.Sprintf("%.1f %s", v, unit)
 		}
 	}

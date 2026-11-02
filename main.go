@@ -46,6 +46,7 @@ Common options:
   --cache FILE      Application scan cache (default: private OS temp directory)
   --no-cache        Do not read/write a scan cache
   --port N          UI port (default 0 = random localhost port)
+  --binary          Display binary KiB/MiB/GiB instead of decimal units
   --no-open         Do not open a browser
   --help            Show this help
 
@@ -122,6 +123,7 @@ func run(args []string) error {
 	cache := fs.String("cache", report.CachePath(), "scan cache")
 	noCache := fs.Bool("no-cache", false, "no cache")
 	port := fs.Int("port", 0, "UI port")
+	binary := fs.Bool("binary", false, "binary display units")
 	noOpen := fs.Bool("no-open", false, "don't open browser")
 	rest := args[1:]
 	pos := ""
@@ -269,31 +271,38 @@ func run(args []string) error {
 	if *summary == "-" {
 		return nil
 	}
-	human(os.Stdout, cmd, s, output, *limit)
+	humanUnits(os.Stdout, cmd, s, output, *limit, *binary)
 	return nil
 }
 func human(w io.Writer, cmd string, s *report.Snapshot, output any, limit int) {
-	fmt.Fprintf(w, "%s  %s allocated · %d files · scanned %s\n", s.Scan.Root.Path, report.HumanBytes(s.Scan.Root.Bytes), s.Scan.Root.Files, s.Scan.Finished.Format(time.RFC3339))
+	humanUnits(w, cmd, s, output, limit, false)
+}
+func humanUnits(w io.Writer, cmd string, s *report.Snapshot, output any, limit int, binary bool) {
+	size := func(b int64) string { return report.FormatBytes(b, binary) }
+	if v, err := report.VolumeFor(s.Scan.Root.Path, s.Scan.Root.Bytes); err == nil {
+		fmt.Fprintf(w, "Volume: %s capacity · %s used · %s available · %s outside scanned folder\n", size(v.Capacity), size(v.Used), size(v.Available), size(v.Outside))
+	}
+	fmt.Fprintf(w, "%s  %s allocated · %d files · scanned %s\n", s.Scan.Root.Path, size(s.Scan.Root.Bytes), s.Scan.Root.Files, s.Scan.Finished.Format(time.RFC3339))
 	switch cmd {
 	case "scan":
 		for _, n := range s.Scan.Root.Children {
-			fmt.Fprintf(w, "%10s  %8d files  %s\n", report.HumanBytes(n.Bytes), n.Files, n.Name)
+			fmt.Fprintf(w, "%10s  %8d files  %s\n", size(n.Bytes), n.Files, n.Name)
 		}
 	case "top":
 		fmt.Fprintln(w, "Largest entries (parent/child sizes overlap):")
 		for _, n := range output.([]*scanner.Node) {
-			fmt.Fprintf(w, "%10s  %s\n", report.HumanBytes(n.Bytes), n.Path)
+			fmt.Fprintf(w, "%10s  %s\n", size(n.Bytes), n.Path)
 		}
 	case "suggest":
 		for i, v := range output.([]rules.Suggestion) {
-			fmt.Fprintf(w, "%2d. %10s  %-14s  %s\n    %s · %d days since activity · score %.0f\n    %s\n", i+1, report.HumanBytes(v.Bytes), v.Safety, v.Path, v.Category, v.StaleDays, v.Score, v.Explanation)
+			fmt.Fprintf(w, "%2d. %10s  %-14s  %s\n    %s · %d days since activity · score %.0f\n    %s\n", i+1, size(v.Bytes), v.Safety, v.Path, v.Category, v.StaleDays, v.Score, v.Explanation)
 			if v.Command != "" {
 				fmt.Fprintf(w, "    Human-only suggestion: %s\n", v.Command)
 			}
 		}
 	case "explain":
 		v := output.(*rules.Suggestion)
-		fmt.Fprintf(w, "%s\n%s · %s · %s\n%s\nLast activity: %s (%d days); score %.0f\n", v.Path, report.HumanBytes(v.Bytes), v.Category, v.Safety, v.Explanation, v.LastActivity.Format(time.RFC3339), v.StaleDays, v.Score)
+		fmt.Fprintf(w, "%s\n%s · %s · %s\n%s\nLast activity: %s (%d days); score %.0f\n", v.Path, size(v.Bytes), v.Category, v.Safety, v.Explanation, v.LastActivity.Format(time.RFC3339), v.StaleDays, v.Score)
 		if v.ProjectPath != "" {
 			fmt.Fprintln(w, "Project activity:", v.ProjectPath)
 		}
