@@ -1334,13 +1334,6 @@ for (const [id, binary] of [
     }
   };
 }
-// Reserve each button's layout box; only its painted surface grows by 2px.
-document.addEventListener("pointerover", (e) => {
-  const b = e.target.closest("button");
-  if (!b || b.disabled || b.matches(".side .nv, .location-remove")) return;
-  b.style.setProperty("--hover-x", 1 + 2 / Math.max(1, b.offsetWidth));
-  b.style.setProperty("--hover-y", 1 + 2 / Math.max(1, b.offsetHeight));
-});
 document.addEventListener("keydown", (e) => {
   if (e.target.closest?.("#terminal-screen")) return;
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "r") {

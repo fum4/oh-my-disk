@@ -2457,20 +2457,16 @@ select,
 }
 button {
   transition:
-    transform 140ms ease,
+    outline-color 140ms ease,
     background-color 140ms ease,
     color 140ms ease,
     box-shadow 140ms ease;
-  transform-origin: center;
 }
-button:not(:disabled):not(.nv):not(.location-remove):hover {
-  transform: scale(var(--hover-x, 1.02), var(--hover-y, 1.06));
-}
-button:not(:disabled):active {
-  transform: scale(1);
-}
-button:disabled:hover {
-  transform: none;
+/* Grow only the painted edge; labels, icons, and layout stay unchanged.
+   Keyboard focus retains the stronger focus-visible outline above. */
+button:not(:disabled):not(.nv):not(.location-remove):not(:focus-visible):hover {
+  outline: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  outline-offset: 0;
 }
 .link,
 footer button {
@@ -3298,6 +3294,18 @@ body:has(#welcome:not([hidden])) footer { visibility: hidden; }
   height: 28px;
   display: grid;
   place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+#dismiss-access:hover,
+#dismiss-access:focus-visible {
+  background: color-mix(in srgb, var(--banner-color) 12%, transparent);
+}
+#dismiss-access:not(:focus-visible):hover {
+  outline: none;
 }
 
 /* Round 5: one quiet agent control and a terminal surface of its own. */

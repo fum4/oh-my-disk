@@ -105,6 +105,11 @@
       definitions = app ? await app.Agents() : await (await fetch("/api/agents")).json();
       for (const d of definitions) names[d.name] = d.label;
       if (app) installed = Object.fromEntries(definitions.map(c => [c.name, c.path]));
+      // A removed CLI falls back to a plain scan, even if installed again later.
+      if (choice && !installed[choice]) {
+        choice = "";
+        try { localStorage.setItem("omd-agent-choice", ""); } catch {}
+      }
       if (!detected) {
         showNudge = !!app && !definitions.some(d => installed[d.name]) && !dismissed();
         detected = true;

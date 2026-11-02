@@ -13,7 +13,7 @@ const wait = async (fn) => {
 };
 (async () => {
   const registry = await (await fetch(new URL("/api/agents", url), { headers: { Cookie: "omd=" + token } })).json();
-  let available = process.argv.includes("--remembered"),
+  let available = ["--remembered", "--remembered-none", "--fresh-installed"].some(flag => process.argv.includes(flag)),
     launched = [],
     trashCalls = 0,
     closed = 0,
@@ -46,6 +46,7 @@ const wait = async (fn) => {
           w.localStorage.setItem("omd-agent-choice", "claude");
           w.localStorage.setItem("omd-agent-tip-dismissed", "1");
         }
+        if (process.argv.includes("--remembered-none")) w.localStorage.setItem("omd-agent-choice", "");
         w.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
         w.HTMLDialogElement.prototype.close = function () { this.open = false; };
         w.fetch = (path, options = {}) => {
@@ -160,12 +161,32 @@ const wait = async (fn) => {
   if (process.argv.includes("--remembered") || process.argv.includes("--missing-remembered")) {
     assert.equal($("agent-choice").textContent, available ? "Claude" : "None");
     assert.equal($("agent-tip").hidden, true);
-    assert.equal(w.localStorage.getItem("omd-agent-choice"), "claude");
+    assert.equal(w.localStorage.getItem("omd-agent-choice"), available ? "claude" : "");
+    if (!available) {
+      available = true;
+      await $("agent-check").onclick();
+      assert.equal($("agent-choice").textContent, "None");
+    }
     w.close();
     console.log("PASS: remembered choice, unavailable fallback, once-only nudge, pre-scan visibility on every page.");
     return;
   }
   assert.equal($("agent-choice").textContent, "None");
+  if (process.argv.includes("--fresh-installed") || process.argv.includes("--remembered-none")) {
+    assert.ok(option("Claude"));
+    assert.equal(option("None").getAttribute("aria-pressed"), "true");
+    await $("plain-scan").onclick();
+    state.busy = false;
+    state.hasScan = true;
+    state.phase = "Complete";
+    state.revision = 1;
+    await wait(() => !$("plain-scan").disabled);
+    assert.equal(launched.length, 0);
+    assert.equal($("agent-choice").textContent, "None");
+    w.close();
+    console.log("PASS: fresh/remembered None stays a plain scan with an installed agent.");
+    return;
+  }
 
   assert.equal(w.document.querySelectorAll(".launch-card").length, 1);
   assert.equal(option("Claude"), undefined);
@@ -269,6 +290,7 @@ const wait = async (fn) => {
   assert.ok(closed >= 2);
   // None scans without launching, even when a CLI is installed.
   option("None").click();
+  assert.equal(w.localStorage.getItem("omd-agent-choice"), "");
   await $("hub-scan").onclick();
   await wait(() => $("plain-scan").disabled);
   state.busy = false;
