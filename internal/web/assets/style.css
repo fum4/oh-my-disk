@@ -2691,7 +2691,8 @@ body:has(#welcome:not([hidden])) #toolbar-choose {
   place-items: center;
   width: 28px;
   height: 28px;
-  font-size: 20px;
+  font-size: 25px;
+  line-height: 1;
 }
 .target-chip {
   display: flex;
@@ -2820,7 +2821,8 @@ body:has(#welcome:not([hidden])) #toolbar-choose {
   border-radius: 6px;
   opacity: 0;
   pointer-events: none;
-  font-size: 18px;
+  font-size: 23px;
+  line-height: 1;
   color: var(--label-2);
 }
 .location-row:hover .location-remove,
@@ -3270,6 +3272,7 @@ body:has(#welcome:not([hidden])) footer { visibility: hidden; }
   border: 0;
   background: transparent;
   cursor: pointer;
+  font-size: 16px;
   line-height: 1;
 }
 #dismiss-access:hover,
