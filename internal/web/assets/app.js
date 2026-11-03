@@ -840,7 +840,12 @@ function updateSortHeaders(selector, key, asc) {
     if (!button.dataset.label) button.dataset.label = button.textContent.replace(/ [↕▴▾]$/, "");
     const active = (button.dataset.sort || button.dataset.cleanupSort) === key;
     button.replaceChildren(document.createTextNode(button.dataset.label));
-    if (active) button.append(dom("span", "sort-chevron", asc ? "▴" : "▾"));
+    if (active) {
+      const chevron = icon("regular-caret-down");
+      chevron.classList.add("sort-chevron");
+      chevron.classList.toggle("asc", asc);
+      button.append(chevron);
+    }
     button.closest("th").setAttribute("aria-sort", active ? (asc ? "ascending" : "descending") : "none");
   }
 }

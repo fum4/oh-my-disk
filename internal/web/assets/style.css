@@ -3899,8 +3899,8 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #scan-options #desktop.legacy-target { display: none; }
 #scan-agent-link, #remembered-overview { align-self: flex-start; }
 #agent-empty { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; gap: 16px; }
-#agent-start { position: static; align-self: center; margin: 0; padding: 6px 12px; min-height: 30px; background: transparent; box-shadow: none; color: var(--label-2); font-size: var(--fs-12); }
-#agent-start:hover { color: var(--label); background: var(--fill); }
+/* A normal primary button; it stays positioned so its hover paint can't spill onto the pane. */
+#agent-start { position: relative; align-self: center; margin: 0; }
 .scan-command-bar { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .scan-command-bar #folder-picker { min-width: 0; flex: 1 1 auto; }
 .scan-command-bar #folder-picker summary { min-width: 0; }
@@ -4202,3 +4202,9 @@ body.agent-page-active :is(#agent-empty, #agent-terminal) { order: 3; }
 .is-scanning #scan-strip #progress { font-size: var(--fs-15); white-space: normal; }
 .is-scanning #scan-strip #scan-path { flex: none; width: auto; display: block; }
 .is-scanning #scan-strip #cancel-scan { margin-top: 8px; }
+
+/* Sort chevrons: the icon family's caret at 12px, centred with the label, 4px gap (the pill's flex gap). */
+th button svg.sort-chevron, :is(.cleanup-head, .files-panel) th button svg.sort-chevron { width: 12px; height: 12px; flex: none; color: currentColor; font-size: 12px; }
+:is(.cleanup-head, .files-panel) th button svg.sort-chevron.asc { transform: rotate(180deg); }
+th:is([aria-sort="ascending"], [aria-sort="descending"]) button { color: color-mix(in srgb, var(--label) 55%, var(--label-2)); }
+th:is([aria-sort="ascending"], [aria-sort="descending"]) button:hover { color: var(--label); }
