@@ -31,6 +31,8 @@
   --card: #ffffff;
   --fill: #f0f0f3;
   --fill-2: #e8e8ed;
+  --sidebar-active: rgba(18, 22, 38, 0.08);
+  --sidebar-hover: rgba(18, 22, 38, 0.045);
   --hair: rgba(18, 22, 38, 0.08);
   --hair-2: rgba(18, 22, 38, 0.12);
   --label: #1d1d1f;
@@ -796,7 +798,7 @@ button:hover {
   text-align: left;
 }
 .nv.active {
-  background: rgba(18, 22, 38, 0.08);
+  background: var(--sidebar-active);
   font-weight: 600;
 }
 .main-content {
@@ -1606,6 +1608,8 @@ dialog pre {
     --card: #292a2e;
     --fill: #333439;
     --fill-2: #3e3f45;
+    --sidebar-active: rgba(255, 255, 255, 0.07);
+    --sidebar-hover: rgba(255, 255, 255, 0.045);
     --hair: rgba(230, 234, 255, 0.08);
     --hair-2: rgba(230, 234, 255, 0.15);
     --label: #eeeef1;
@@ -1631,7 +1635,7 @@ dialog pre {
     background: rgba(37, 39, 46, 0.72);
   }
   .nv.active {
-    background: #ffffff12;
+    background: var(--sidebar-active);
   }
   .vol {
     background: #ffffff08;
@@ -2755,7 +2759,7 @@ body:has(#welcome:not([hidden])) #hub-scan {
   flex: none;
 }
 .location-open {
-  padding-right: 32px;
+  padding-right: 26px;
 }
 .location-name {
   overflow: hidden;
@@ -2764,17 +2768,19 @@ body:has(#welcome:not([hidden])) #hub-scan {
 }
 .location-remove {
   position: absolute;
-  right: 4px;
+  right: 8px;
   top: 50%;
   translate: 0 -50%;
-  width: 24px;
-  height: 24px;
+  width: 14px;
+  height: 14px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 3px;
+  padding: 0;
+  background: transparent;
   opacity: 0;
   pointer-events: none;
-  font-size: 23px;
+  font-size: 11px;
   line-height: 1;
   color: var(--label-2);
 }
@@ -3142,13 +3148,16 @@ body:has(#welcome:not([hidden])) footer { visibility: hidden; }
 #scan-another { margin-top: 3px; }
 .side .nv:hover,
 .location-remove:hover { transform: none; }
+.side .nv:not(.active):not(.location-open):hover,
+.side .nv:not(.active):not(.location-open):focus-visible { background: var(--sidebar-hover); }
+.side .nv.active:hover { background: var(--sidebar-active); }
 .location-row { border-radius: var(--r-ctl); }
 .location-row:hover,
-.location-row:focus-within { background: var(--fill); }
+.location-row:focus-within { background: var(--sidebar-hover); }
 .location-row:hover .location-open,
 .location-row:focus-within .location-open { background: transparent; }
 .location-remove:hover {
-  background: color-mix(in srgb, var(--fill) 88%, white);
+  background: var(--sidebar-active);
 }
 #welcome {
   min-width: 0;
@@ -3455,7 +3464,8 @@ button:not(:disabled):hover::before, summary:hover::before { inset: -1px; }
 :is(.fr, .nv, .agent-option, .item-name, th button)::before { content: none; }
 .btn.sec, .btn.pri, .btn.dan, #agent-terminal .terminal-heading .btn { box-shadow: none; }
 .location-remove { display: flex; align-items: center; justify-content: center; line-height: 1; }
-.location-remove .i { display: block; width: 22px; height: 22px; }
+.location-remove .i { display: block; width: 11px; height: 11px; }
+.location-remove::before { content: none; }
 /* The SVG and its overlay always share the same actual box, including small windows. */
 .rc { transform: none; width: 180px; height: 180px; margin: 0 auto; flex: none; }
 #ringsvg { display: block; width: 100%; height: 100%; }
@@ -3513,10 +3523,17 @@ button:not(:disabled):hover::before, summary:hover::before { inset: -1px; }
 body:has(#welcome:not([hidden])) .scan-split,
 .is-scanning :is(.scan-split, #scan-options) { display: none; }
 @media (min-width: 701px) and (max-width: 1350px) {
-  .ring { grid-template-columns: 1fr; gap: 8px; }
+  /* Keep the disk summary beside the chart so folder rows retain their height. */
+  .ring { grid-template-columns: 150px minmax(0, 1fr); gap: 16px; }
+  .lg .li { padding: 6px 0; }
+  .lg .d { display: none; }
   .rc { width: 150px; height: 150px; }
   .rc .v { font-size: 23px; }
   .rc .pill { font-size: 10px; height: 19px; }
+}
+@media (min-width: 701px) and (max-width: 1150px) {
+  .ring { grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
+  .rc { width: 120px; height: 120px; }
 }
 @media (max-height: 760px) {
   .ring { display: flex; gap: 12px; }
@@ -3752,7 +3769,6 @@ body.agent-page-active .main-content > :not(#agent-page) { display: none !import
 }
 
 .location-row { cursor: pointer; }
-.location-row:hover { background: var(--fill); }
 .is-scanning #scan-agent-link { display: none; }
 #session-picker summary[aria-disabled="true"] { opacity: .5; cursor: default; }
 

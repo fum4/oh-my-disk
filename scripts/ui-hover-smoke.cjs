@@ -15,6 +15,7 @@ require("node:fs").mkdirSync(".build/screens", { recursive: true });
     const page = await browser.newPage();
     await page.goto(url);
     await page.waitForSelector("#overview-folders .fr");
+    await page.evaluate(() => document.fonts.ready);
     const geometry = locator => locator.evaluate(node => {
       const rect = element => {
         const r = element.getBoundingClientRect();
@@ -31,6 +32,45 @@ require("node:fs").mkdirSync(".build/screens", { recursive: true });
     });
     for (const theme of ["light", "dark"]) {
       await page.emulateMedia({ colorScheme: theme, reducedMotion: "reduce" });
+      // Round 12: quiet sidebar controls and usable folder-list space at laptop size.
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.locator("#access-banner").evaluate(node => { node.hidden = true; });
+      const location = page.locator(".location-row").first();
+      const remove = location.locator(".location-remove");
+      await page.mouse.move(0, 0);
+      const rowBefore = await location.boundingBox();
+      assert.equal(await remove.evaluate(n => getComputedStyle(n).opacity), "0");
+      await location.hover();
+      await page.waitForTimeout(180);
+      const removeBox = await remove.boundingBox();
+      assert.equal(removeBox.width, 14);
+      assert.equal(removeBox.height, 14);
+      assert.ok(Math.abs(removeBox.y + 7 - rowBefore.y - rowBefore.height / 2) < 1);
+      assert.equal(await remove.locator("svg").evaluate(n => n.getBoundingClientRect().width), 11);
+      assert.equal(await remove.evaluate(n => getComputedStyle(n).opacity), "1");
+      assert.equal(await remove.evaluate(n => getComputedStyle(n).backgroundColor), "rgba(0, 0, 0, 0)");
+      const locationHover = await location.evaluate(n => getComputedStyle(n).backgroundColor);
+      await page.locator("#folders").hover();
+      await page.waitForTimeout(180);
+      assert.equal(await page.locator("#folders").evaluate(n => getComputedStyle(n).backgroundColor), locationHover);
+      const active = await page.locator("#overview").evaluate(n => getComputedStyle(n).backgroundColor);
+      const channels = color => color.match(/[\d.]+/g).map(Number);
+      assert.deepEqual(channels(locationHover).slice(0, 3), channels(active).slice(0, 3));
+      assert.ok(channels(locationHover)[3] < channels(active)[3], "Active navigation remains distinct");
+      if (theme === "dark") assert.deepEqual(channels(locationHover).slice(0, 3), [255, 255, 255]);
+      await remove.focus();
+      assert.equal(await remove.evaluate(n => getComputedStyle(n).opacity), "1");
+      assert.deepEqual(await location.boundingBox(), rowBefore, "Sidebar row does not grow");
+      await remove.evaluate(n => n.blur());
+      const folderList = page.locator("#overview-folders");
+      const folderRow = await folderList.locator(".fr").first().boundingBox();
+      assert.ok((await folderList.boundingBox()).height >= folderRow.height * 3, "Laptop Overview shows at least three complete folder rows");
+      const heading = page.locator(".folder-card .ch");
+      const headingBefore = await heading.boundingBox();
+      await folderList.evaluate(n => { n.scrollTop = n.scrollHeight; });
+      assert.deepEqual(await heading.boundingBox(), headingBefore, "Only the folder list scrolls");
+      await folderList.evaluate(n => { n.scrollTop = 0; });
+      await page.screenshot({ path: `.build/screens/round12-${theme}-1280-overview.png` });
       for (const width of [1440, 900, 390]) {
         await page.setViewportSize({ width, height: 900 });
         await page.locator("#access-banner").evaluate(node => { node.hidden = false; });
@@ -130,6 +170,6 @@ require("node:fs").mkdirSync(".build/screens", { recursive: true });
         await page.screenshot({ path: `.build/screens/round7-${theme}-${width}-landing.png` });
       }
     }
-    console.log("PASS: transparent warning close, hover/focus fill, centered stable bounds; unchanged button text/icons; command bar height, fit, hover stability and keyboard focus across light/dark and three widths.");
+    console.log("PASS: compact sidebar remove, theme-adaptive navigation hover, laptop folder-list height; transparent warning close, hover/focus fill, centered stable bounds; unchanged button text/icons; command bar height, fit, hover stability and keyboard focus across light/dark and three widths.");
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exit(1); });
