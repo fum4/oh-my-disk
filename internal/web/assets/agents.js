@@ -141,14 +141,17 @@
     renderModel();
     mark("session-mark", sessionChoice);
     $("agent-running-dot").hidden = !sessionRunning;
-    $("terminal-close").disabled = !sessionRunning || opening;
+    // One top-right slot, like Scan/Rescan elsewhere: Start session while idle, Stop (and Restart) while a session runs.
+    const live = sessionRunning || opening;
+    $("terminal-close").hidden = !live;
+    $("terminal-close").disabled = opening;
+    $("terminal-restart").hidden = !sessionRunning;
     $("terminal-restart").disabled = !app || !installed[sessionChoice] || opening;
-    $("terminal-restart").hidden = !term;
     $("agent-empty").hidden = !!term;
     $("agent-nudge").textContent = ready ? "Your scan is ready. Ask what’s taking space or where to start." : "Start a session to talk with your agent.";
     $("agent-start").textContent = "Start session";
     $("agent-start").disabled = !app || !installed[sessionChoice] || opening;
-    $("agent-start").hidden = !ready;
+    $("agent-start").hidden = !ready || live;
     $("agent-desktop-hint").hidden = !!app;
     $("scan-agent-link").title = "Ask " + (names[sessionChoice || selected] || "your agent") + " about this scan";
     $("plain-scan").disabled = busy || opening;

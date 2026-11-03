@@ -773,13 +773,13 @@
           </div>
           <span id="terminal-status" role="status">Ready</span>
           <div class="sp"></div>
+          <button id="agent-start" class="btn pri" hidden>Start session</button>
           <button id="terminal-restart" class="btn ghost" aria-label="Restart session" title="Restart session"><svg class="i" aria-hidden="true"><use href="#regular-arrow-clockwise"/></svg><span class="agent-action-label">Restart session</span></button>
-          <button id="terminal-close" class="btn ghost" aria-label="Stop session" title="Stop session" disabled><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/></svg><span class="agent-action-label">Stop</span></button>
+          <button id="terminal-close" class="btn ghost" aria-label="Stop session" title="Stop session" hidden><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/></svg><span class="agent-action-label">Stop</span></button>
           <button id="terminal-copy" hidden>Copy</button><button id="terminal-paste" hidden>Paste</button>
         </div>
         <div id="agent-empty">
           <p id="agent-nudge">Scan first to give your agent a clear picture of your disk.</p>
-          <button id="agent-start" class="btn pri" hidden>Start session</button>
           <p id="agent-desktop-hint" hidden>Agent sessions are available in the desktop app.</p>
         </div>
         <section id="agent-terminal" aria-label="Agent terminal" hidden><div id="terminal-screen"></div></section>

@@ -3899,8 +3899,13 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #scan-options #desktop.legacy-target { display: none; }
 #scan-agent-link, #remembered-overview { align-self: flex-start; }
 #agent-empty { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; gap: 16px; }
-/* A normal primary button; it stays positioned so its hover paint can't spill onto the pane. */
-#agent-start { position: relative; align-self: center; margin: 0; }
+/* Start session sits in the established top-right slot (the Scan/Rescan split elsewhere): same
+   height, radius and right edge. It stays positioned so its hover paint can't spill onto the pane. */
+.agent-topbar #agent-start { position: relative; margin: 0; flex: none; height: var(--scan-control-height); min-height: var(--scan-control-height); padding: 0 16px; border-radius: var(--scan-control-radius); font-size: var(--fs-13); white-space: nowrap; }
+/* Stop and Restart share that slot's height while a session runs, so nothing shifts. */
+.agent-topbar :is(#terminal-close, #terminal-restart) { height: var(--scan-control-height); min-height: var(--scan-control-height); border-radius: var(--scan-control-radius); }
+.agent-topbar :is(#terminal-close, #terminal-restart)[hidden] { display: none; }
+@media (max-width: 700px) { .agent-topbar #agent-start { width: auto; min-width: 0; padding: 0 12px; } .agent-topbar :is(#terminal-close, #terminal-restart) { width: 36px; min-width: 36px; } }
 .scan-command-bar { max-width: 100%; min-width: 0; box-sizing: border-box; }
 .scan-command-bar #folder-picker { min-width: 0; flex: 1 1 auto; }
 .scan-command-bar #folder-picker summary { min-width: 0; }
