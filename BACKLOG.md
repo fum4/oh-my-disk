@@ -12,6 +12,8 @@
 - [ ] Explain what each "What you can clean" CLI command does.
 - [ ] "You could get back" banner: drop the "≥", and add more useful content because it feels too empty.
 - [ ] Finalize the app icon.
+- [ ] Calculate and show numbers consistently everywhere (e.g. a folder's disk share differs between charts and lists).
+- [ ] Categories: drill-down doesn't work (or isn't implemented).
 
 ## UI polish
 
@@ -23,3 +25,7 @@
 - [ ] Categories and Folders lists: the size bars are barely visible, and they disappear on hover.
 - [ ] Category map and Space map: move "Click to explore · center to go back" next to the left-side text.
 - [ ] Remove the divider between the header and the page content.
+- [ ] Use a folder icon for "Show in Finder" actions.
+- [ ] Give tabs more contrast.
+- [ ] Categories: remove "Current folder: All categories".
+- [ ] "How we counted" panel: align the "What's included" values (right-aligned) with the "What's skipped" values (left-aligned).
