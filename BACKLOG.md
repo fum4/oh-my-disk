@@ -8,7 +8,7 @@
 ## Distribution
 
 - [ ] Apple Developer ID signing and notarization: provision a Developer ID Application certificate and notarization credentials; sign the app and embedded CLI with hardened runtime and secure timestamp; notarize and staple the app/DMG; verify with Gatekeeper before publishing. Deferred by the owner on 2026-11-03. Until then the DMG is ad-hoc signed and macOS may warn on download.
-- [ ] Dedicated oh-my-disk product/docs page on nomadware.io (after the release catalogue integration).
+- [ ] After the first release is fully verified (Apple signing excluded), audit and update the GitHub README. Then design a shared, clean docs-page template for Waker and oh-my-disk with title, summary/use case and command reference. Present a visual proposal for owner feedback before implementation. Requested on 2026-11-03; no separate product/docs page ships during release integration.
 - [ ] Windows support: the scanner currently targets macOS/Linux; do not advertise Windows downloads yet.
 
 ## Product
@@ -23,6 +23,7 @@
 
 ## UI polish
 
+- [ ] After the Nomadware release integration ships: remove the app icon from the sidebar and enlarge the “oh-my-disk” sidebar heading. Keep the finalized Prism app/Dock icon unchanged. Requested by the owner on 2026-11-03.
 - [ ] Remove tooltips across the app.
 - [ ] Fix the glossy look of dropdowns.
 - [ ] "How we counted" panel: add a slide animation and rename it.

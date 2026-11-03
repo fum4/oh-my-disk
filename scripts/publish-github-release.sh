@@ -10,8 +10,6 @@ case ${1:-} in
   cat >"$notes" <<'NOTES'
 macOS desktop: download the universal DMG and drag oh-my-disk into Applications.
 
-Apple Developer ID signing and notarization are deferred. This build is ad-hoc signed and macOS may block opening it.
-
 CLI: macOS and Linux, Intel/AMD64 and ARM64. Native Trash support requires macOS.
 
 Downloads, signed checksums and CLI installer: https://releases.nomadware.io/#oh-my-disk
