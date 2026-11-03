@@ -28,4 +28,5 @@
 - [ ] Use a folder icon for "Show in Finder" actions.
 - [ ] Give tabs more contrast.
 - [ ] Categories: remove "Current folder: All categories".
+- [ ] "How we counted" panel: show the resize bar whenever the panel is hovered.
 - [ ] "How we counted" panel: align the "What's included" values (right-aligned) with the "What's skipped" values (left-aligned).
