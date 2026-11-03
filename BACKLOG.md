@@ -3,7 +3,13 @@
 ## Top priority
 
 1. **Releases and CI.** Fix deploys and releases, run tests in CI, and ship builds for macOS, Linux and Windows.
-2. **Publish to nomadware.io.** Host releases there and give oh-my-disk its own page.
+2. **Publish to nomadware.io.** Publish in the existing releases catalogue first; a dedicated page is deferred.
+
+## Distribution
+
+- [ ] Apple Developer ID signing and notarization: provision a Developer ID Application certificate and notarization credentials; sign the app and embedded CLI with hardened runtime and secure timestamp; notarize and staple the app/DMG; verify with Gatekeeper before publishing. Deferred by the owner on 2026-11-03. Until then the DMG is ad-hoc signed and macOS may warn on download.
+- [ ] Dedicated oh-my-disk product/docs page on nomadware.io (after the release catalogue integration).
+- [ ] Windows support: the scanner currently targets macOS/Linux; do not advertise Windows downloads yet.
 
 ## Product
 
@@ -11,7 +17,7 @@
 - [ ] Add more icons, categories, CLI commands and explanations where useful.
 - [ ] Explain what each "What you can clean" CLI command does.
 - [ ] "You could get back" banner: drop the "≥", and add more useful content because it feels too empty.
-- [ ] Finalize the app icon.
+- [x] Finalize the app icon (Prism storage blocks).
 - [ ] Calculate and show numbers consistently everywhere (e.g. a folder's disk share differs between charts and lists).
 - [ ] Categories: drill-down works but takes a very long time; make it fast.
 

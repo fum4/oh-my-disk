@@ -18,6 +18,7 @@ import (
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/rules"
 	"github.com/fum4/oh-my-disk/internal/scanner"
+	"github.com/fum4/oh-my-disk/internal/version"
 	"github.com/fum4/oh-my-disk/internal/web"
 )
 
@@ -53,6 +54,7 @@ Common options:
   --port N          UI port (default 0 = random localhost port)
   --binary          Display binary KiB/MiB/GiB instead of decimal units
   --no-open         Do not open a browser
+  --version         Show the installed release version
   --help            Show this help
 
 Scanning is read-only. Trash requires explicit user confirmation; no permanent
@@ -98,6 +100,10 @@ func normalize(args []string) []string {
 	return out
 }
 func run(args []string) error {
+	if len(args) == 1 && (args[0] == "--version" || args[0] == "version") {
+		fmt.Println("oh-my-disk " + version.Version)
+		return nil
+	}
 	if len(args) == 0 || args[0] == "--help" || args[0] == "help" {
 		fmt.Print(usage)
 		return nil

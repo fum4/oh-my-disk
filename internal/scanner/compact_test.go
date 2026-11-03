@@ -43,15 +43,28 @@ func TestCompactScannerEquivalence(t *testing.T) {
 		}
 		return err
 	})
-	// Directory atimes change during enumeration; preserve raw atimes by resetting
-	// the fixture between runs. Source file contents/modes/mtime remain untouched.
+	// Linux relatime updates old directory atimes during enumeration. Collect
+	// directories first, then set their atimes beyond the test duration so each
+	// scanner sees the same metadata without the reset walk changing it again.
+	var dirs []string
+	if err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			dirs = append(dirs, p)
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	atime := time.Now().Add(48 * time.Hour)
 	reset := func() {
-		filepath.WalkDir(root, func(p string, d os.DirEntry, e error) error {
-			if e == nil && d.IsDir() {
-				os.Chtimes(p, old, old)
+		for _, p := range dirs {
+			if err := os.Chtimes(p, atime, old); err != nil {
+				t.Fatal(err)
 			}
-			return e
-		})
+		}
 	}
 	var want []byte
 	for _, legacy := range []bool{true, false} {

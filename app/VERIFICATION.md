@@ -22,6 +22,8 @@ Passed:
   The last build occupies `build/bin/oh-my-disk.app`.
 - `file` confirms both architectures; `plutil -lint` validates the bundle plist;
   `codesign --verify --deep --strict` validates the local ad-hoc signature.
+- The selected app identity is the Prism storage-block icon. `make icon` regenerates
+  the 1024px PNG, macOS ICNS, and shared sidebar/favicon PNG from `scripts/icon.go`.
 - Bundle icon bytes match `build/darwin/icon.icns`. The original 1024px PNG was
   visually inspected. The build first attempts `iconutil`; this host rejected
   its dimension-checked iconset, so the portable PNG-based ICNS fallback was used.

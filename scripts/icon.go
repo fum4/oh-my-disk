@@ -1,6 +1,7 @@
 //go:build ignore
 
-// Original procedural artwork; no external assets. Run: go run scripts/icon.go
+// Prism: the selected storage-block identity for oh-my-disk.
+// Original procedural artwork. Run: go run scripts/icon.go
 package main
 
 import (
@@ -11,72 +12,78 @@ import (
 	"os"
 )
 
+type col struct{ r, g, b float64 }
+type tile struct {
+	x, y, w, h float64
+	c          col
+}
+
+func rounded(x, y, cx, cy, w, h, r float64) float64 {
+	dx, dy := math.Abs(x-cx)-(w/2-r), math.Abs(y-cy)-(h/2-r)
+	return math.Hypot(math.Max(dx, 0), math.Max(dy, 0)) + math.Min(math.Max(dx, dy), 0) - r
+}
 func main() {
-	const size = 1024
-	im := image.NewNRGBA(image.Rect(0, 0, size, size))
-	palette := []color.NRGBA{{212, 84, 97, 255}, {220, 120, 68, 255}, {209, 161, 57, 255}, {165, 175, 66, 255}, {87, 168, 107, 255}, {41, 158, 135, 255}, {48, 159, 185, 255}, {57, 124, 198, 255}, {101, 104, 188, 255}, {174, 86, 168, 255}, {203, 89, 139, 255}}
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
+	// Prism palette, in reading order: violet, turquoise, orange, blue, pink, lime, yellow.
+	tiles := []tile{
+		{164, 164, 420, 420, col{173, 119, 235}},
+		{602, 164, 258, 201, col{70, 205, 210}},
+		{602, 383, 258, 201, col{247, 170, 79}},
+		{164, 602, 258, 258, col{88, 145, 235}},
+		{440, 602, 244, 258, col{241, 115, 168}},
+		{702, 602, 158, 120, col{151, 213, 112}},
+		{702, 740, 158, 120, col{249, 211, 107}},
+	}
+	im := image.NewNRGBA(image.Rect(0, 0, 1024, 1024))
+	for y := 0; y < 1024; y++ {
+		for x := 0; x < 1024; x++ {
 			var rr, gg, bb, aa float64
-			for sy := 0; sy < 2; sy++ {
-				for sx := 0; sx < 2; sx++ {
-					px, py := float64(x)+float64(sx)/2, float64(y)+float64(sy)/2
-					dx, dy := math.Abs(px-512)-306, math.Abs(py-512)-306
-					distance := math.Hypot(math.Max(dx, 0), math.Max(dy, 0)) + math.Min(math.Max(dx, dy), 0) - 150
-					c := color.NRGBA{}
-					if distance < 0 {
-						t := py / 1024
-						c = color.NRGBA{uint8(28 - 14*t), uint8(29 - 14*t), uint8(34 - 16*t), 255}
-						r := math.Hypot(px-512, py-512)
-						angle := math.Atan2(py-512, px-512) + math.Pi
-						if r > 143 && r < 359 {
-							ring := int((r - 143) / 73)
-							segments := []int{7, 12, 18}[ring]
-							position := angle / (2 * math.Pi) * float64(segments)
-							if r-143-float64(ring)*73 > 5 && position-math.Floor(position) > .018 {
-								// Balanced mixed hues; no matching neighbours, including the seam.
-								order := [][]int{
-									{0, 5, 2, 7, 4, 9, 6},
-									{3, 8, 1, 5, 10, 6, 2, 9, 4, 7, 0, 5},
-									{6, 0, 4, 9, 2, 7, 5, 10, 3, 8, 1, 6, 4, 0, 9, 2, 7, 5},
-								}
-								c = palette[order[ring][int(position)]]
-								shade := 1 - float64(ring)*.045
-								c.R = uint8(float64(c.R) * shade)
-								c.G = uint8(float64(c.G) * shade)
-								c.B = uint8(float64(c.B) * shade)
+			for sy := 0; sy < 3; sy++ {
+				for sx := 0; sx < 3; sx++ {
+					px, py := float64(x)+float64(sx)/3, float64(y)+float64(sy)/3
+					d := rounded(px, py, 512, 512, 912, 912, 190)
+					if d >= 0 {
+						continue
+					}
+					t := py / 1024
+					c := col{42 - 16*t, 35 - 13*t, 65 - 22*t}
+					if d > -4 {
+						c = col{105, 90, 140}
+					}
+					for _, b := range tiles {
+						b.x = 512 + (b.x-512)*0.84
+						b.y = 512 + (b.y-512)*0.84
+						b.w *= 0.84
+						b.h *= 0.84
+						b.x += 7.5
+						b.y += 7.5
+						b.w -= 15
+						b.h -= 15
+						td := rounded(px, py, b.x+b.w/2, b.y+b.h/2, b.w, b.h, 26)
+						if td < 0 {
+							shade := 1.055 - .12*(py-b.y)/b.h
+							c = col{b.c.r * shade, b.c.g * shade, b.c.b * shade}
+							if td > -2 {
+								c = col{c.r + 10, c.g + 10, c.b + 10}
 							}
 						}
-						if r < 116 {
-							c = color.NRGBA{244, 244, 246, 255}
-						}
-						if r < 57 {
-							c = color.NRGBA{21, 22, 26, 255}
-						}
-						if math.Hypot(px-512, py-505) < 15 {
-							c = palette[5]
-						}
 					}
-					rr += float64(c.R) * float64(c.A) / 255
-					gg += float64(c.G) * float64(c.A) / 255
-					bb += float64(c.B) * float64(c.A) / 255
-					aa += float64(c.A)
+					rr += c.r
+					gg += c.g
+					bb += c.b
+					aa++
 				}
 			}
 			if aa > 0 {
-				im.SetNRGBA(x, y, color.NRGBA{uint8(rr * 255 / aa), uint8(gg * 255 / aa), uint8(bb * 255 / aa), uint8(aa / 4)})
+				im.SetNRGBA(x, y, color.NRGBA{uint8(math.Min(255, rr/aa)), uint8(math.Min(255, gg/aa)), uint8(math.Min(255, bb/aa)), uint8(255 * aa / 9)})
 			}
 		}
 	}
-	if err := os.MkdirAll("build", 0755); err != nil {
-		panic(err)
-	}
-	f, err := os.Create("build/appicon.png")
-	if err != nil {
-		panic(err)
+	f, e := os.Create("build/appicon.png")
+	if e != nil {
+		panic(e)
 	}
 	defer f.Close()
-	if err = png.Encode(f, im); err != nil {
-		panic(err)
+	if e = png.Encode(f, im); e != nil {
+		panic(e)
 	}
 }
