@@ -934,7 +934,9 @@ function renderCounting() {
   const skipped = s.skipped_count || s.scan.skipped.length;
   $("skipped").replaceChildren(noteRow("Paths", skipped ? "Some folders could not be read; totals are partial." : "All accessible paths were counted.", skipped.toLocaleString()));
   for (const p of s.scan.skipped.slice(0, 500)) {
-    const row = noteRow(p.path, p.reason);
+    const row = dom("div", "note-row skipped-row"), term = dom("span", "note-term ellipsized-path"), slash = p.path.lastIndexOf("/", p.path.length - 2);
+    term.append(dom("span", "path-prefix", p.path.slice(0, slash + 1)), dom("span", "path-tail", p.path.slice(slash + 1)));
+    row.append(term, dom("span", "note-copy", p.reason));
     row.title = p.path + " — " + p.reason;
     $("skipped").append(row);
   }
@@ -972,10 +974,9 @@ function loadSnapshot() {
       $("welcome").hidden = true;
       $("content-grid").hidden = false;
       renderCounting();
-      $("scan-status").textContent =
-        s.skipped_count || s.scan.skipped.length
-          ? `${s.skipped_count || s.scan.skipped.length} skipped paths · partial totals · local only`
-          : "Local scan · no data leaves this device";
+      const skippedPaths = s.skipped_count || s.scan.skipped.length;
+      $("scan-status").textContent = skippedPaths ? `${skippedPaths.toLocaleString()} skipped ${skippedPaths === 1 ? "path" : "paths"}` : "";
+      $("scan-status").hidden = !skippedPaths;
       selected.clear();
       updateSelection();
       for (const [id, values] of [
@@ -1512,6 +1513,17 @@ function renderOverview() {
   }
   if (!displayed.length)
     list.append(dom("p", "empty", "No folders in this scan."));
+  fitOverviewFolders();
+}
+// The Overview list ends on a whole row; anything beyond scrolls inside the list.
+function fitOverviewFolders() {
+  const list = $("overview-folders"), card = list.closest(".folder-card"), row = list.querySelector(".fr");
+  if (!row) return list.style.removeProperty("max-height");
+  list.style.removeProperty("max-height");
+  const ls = getComputedStyle(list), inner = parseFloat(ls.paddingTop) + parseFloat(ls.paddingBottom);
+  const avail = card.getBoundingClientRect().bottom - (parseFloat(getComputedStyle(card).paddingBottom) || 0) - list.getBoundingClientRect().top;
+  const step = row.getBoundingClientRect().height, height = Math.max(1, Math.floor((avail - inner) / step)) * step + inner;
+  if (step && height < list.scrollHeight) list.style.maxHeight = height + "px";
 }
 let feedbackKey = "", dismissedFeedback = "", feedbackTimer;
 function showFeedback(message, kind = "error") {
@@ -1736,6 +1748,14 @@ if (window.ResizeObserver) {
     cancelAnimationFrame(mapFrame);
     mapFrame = requestAnimationFrame(() => { if (snapshot && !$("explorer").hidden) render(); });
   }).observe(document.querySelector(".map-panel"));
+}
+
+if (window.ResizeObserver) new ResizeObserver(entries => {
+  $("scan-options").style.setProperty("--scan-split-width", entries[0].target.offsetWidth + "px");
+}).observe(document.querySelector("#scan-options .scan-split"));
+if (window.ResizeObserver) {
+  let fitFrame;
+  new ResizeObserver(() => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitOverviewFolders); }).observe(document.querySelector(".folder-card"));
 }
 
 if (window.ResizeObserver) new ResizeObserver(() => {

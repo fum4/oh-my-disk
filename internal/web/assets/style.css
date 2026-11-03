@@ -4002,3 +4002,41 @@ th button:hover { background: var(--fill); color: var(--label); }
 .growth-tooltip { display: block; }
 .growth-tooltip[hidden] { display: none; }
 #scan-feedback > .icon-action:hover { color: var(--label); background: var(--fill); }
+
+/* Round 15: div rows keep their hover paint out of flow, so ::before never takes a grid column. */
+.fr { isolation: isolate; }
+.fr::before { position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; background: inherit; }
+.fr .p, .fr .s { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.folder-card #overview-folders { flex: 0 1 auto; }
+/* Commands wrap inside their box; the copy button keeps the top-right corner. */
+.detail-command { align-items: flex-start; }
+.detail-command code, .command-prompt { padding-block: 5px; line-height: 18px; }
+.detail-command code { white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; }
+.command-prompt { flex: none; color: var(--command-prompt); }
+/* Cleanup details: left-aligned facts, the reveal icon sits right after the path. */
+.detail-facts dd, .detail-facts dd.num { text-align: left; }
+.detail-path > .ellipsized-path { flex: 0 1 auto; }
+.detail-path .item-actions .icon-action { width: 22px; height: 22px; min-height: 22px; border-radius: 6px; color: var(--label-2); }
+.detail-path .item-actions .icon-action .i { width: 13px; height: 13px; }
+.detail-path .item-actions .icon-action:hover { color: var(--label); background: var(--fill); }
+#scan-status[hidden] { display: none; }
+#skipped .skipped-row { grid-template-columns: minmax(0, 1fr) minmax(120px, 0.6fr); }
+#skipped .skipped-row .note-term { display: flex; min-width: 0; color: var(--label); font: 11px "JetBrains Mono", monospace; }
+#skipped .skipped-row .note-copy { color: var(--label-2); }
+/* Sortable headers: one ghost pill that wraps label and chevron; negative margins keep labels on the column edge. */
+:is(.cleanup-head, .files-panel) th button {
+  display: inline-flex; align-items: center; gap: 4px; width: auto; height: 24px; min-height: 24px;
+  padding: 0 8px; margin: 0 -8px; border-radius: 6px; line-height: 1; white-space: nowrap;
+}
+:is(.cleanup-head, .files-panel) th button .sort-chevron { position: static; transform: none; right: auto; }
+:is(.cleanup-head th.rt, .files-panel th:nth-child(n+3)) button { flex-direction: row-reverse; }
+/* How we counted: the panel spans the content width and joins the button tab. */
+footer, .main-content:has(#notes:not([hidden])) footer { position: relative; inset: auto; }
+#counting-disclosure { position: static; }
+#counting-disclosure .notes-reveal { left: 0; right: 0; width: auto; bottom: calc(100% - 1px); }
+#notes { inset: auto; width: 100%; max-height: min(400px, 55vh); border-radius: 12px 12px 12px 0; }
+/* Muted prompt token: AA on the command box in both themes. */
+:root { --command-prompt: #5c5d65; }
+@media (prefers-color-scheme: dark) { :root { --command-prompt: #a1a2ad; } }
+/* Rescan progress stops one toolbar gap before the Rescan split button, whatever its width. */
+#scan-options #scan-strip { right: calc(var(--scan-split-width, 146px) + 12px); }

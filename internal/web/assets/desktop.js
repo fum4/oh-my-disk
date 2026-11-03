@@ -44,7 +44,7 @@ function itemActions(path) {
     };
     group.append(b);
   };
-  action("Show in Finder", () => nativeApp.Reveal(path), "regular-eye");
+  action("Show in Finder", () => nativeApp.Reveal(path), "regular-arrow-square-out");
   action("Copy path", () => nativeApp.Copy(path), "regular-copy");
   return group;
 }
