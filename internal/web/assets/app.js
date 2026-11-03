@@ -677,6 +677,47 @@ function itemIcon(name) {
                       : "folder";
 }
 let suggestionsShown = 100;
+// Tool-owned prune/clean commands the desktop backend will run (exact allowlist from Go).
+let runnableCleanups = new Set();
+window.go?.main?.App?.CleanupCommands?.().then(list => {
+  runnableCleanups = new Set(list || []);
+  if (snapshot && runnableCleanups.size) renderSuggestions();
+}).catch(() => {});
+let cleanupRunning = false;
+function cleanupRunButton(s, card) {
+  const run = dom("button", "icon-action command-run");
+  const idle = () => { run.disabled = cleanupRunning; run.classList.remove("running"); run.removeAttribute("aria-busy"); run.title = "Run " + s.suggested_command; run.setAttribute("aria-label", run.title); run.replaceChildren(icon("regular-play")); };
+  idle();
+  run.onclick = async e => {
+    e.stopPropagation();
+    if (cleanupRunning) return;
+    cleanupRunning = true;
+    document.querySelectorAll(".command-run").forEach(b => { b.disabled = true; });
+    run.classList.add("running"); run.setAttribute("aria-busy", "true");
+    run.title = "Running " + s.suggested_command + "…"; run.setAttribute("aria-label", run.title);
+    run.replaceChildren(dom("span", "run-spinner"));
+    try {
+      const r = await window.go.main.App.RunCleanup(s.suggested_command, s.path);
+      const size = card.querySelector(".suggestion-size");
+      if (r?.measured) {
+        const freed = Math.max(0, r.before - r.after);
+        s.bytes = r.after;
+        if (size) { size.textContent = fmt(r.after); size.title = "Measured after cleanup"; }
+        showToast(freed > 0 ? `${s.suggested_command} freed ${fmt(freed)}` : `${s.suggested_command} finished · nothing to free`);
+      } else {
+        if (size) { size.classList.add("stale"); size.title = "Size before cleanup; rescan to refresh"; }
+        showToast(`${s.suggested_command} finished`);
+      }
+    } catch (err) {
+      showToast(String(err?.message || err).slice(-280), "", "error");
+    } finally {
+      cleanupRunning = false;
+      document.querySelectorAll(".command-run").forEach(b => { b.disabled = false; });
+      idle();
+    }
+  };
+  return run;
+}
 function renderSuggestions() {
   const list = $("suggestion-list");
   list.replaceChildren();
@@ -743,7 +784,9 @@ function renderSuggestions() {
           setTimeout(() => { copy.replaceChildren(icon("regular-copy")); copy.title = "Copy suggested command"; copy.setAttribute("aria-label", copy.title); }, 1600);
         } catch (e) { showFeedback(String(e)); }
       };
-      terminal.append(dom("span", "command-prompt", "$"), dom("code", "", s.suggested_command), copy);
+      terminal.append(dom("span", "command-prompt", "$"), dom("code", "", s.suggested_command));
+      if (runnableCleanups.has(s.suggested_command) && window.go?.main?.App?.RunCleanup) terminal.append(cleanupRunButton(s, card));
+      terminal.append(copy);
       details.append(terminal);
     }
     title.append(
@@ -1587,11 +1630,11 @@ function showFeedback(message, kind = "error") {
   if (kind !== "error") feedbackTimer = setTimeout(() => { dismissedFeedback = key; showFeedback(""); }, 6000);
 }
 // Quiet bottom-right confirmations for finished exports; errors keep the banner.
-function showToast(message, path = "") {
+function showToast(message, path = "", kind = "success") {
   let stack = $("toasts");
   if (!stack) { stack = dom("div"); stack.id = "toasts"; stack.setAttribute("role", "status"); stack.setAttribute("aria-live", "polite"); document.body.append(stack); }
-  const toast = dom("div", "toast");
-  toast.append(icon("fill-check-circle"), dom("span", "toast-copy", message));
+  const toast = dom("div", kind === "error" ? "toast toast-error" : "toast");
+  toast.append(icon(kind === "error" ? "fill-warning-circle" : "fill-check-circle"), dom("span", "toast-copy", message));
   toast.querySelector(".toast-copy").title = path || message;
   const app = window.go?.main?.App;
   if (path?.startsWith("/") && app?.Reveal) {

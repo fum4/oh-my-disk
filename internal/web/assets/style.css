@@ -4220,6 +4220,18 @@ th button svg.sort-chevron, :is(.cleanup-head, .files-panel) th button svg.sort-
 th:is([aria-sort="ascending"], [aria-sort="descending"]) button { color: color-mix(in srgb, var(--label) 55%, var(--label-2)); }
 th:is([aria-sort="ascending"], [aria-sort="descending"]) button:hover { color: var(--label); }
 
+/* Run a tool-owned cleanup: a green play next to Copy, same size and hover as Copy. */
+.detail-command .command-run { color: var(--green); }
+.detail-command .command-run:hover:not(:disabled) { color: var(--green); background: var(--fill); }
+.detail-command .command-run:disabled { opacity: .45; cursor: default; }
+.detail-command .command-run.running { opacity: 1; }
+.run-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--green) 28%, transparent); border-top-color: var(--green); animation: spin .8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .run-spinner { animation: run-pulse 1.6s ease-in-out infinite !important; border-color: var(--green); } }
+@keyframes run-pulse { 50% { opacity: .35; } }
+.suggestion-size.stale { color: var(--label-3); }
+.toast-error > .i { color: var(--red); }
+.toast-error .toast-copy { white-space: normal; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow-wrap: anywhere; font-family: var(--mono, ui-monospace, monospace); font-size: var(--fs-12); }
+
 /* App name above the nav, below the macOS window buttons (hidden-inset title bar). The row
    stays a window drag handle; it replaces 28px of the old top padding so the nav moves
    down only by what the name needs. */

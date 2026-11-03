@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fum4/oh-my-disk/internal/cleanup"
 	"github.com/fum4/oh-my-disk/internal/memlimit"
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/rules"
@@ -45,6 +46,7 @@ type App struct {
 	agentMu  sync.Mutex
 	terminal *agentSession
 	status   Status
+	cleanMu  sync.Mutex
 }
 
 func main() {
@@ -237,6 +239,60 @@ func (a *App) Reveal(path string) error {
 	}
 	return exec.Command("/usr/bin/open", "-R", path).Run()
 }
+
+// CleanupCommands lists the suggested commands the UI may offer to run.
+func (a *App) CleanupCommands() []string { return cleanup.Commands() }
+
+// CleanupRun reports one cleanup and the item's size before and after it.
+type CleanupRun struct {
+	cleanup.Result
+	Path     string `json:"path"`
+	Before   int64  `json:"before"`
+	After    int64  `json:"after"`
+	Measured bool   `json:"measured"`
+}
+
+// RunCleanup runs an allowlisted cleanup command (fixed argv, no shell) and rescans
+// just the item's folder to report what it freed.
+func (a *App) RunCleanup(command, path string) (CleanupRun, error) {
+	run := CleanupRun{Path: path}
+	if _, ok := cleanup.Argv(command); !ok {
+		return run, fmt.Errorf("this command can't be run from oh-my-disk; copy it instead")
+	}
+	if !a.cleanMu.TryLock() {
+		return run, fmt.Errorf("another cleanup is still running")
+	}
+	defer a.cleanMu.Unlock()
+	before, measured := measure(a.ctx, path)
+	res, err := cleanup.Run(a.ctx, command)
+	run.Result = res
+	if err != nil {
+		return run, err
+	}
+	if after, ok := measure(a.ctx, path); ok && measured {
+		run.Before, run.After, run.Measured = before, after, true
+	}
+	return run, nil
+}
+
+// measure rescans one absolute folder; a folder the command removed counts as empty.
+func measure(ctx context.Context, path string) (int64, bool) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if !filepath.IsAbs(path) {
+		return 0, false
+	}
+	if _, err := os.Lstat(path); os.IsNotExist(err) {
+		return 0, true
+	}
+	scan, err := scanner.Scan(ctx, path, scanner.Options{Exclude: []string{filepath.Dir(report.CachePath())}})
+	if err != nil || scan.Root == nil {
+		return 0, false
+	}
+	return scan.Root.Bytes, true
+}
+
 func (a *App) Copy(text string) error { return wr.ClipboardSetText(a.ctx, text) }
 func (a *App) FullDiskAccess() error {
 	return exec.Command("/usr/bin/open", "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles").Run()

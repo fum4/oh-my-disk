@@ -76,3 +76,26 @@ func TestScanRejectsInvalidAndConcurrentRequests(t *testing.T) {
 		t.Fatal("accepted overlapping scan")
 	}
 }
+
+func TestRunCleanupRefusesUnlistedAndMeasures(t *testing.T) {
+	a := &App{}
+	if _, err := a.RunCleanup("rm -rf /", "/tmp"); err == nil {
+		t.Fatal("unlisted cleanup ran")
+	}
+	if len(a.CleanupCommands()) == 0 {
+		t.Fatal("no runnable cleanups")
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "blob"), make([]byte, 64<<10), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if n, ok := measure(context.Background(), dir); !ok || n <= 0 {
+		t.Fatalf("measure(dir) = %d %v", n, ok)
+	}
+	if n, ok := measure(context.Background(), filepath.Join(dir, "gone")); !ok || n != 0 {
+		t.Fatalf("measure(removed) = %d %v", n, ok)
+	}
+	if _, ok := measure(context.Background(), "relative"); ok {
+		t.Fatal("relative paths must not be measured")
+	}
+}
