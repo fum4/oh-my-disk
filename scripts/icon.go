@@ -14,7 +14,7 @@ import (
 func main() {
 	const size = 1024
 	im := image.NewNRGBA(image.Rect(0, 0, size, size))
-	palette := []color.NRGBA{{244, 244, 246, 255}, {190, 191, 198, 255}, {218, 219, 224, 255}, {138, 139, 147, 255}, {244, 244, 246, 255}, {190, 191, 198, 255}}
+	palette := []color.NRGBA{{212, 84, 97, 255}, {220, 120, 68, 255}, {209, 161, 57, 255}, {165, 175, 66, 255}, {87, 168, 107, 255}, {41, 158, 135, 255}, {48, 159, 185, 255}, {57, 124, 198, 255}, {101, 104, 188, 255}, {174, 86, 168, 255}, {203, 89, 139, 255}}
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
 			var rr, gg, bb, aa float64
@@ -34,8 +34,14 @@ func main() {
 							segments := []int{7, 12, 18}[ring]
 							position := angle / (2 * math.Pi) * float64(segments)
 							if r-143-float64(ring)*73 > 5 && position-math.Floor(position) > .018 {
-								c = palette[(int(position)+ring*2)%len(palette)]
-								shade := 1 - float64(ring)*.10
+								// Balanced mixed hues; no matching neighbours, including the seam.
+								order := [][]int{
+									{0, 5, 2, 7, 4, 9, 6},
+									{3, 8, 1, 5, 10, 6, 2, 9, 4, 7, 0, 5},
+									{6, 0, 4, 9, 2, 7, 5, 10, 3, 8, 1, 6, 4, 0, 9, 2, 7, 5},
+								}
+								c = palette[order[ring][int(position)]]
+								shade := 1 - float64(ring)*.045
 								c.R = uint8(float64(c.R) * shade)
 								c.G = uint8(float64(c.G) * shade)
 								c.B = uint8(float64(c.B) * shade)
@@ -45,10 +51,10 @@ func main() {
 							c = color.NRGBA{244, 244, 246, 255}
 						}
 						if r < 57 {
-							c = color.NRGBA{20, 21, 26, 255}
+							c = color.NRGBA{21, 22, 26, 255}
 						}
 						if math.Hypot(px-512, py-505) < 15 {
-							c = color.NRGBA{138, 139, 147, 255}
+							c = palette[5]
 						}
 					}
 					rr += float64(c.R) * float64(c.A) / 255
