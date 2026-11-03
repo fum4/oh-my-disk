@@ -68,7 +68,9 @@ const wait = async (fn) => {
     assert.equal(d.querySelectorAll("#children .filename").length, 200);
     more().click();
     await wait(() => d.querySelectorAll("#children .filename").length === 400);
-    await d.querySelector('[data-sort="name"]').onclick();
+    tableScroll.scrollTop = 100;
+  await d.querySelector('[data-sort="name"]').onclick();
+  assert.equal(tableScroll.scrollTop, 0, "Sorting resets table scroll");
     assert.equal(d.querySelectorAll("#children .filename").length, 200);
     assert(requests.at(-1).includes("sort=name"));
     $("categories").click();
@@ -101,7 +103,7 @@ const wait = async (fn) => {
   assert.equal($("explorer").hidden, true);
   assert.equal(d.querySelectorAll("#disk-legend .li").length, 4);
   assert.ok(d.querySelector("#ringsvg circle"));
-  assert.equal($("full-disk-access").textContent, "Open settings");
+  assert.equal($("full-disk-access").textContent, "Open Settings…");
   assert.equal(
     d.querySelector("[data-suggest-sort=score]").textContent.trim(),
     "Best",
@@ -165,10 +167,13 @@ const wait = async (fn) => {
   $("folders").click();
   assert.ok(d.querySelector("#chart canvas"));
   assert.equal($("overview-panel").hidden, true);
+  const tableScroll = d.querySelector(".table-scroll");
+  tableScroll.scrollTop = 100;
   const first = d.querySelector("#children .filename");
   first.click();
   await wait(() => $("folder-name").textContent === first.textContent);
   assert(requests.some((x) => x.startsWith("/api/node?")));
+  assert.equal(tableScroll.scrollTop, 0, "Folder navigation resets table scroll");
   d.querySelector("#breadcrumbs button").click();
   await wait(() => $("folder-name").textContent === "home");
   await d.querySelector('[data-sort="name"]').onclick();
@@ -176,7 +181,9 @@ const wait = async (fn) => {
   $("treemap").click();
   assert.ok(d.querySelector("#chart canvas"));
   assert.equal($("treemap").getAttribute("aria-pressed"), "true");
+  tableScroll.scrollTop = 100;
   $("categories").click();
+  assert.equal(tableScroll.scrollTop, 0, "Category context resets table scroll");
   assert.equal($("explorer").classList.contains("category-summary"), true);
   for (const label of d.querySelectorAll("#children .filename")) assert.match(label.textContent, /^[A-Z]/);
   const category = d.querySelector("#children .filename");
@@ -196,6 +203,8 @@ const wait = async (fn) => {
   assert.equal($("selection-bar").parentElement, $("suggestions"));
   $("trash-selected").click();
   assert.equal($("trash-confirm").open, true);
+  assert.equal($("trash-confirm").getAttribute("aria-labelledby"), "trash-title");
+  assert.equal($("trash-confirm").getAttribute("aria-describedby"), "confirm-total trash-summary");
   assert.ok($("confirm-paths").textContent.includes(".fixtures/home"));
   $("cancel-trash").click();
   assert.equal($("trash-confirm").open, false);

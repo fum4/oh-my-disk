@@ -64,8 +64,9 @@ function tooltip(e, n) {
     ),
   );
   t.hidden = false;
-  t.style.left = Math.max(8, Math.min(e.clientX + 15, innerWidth - 395)) + "px";
-  t.style.top = Math.max(8, Math.min(e.clientY + 15, innerHeight - 100)) + "px";
+  t.onpointerleave = () => { t.hidden = true; };
+  t.style.left = Math.max(8, Math.min(e.clientX + 15, innerWidth - t.getBoundingClientRect().width - 8)) + "px";
+  t.style.top = Math.max(8, Math.min(e.clientY + 15, innerHeight - t.getBoundingClientRect().height - 8)) + "px";
 }
 function chartTooltip(node, label, bytes) {
   const capacity = snapshot?.volume?.capacity;
@@ -108,6 +109,7 @@ async function navigate(n) {
     if (!n.synthetic || n.category_name) await loadChildren(n);
     if (version !== navigationVersion) return;
     current = n;
+    resetExplorerScroll();
     shown = 200;
     $("tooltip").hidden = true;
     render();
@@ -163,7 +165,7 @@ function canvasChart(w, h) {
     if (z) tooltip(e, z.node);
     else $("tooltip").hidden = true;
   };
-  canvas.onpointerleave = () => ($("tooltip").hidden = true);
+  canvas.onpointerleave = e => { if (!$("tooltip").contains(e.relatedTarget)) $("tooltip").hidden = true; };
   canvas.onclick = (e) => {
     const z = hit(e);
     if (z) navigate(z.node);
@@ -213,13 +215,13 @@ function sunburst() {
   ctx.textAlign = "center";
   ctx.fillStyle = theme.getPropertyValue("--label").trim() || "#1d1d1f";
   ctx.font = `500 ${Math.max(25, 15 * textScale)}px system-ui`;
-  ctx.fillText(fmt(current.bytes), 300, 300 - 10 * textScale, 228);
+  ctx.fillText(fmt(current.bytes), 300, 300 - 10 * textScale);
   const label = displayName(current) || "/";
-  ctx.fillStyle = theme.getPropertyValue("--label-2").trim();
+  ctx.fillStyle = theme.getPropertyValue("--label").trim();
   ctx.font = `${13 * textScale}px system-ui`;
   const maxChars = Math.max(8, Math.floor(228 / (7 * textScale)));
   ctx.fillText(label.length > maxChars ? label.slice(0, maxChars - 1) + "…" : label, 300, 300 + 13 * textScale);
-  ctx.font = `${11 * textScale}px system-ui`;
+  ctx.font = `${12 * textScale}px system-ui`;
   ctx.fillText(parents.has(current) ? "↑ Parent" : "Allocated", 300, 300 + 33 * textScale);
   return canvas;
 }
@@ -317,12 +319,13 @@ function treemap() {
         displayName(r.n).length > max
           ? displayName(r.n).slice(0, Math.max(1, max - 1)) + "…"
           : displayName(r.n);
-      const lightTile =
-        parseInt(palette[i % palette.length].slice(1, 3), 16) > 145;
-      ctx.fillStyle = lightTile ? "#080b10" : "#ffffff";
+      const theme = getComputedStyle(document.documentElement);
+      ctx.fillStyle = theme.getPropertyValue("--card").trim();
+      ctx.fillRect(r.x + 6 * textScale, r.y + 6 * textScale, r.w - 12 * textScale, 42 * textScale);
+      ctx.fillStyle = theme.getPropertyValue("--label").trim();
       ctx.font = `600 ${13 * textScale}px system-ui`;
       ctx.fillText(name, r.x + 12 * textScale, r.y + 23 * textScale);
-      ctx.fillStyle = lightTile ? "#151a22" : "#e5e9f0";
+      ctx.fillStyle = theme.getPropertyValue("--label").trim();
       ctx.font = `${12 * textScale}px system-ui`;
       ctx.fillText(fmt(r.n.bytes), r.x + 12 * textScale, r.y + 42 * textScale);
     }
@@ -368,7 +371,9 @@ function render() {
       const s = dom("span"),
         dot = dom("i", "dot");
       dot.style.background = palette[i % palette.length];
-      s.append(dot, document.createTextNode(displayName(c)));
+      const label = dom("b", "legend-label", displayName(c));
+      label.title = displayName(c);
+      s.append(dot, label);
       $("legend").append(s);
     });
   renderTable();
@@ -389,7 +394,7 @@ function renderTable() {
   for (const n of children.slice(0, shown)) {
     const tr = dom("tr"),
       name = dom("td"),
-      b = dom("button"),
+      b = dom(n.kind === "directory" || n.synthetic ? "button" : "span", "file-label"),
       dot = dom("i", "dot");
     dot.style.background =
       colors.get(n) || palette[children.indexOf(n) % palette.length];
@@ -403,10 +408,14 @@ function renderTable() {
       dom("span", "filename", displayName(n) + (n.kind === "symlink" ? " ↗" : "")),
     );
     b.title = n.category_name ? categoryLabel(n.category_name) : n.path;
-    b.addEventListener("click", e => { e.stopPropagation(); navigate(n); });
-    tr.classList.add("clickable-row");
-    tr.onclick = () => navigate(n);
-    name.append(selectionBox(n), b);
+    if (b.tagName === "BUTTON") {
+      b.addEventListener("click", e => { e.stopPropagation(); navigate(n); });
+      tr.classList.add("clickable-row");
+      tr.onclick = () => navigate(n);
+    }
+    const entry = dom("div", "file-entry");
+    entry.append(selectionBox(n), b);
+    name.append(entry);
     const bar = dom("div", "size-bar"),
       fill = dom("i");
     fill.style.width =
@@ -423,7 +432,7 @@ function renderTable() {
         ((n.bytes / Math.max(1, current.bytes)) * 100).toFixed(1) + "%",
       ),
       dom("td", "", fmt(n.bytes)),
-      dom("td", "", Number(n.files || 0).toLocaleString()),
+      dom("td", "", n.files == null || n.synthetic ? "—" : Number(n.files).toLocaleString()),
       dom(
         "td",
         "",
@@ -526,6 +535,7 @@ document.addEventListener("keydown", e => {
   if (document.querySelector("details[open]")) return;
   if (!$("overview-back").hidden) { e.preventDefault(); $("overview-back").click(); }
 });
+function resetExplorerScroll() { document.querySelector(".table-scroll").scrollTop = 0; }
 function showMode(next, fromOverview = false, historyNavigation = false) {
   if (next !== mode) {
     if (next !== "overview") restoreOverviewAfterFilter = false;
@@ -538,6 +548,7 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     document.querySelector("main").scrollTop = 0;
     $("content-grid").scrollTop = 0;
   }
+  if (next !== mode) resetExplorerScroll();
   mode = next;
   if (!document.body.classList.contains("is-scanning")) $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"), document.createTextNode(snapshot ? "Rescan" : "Scan"), dom("span", "kbd", "⌘R"));
@@ -631,6 +642,7 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
   if (mode === "cleanup-tab" || mode === "overview") return;
   root = mode === "categories" ? categoryTree() : snapshot.scan.root;
   current = root;
+  resetExplorerScroll();
   shown = 200;
   render();
 }
@@ -804,6 +816,7 @@ document.querySelectorAll("[data-sort]").forEach(
       try {
         await loadChildren(current);
         shown = 200;
+        resetExplorerScroll();
         render();
       } catch (e) {
         $("scan-info").textContent = e.message;
@@ -874,6 +887,7 @@ function loadSnapshot() {
     })
     .then(async (s) => {
       snapshot = s;
+      $("open-last").hidden = true;
       $("skipped").replaceChildren();
       renderVolume();
       index(s.scan.root);
@@ -1089,8 +1103,8 @@ $("confirm-trash").onclick = async () => {
       dom("span", "", moved.length ? `${fmt(bytes)} moved to Trash. Review more items or scan again.` : "No items moved. Review details and try again."), details);
     $("selection-bar").hidden = true;
   } catch (e) {
-    $("trash-results").className = "banner banner-error";
-    $("trash-results").textContent = String(e);
+    $("trash-results").replaceChildren();
+    showFeedback(String(e));
     $("selection-bar").hidden = selected.size === 0;
     $("trash-confirm").close();
   } finally {
@@ -1275,11 +1289,12 @@ function renderOverview() {
   $("nav-categories").textContent = Object.keys(snapshot.categories).length;
   $("nav-cleanup-tab").textContent = (lowerBound ? "≥ " : "") + fmt(reclaim);
   $("home-total").textContent = scan.name + ", " + fmt(scan.bytes);
+  const reclaimDisplay = reclaim > 0 && reclaim < 1e8 ? fmt(reclaim).split(" ") : [(reclaim / 1e9).toFixed(1), "GB"];
   $("reclaim-total").replaceChildren(
     document.createTextNode(
-      (lowerBound ? "≥ " : "") + (reclaim / 1e9).toFixed(1),
+      (lowerBound ? "≥ " : "") + reclaimDisplay[0],
     ),
-    dom("small", "", "GB"),
+    dom("small", "", reclaimDisplay[1]),
   );
   $("reclaim-total").title = lowerBound
     ? "At least this much among the top 100 suggestions; actual reclaimed space can differ."
@@ -1337,17 +1352,33 @@ function renderOverview() {
   if (!displayed.length)
     list.append(dom("p", "empty", "No folders in this scan."));
 }
+let feedbackKey = "", dismissedFeedback = "", feedbackTimer;
 function showFeedback(message, kind = "error") {
-  // Cache compatibility is an app concern, never a user-facing recovery flow.
-  if (/older cache format|older format|rescan with --refresh/i.test(message))
-    message = "";
-  $("scan-feedback").className = "banner banner-" + kind;
-  $("scan-feedback").hidden = !message;
-  $("scan-feedback").replaceChildren(
-    icon(kind === "info" ? "fill-info" : kind === "success" ? "fill-shield-check" : "fill-warning-circle"),
-    dom("span", "", message),
-  );
+  if (/older cache format|older format|rescan with --refresh/i.test(message)) message = "";
+  const key = kind + ":" + message;
+  if (message && (key === dismissedFeedback || key === feedbackKey)) return;
+  clearTimeout(feedbackTimer);
+  feedbackKey = message ? key : "";
+  const banner = $("scan-feedback");
+  banner.className = "banner banner-" + kind;
+  banner.hidden = !message;
+  banner.replaceChildren();
+  if (!message) return;
+  banner.append(icon(kind === "info" ? "fill-info" : kind === "success" ? "fill-shield-check" : "fill-warning-circle"), dom("span", "feedback-copy", message));
+  if (kind === "error" || /Scan canceled/.test(message)) {
+    const retry = dom("button", "link", "Try Again");
+    retry.onclick = () => { dismissedFeedback = ""; showFeedback(""); $("hub-scan").click(); };
+    const choose = dom("button", "link", "Choose Folder…");
+    choose.onclick = chooseScanFolder;
+    banner.append(retry, choose);
+  }
+  const close = dom("button", "icon-action", "×");
+  close.setAttribute("aria-label", "Dismiss status");
+  close.onclick = () => { dismissedFeedback = key; showFeedback(""); };
+  banner.append(close);
+  if (kind !== "error") feedbackTimer = setTimeout(() => { dismissedFeedback = key; showFeedback(""); }, 6000);
 }
+const scanProgressStrip = $("scan-strip");
 let scanTarget = "Home", scanCounterTimer, displayedEntries = 0, desiredEntries = 0;
 function scanningHeader() { $("scan-info").textContent = "Scanning " + scanTarget + "…"; }
 function updateScanProgress(state) {
@@ -1367,7 +1398,9 @@ function updateScanProgress(state) {
 function scanState(busy) {
   document.body.classList.toggle("is-scanning", busy);
   if (busy) {
+    (snapshot ? $("scan-options") : document.querySelector(".launch-card")).append(scanProgressStrip);
     toggleNotes(false);
+    dismissedFeedback = "";
     showFeedback("");
     scanTarget = window.scanTargetLabel?.() || $("folder-choice").textContent || "Home";
     $("scan-target").textContent = scanTarget;
@@ -1388,10 +1421,10 @@ function scanState(busy) {
   $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"),
     document.createTextNode(
-      busy ? "Scanning…" : snapshot ? "Rescan" : "Scan",
+      snapshot ? "Rescan" : "Scan",
     ),
   );
-  if (!busy) $("hub-scan").append(dom("span", "kbd", "⌘R"));
+  $("hub-scan").append(dom("span", "kbd", "⌘R"));
   $("scan-strip").hidden = !busy;
   window.agentViewChanged?.();
   if (busy) $("progress").textContent = "Walking folders…";
@@ -1543,3 +1576,8 @@ if (window.ResizeObserver) {
     mapFrame = requestAnimationFrame(() => { if (snapshot && !$("explorer").hidden) render(); });
   }).observe(document.querySelector(".map-panel"));
 }
+
+if (window.ResizeObserver) new ResizeObserver(() => {
+  const list = $("suggestion-list");
+  $("suggestions").style.setProperty("--cleanup-gutter", (list.offsetWidth - list.clientWidth) + "px");
+}).observe($("suggestion-list"));

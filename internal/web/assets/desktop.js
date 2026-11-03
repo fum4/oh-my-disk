@@ -75,6 +75,7 @@ if (nativeApp) {
   };
   function showResults() {
     opened = true;
+    $("open-last").hidden = true;
     window.selectScanTarget(
       snapshot.scan.root.path === home ? "home" : snapshot.scan.root.path,
     );
@@ -132,8 +133,10 @@ if (nativeApp) {
     nativeApp.Cancel().catch(reportError);
   };
   $("open-last").onclick = async () => {
-    await loadSnapshot();
-    if (snapshot) showResults();
+    try {
+      await loadSnapshot();
+      if (snapshot) showResults();
+    } catch (e) { reportError(e); }
   };
   $("full-disk-access").onclick = () =>
     nativeApp.FullDiskAccess().catch(reportError);
@@ -176,12 +179,13 @@ if (nativeApp) {
       $("scan-strip").hidden = !presentingScan;
       $("cancel-scan").hidden =
         !s.busy || s.phase === "Opening last cached scan";
-      $("open-last").hidden = !s.hasScan || opened;
+      $("open-last").hidden = !s.hasScan || opened || !!snapshot;
+      $("open-last").disabled = presentingScan;
       $("export-json").disabled = !s.hasScan;
       $("export-summary").disabled = !s.hasScan;
       updateScanProgress(s);
       if (s.error) reportError(s.error);
-      else if (!s.busy && /Cancel[le]+d/i.test(s.phase)) showFeedback("Scan cancelled. Choose a folder when you’re ready.", "info");
+      else if (!s.busy && /Cancel[le]+d/i.test(s.phase)) showFeedback("Scan canceled. Try again or choose a folder.", "info");
       $("access-banner").hidden = accessDismissed || !s.protected.length;
       if (s.revision !== revision && !loading) {
         if (opened || s.phase === "Complete") {

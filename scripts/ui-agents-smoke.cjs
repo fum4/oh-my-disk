@@ -225,7 +225,7 @@ const wait = async (fn) => {
   assert.equal($("folder-choice").textContent, "Home");
   assert.equal($("toolbar-choose"), null);
   assert.equal($("options-toggle"), null);
-  assert.equal($("scan-another").textContent.trim(), "Scan folder");
+  assert.equal($("scan-another").textContent.trim(), "Scan Folder…");
   const savedOptions = () => [...$("rescan-options").querySelectorAll("button")];
   assert.deepEqual(savedOptions().map(b => b.textContent), [...$("locations").querySelectorAll(".location-name")].map(b => b.textContent));
   savedOptions().find(b => b.textContent === "Macintosh HD").click();

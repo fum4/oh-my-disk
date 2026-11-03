@@ -188,7 +188,10 @@ const wait = async (fn) => {
   assert.equal($("choose-folder").hidden, false);
   assert.equal($("choose-folder").parentElement, $("scan-root").parentElement);
   $("folders").click(); // Safe before a snapshot has been opened.
+  assert.equal($("open-last").hidden, false);
+  assert.equal($("open-last").closest("[hidden]"), null, "Cached scan is reachable before results");
   await $("open-last").onclick();
+  assert.equal($("open-last").hidden, true, "Opening results hides cached action immediately");
   await wait(() => d.querySelector("#overview-folders .fr"));
   assert.equal($("ask-agent"), null);
   assert.equal($("agent-control").parentElement.id, "scan-agent-slot");
@@ -200,6 +203,14 @@ const wait = async (fn) => {
   state.error = "older cache format; rescan with --refresh";
   await new Promise((r) => setTimeout(r, 450));
   assert.equal($("scan-feedback").hidden, true);
+  state.error = "Fixture scan failed";
+  await wait(() => $("scan-feedback").textContent.includes(state.error));
+  assert.ok([...$("scan-feedback").querySelectorAll("button")].some(b => b.textContent === "Try Again"));
+  $("scan-feedback").querySelector('[aria-label="Dismiss status"]').click();
+  await new Promise(r => setTimeout(r, 850));
+  assert.equal($("scan-feedback").hidden, true, "Unchanged polled error stays dismissed");
+  state.error = "Different fixture error";
+  await wait(() => !$("scan-feedback").hidden);
   state.error = "";
   await $("choose-folder").onclick();
   assert.equal($("scan-root").value, "custom");
@@ -207,6 +218,8 @@ const wait = async (fn) => {
   await $("hub-scan").onclick();
   await wait(() => !$("cancel-scan").hidden);
   assert.equal($("hub-scan").disabled, true);
+  assert.match($("hub-scan").textContent, /^Rescan/);
+  assert.equal($("scan-strip").parentElement.id, "scan-options");
   assert.equal($("progress").textContent, "Walking folders…");
   assert.equal($("scan-target").textContent, "home");
   assert.equal($("scan-info").textContent, "Scanning home…");
@@ -224,6 +237,9 @@ const wait = async (fn) => {
   await $("cancel-scan").onclick();
   await wait(() => $("cancel-scan").hidden);
   assert.equal($("hub-scan").disabled, false);
+  state.phase = "Canceled";
+  await wait(() => $("scan-feedback").textContent.includes("Scan canceled"));
+  assert.equal($("scan-feedback").className, "banner banner-info");
   state.phase = "Complete";
   state.revision = 2;
   await wait(() => $("progress").textContent === "Complete");

@@ -436,7 +436,7 @@
         <div id="locations" role="list" aria-label="Favorite locations"></div>
         <button class="nv add" id="scan-another">
           <svg class="i" aria-hidden="true"><use href="#regular-plus" /></svg
-          >Scan folder
+          >Scan Folder…
         </button>
       </div>
       <div class="vol">
@@ -466,11 +466,11 @@
               <option value="home">Home</option>
               <option value="/">Macintosh HD</option>
               <option value="custom">Chosen folder</option>
-            </select><button id="choose-folder" class="link">Change folder…</button></div
+            </select><button id="choose-folder" class="link">Change Folder…</button></div
           >
           <span id="chosen-path"></span>
           <button id="start-scan" hidden>Scan</button
-          ><button id="open-last" class="link" hidden>Open last scan</button>
+          >
           <p id="desktop-error" role="alert"></p>
         </section>
         <section id="web-scan" hidden>
@@ -509,7 +509,7 @@
           <summary aria-label="Choose scan folder"><svg class="i command-chevron" aria-hidden="true"><use href="#regular-caret-down"/></svg></summary>
           <div class="agent-menu folder-menu">
             <div id="rescan-options" role="group" aria-label="Saved Locations"></div>
-            <button id="rescan-new" class="agent-option">New folder…</button>
+            <button id="rescan-new" class="agent-option">New Folder…</button>
           </div>
         </details>
         </div>
@@ -544,7 +544,7 @@
           Enable Full Disk Access, then reopen and scan again. You can explore
           partial results.
         </p>
-        <button id="full-disk-access" class="btn sec">Open settings</button>
+        <button id="full-disk-access" class="btn sec">Open Settings…</button>
         <button id="dismiss-access" class="icon-action" aria-label="Dismiss Full Disk Access warning" title="Dismiss warning">×</button>
       </aside>
       <section id="welcome" class="empty" hidden>
@@ -565,6 +565,7 @@
               <span class="command-divider" aria-hidden="true"></span>
               <button id="plain-scan" class="btn pri">Scan<span class="kbd">⌘R</span></button>
             </div>
+            <button id="open-last" class="link" hidden>Open Last Scan</button>
           </article>
         </div>
       </section>
@@ -713,7 +714,7 @@
                   <span class="eyebrow">Current folder</span>
                   <h2 id="folder-name">—</h2>
                 </div>
-                <span id="folder-size">—</span>
+                <span id="folder-size" class="num">—</span>
               </div>
               <div id="folder-actions"></div>
               <div class="table-scroll">
@@ -790,14 +791,14 @@
       <h2>End the running session?</h2><p id="agent-confirm-message">Switching agents ends the current conversation.</p>
       <div class="dialog-actions"><button id="agent-keep" class="btn sec">Keep session</button><button id="agent-replace" class="btn pri">End and continue</button></div>
     </dialog>
-    <dialog id="trash-confirm">
+    <dialog id="trash-confirm" aria-labelledby="trash-title" aria-describedby="confirm-total trash-summary">
       <div class="dialog-icon">
         <svg class="i" aria-hidden="true"><use href="#regular-trash" /></svg>
       </div>
-      <h2>Move to Trash?</h2>
+      <h2 id="trash-title">Move to Trash?</h2>
       <p id="confirm-total"></p>
       <pre id="confirm-paths"></pre>
-      <p>
+      <p id="trash-summary">
         You can restore these items from the Trash. Files are checked again
         before moving.
       </p>
