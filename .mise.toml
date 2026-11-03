@@ -1,0 +1,43 @@
+[tools]
+terraform = "1.17.1"
+
+[tasks.setup]
+description = "Install the pinned infrastructure toolchain (Go and Wails remain in Makefile)"
+run = "mise install"
+
+[tasks.tf]
+description = "Run Terraform with encrypted R2 state credentials and existing gh authentication"
+run = 'GITHUB_TOKEN="$(gh auth token)" || exit; export GITHUB_TOKEN; exec repo-secrets exec secrets/oh-my-disk-terraform-state.env.age -- env -u AWS_PROFILE -u AWS_DEFAULT_PROFILE -u AWS_SESSION_TOKEN AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_CONFIG_FILE=/dev/null terraform -chdir=infra/terraform "$@"'
+
+[tasks."tf:check"]
+description = "Check Terraform formatting and validate offline with the locked provider"
+env = { TF_DATA_DIR = ".terraform-check" }
+run = [
+  "terraform -chdir=infra/terraform fmt -check -recursive",
+  "terraform -chdir=infra/terraform init -backend=false -input=false -lockfile=readonly",
+  "terraform -chdir=infra/terraform validate -no-color",
+]
+
+[tasks."secrets:decrypt"]
+description = "Materialize file secrets and render generated env files"
+run = "repo-secrets decrypt"
+
+[tasks."secrets:clean"]
+description = "Remove materialized secrets"
+run = "repo-secrets clean"
+
+[tasks."secrets:encrypt"]
+description = "Re-encrypt file secrets from their plaintext"
+run = "repo-secrets encrypt"
+
+[tasks."secrets:render"]
+description = "Render env files from committed config and encrypted secrets"
+run = "repo-secrets render"
+
+[tasks."secrets:edit"]
+description = "Edit one encrypted secret in tmpfs"
+run = "repo-secrets edit"
+
+[tasks."secrets:check"]
+description = "Check manifest sources and recipients without decrypting"
+run = "repo-secrets check"

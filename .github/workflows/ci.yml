@@ -9,6 +9,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d
+      - name: Validate Terraform without state or credentials
+        run: mise run tf:check
+
   test:
     strategy:
       fail-fast: false
