@@ -396,7 +396,7 @@ const wait = async (fn) => {
   assert.deepEqual(errors, []);
   w.close();
   console.log(
-    "PASS: install states, detect on open, command-bar folder selection, scan-to-agent handoff, Agent page navigation keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, stop/reopen, cancelled scan never launches. Native terminal mocked.",
+    "PASS: install states, detect on open, command-bar folder selection, scan-to-agent handoff, Agents page navigation keeps polling, resize, control keys, UTF-8 output, bracketed paste, copy, stop/reopen, cancelled scan never launches. Native terminal mocked.",
   );
 })().catch((e) => {
   console.error(e);

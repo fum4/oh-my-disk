@@ -88,7 +88,7 @@ fs.mkdirSync(".build/screens", { recursive: true });
       await page.locator("#agent").click();
       await page.evaluate(() => {
         const main = document.querySelector("main"), agent = document.querySelector("#agent-page");
-        if (main.scrollHeight > main.clientHeight + 1 || agent.getBoundingClientRect().bottom > innerHeight) throw Error("Agent page exceeds the main panel");
+        if (main.scrollHeight > main.clientHeight + 1 || agent.getBoundingClientRect().bottom > innerHeight) throw Error("Agents page exceeds the main panel");
         if (getComputedStyle(document.querySelector("#scan-options")).display !== "none") throw Error("Results toolbar visible on Agent");
       });
       await shot(`${prefix}-agent`);

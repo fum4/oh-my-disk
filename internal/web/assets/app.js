@@ -559,7 +559,7 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
   if (!document.body.classList.contains("is-scanning")) $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"), document.createTextNode(snapshot ? "Rescan" : "Scan"), dom("span", "kbd", "⌘R"));
   $("scan-options").hidden = !snapshot;
-  // Before a scan the Agent page is the shared launch hero, like every other page;
+  // Before a scan the Agents page is the shared launch hero, like every other page;
   // the session view (header, selectors, terminal) appears once there is a scan.
   const agentPage = mode === "agent" && (!!snapshot || !!window.agentSessionActive?.());
   document.body.classList.toggle("agent-page-active", agentPage);

@@ -101,7 +101,7 @@ if (!url) throw Error("Usage: node scripts/ui-round14-smoke.cjs <fixture-ui-url>
   await page.evaluate(()=>showFeedback("Error: invalid path"));
   await page.getByRole("button",{name:"Dismiss status",exact:true}).click();
   assert.equal(await page.locator("#scan-feedback").isHidden(),true);
-  // Same command bar on the pre-scan Agent page, centered and fully in bounds.
+  // Same command bar on the pre-scan Agents page, centered and fully in bounds.
   await page.evaluate(()=>{snapshot=undefined;showMode("agent");});
   for(const width of [1440,900,600,390]) {
    await page.setViewportSize({width,height:800});
