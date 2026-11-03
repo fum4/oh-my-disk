@@ -12,8 +12,9 @@ $("dismiss-access").onclick = () => {
     localStorage.setItem(accessDismissalKey, "1");
   } catch (_) {}
 };
-function itemActions(path, command) {
+function itemActions(path) {
   const group = dom("div", "item-actions");
+  if (!path?.startsWith("/")) return group;
   const action = (label, fn, glyph) => {
     const b = dom(
       "button",
@@ -43,9 +44,8 @@ function itemActions(path, command) {
     };
     group.append(b);
   };
-  action("Reveal in Finder", () => nativeApp.Reveal(path), "regular-eye");
+  action("Show in Finder", () => nativeApp.Reveal(path), "regular-eye");
   action("Copy path", () => nativeApp.Copy(path), "regular-copy");
-  if (command) action("Copy suggested command", () => nativeApp.Copy(command));
   return group;
 }
 if (nativeApp) {

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/fum4/oh-my-disk/internal/remembered"
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/scanner"
 )
@@ -165,5 +166,56 @@ func TestRescanPublishesNewTree(t *testing.T) {
 	h.ServeHTTP(w, httptest.NewRequest("GET", "/api/scan", nil))
 	if w.Code != 200 || !strings.Contains(w.Body.String(), "new-file") || strings.Contains(w.Body.String(), `"path":"/old"`) {
 		t.Fatal("rescan did not replace tree", w.Code, w.Body.String())
+	}
+}
+
+func TestRememberedAPI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	path, err := remembered.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = remembered.Update(path, func(store *remembered.Store) {
+		store.Remember(remembered.Entry{Path: "/fixture/cache", Bytes: 10, Kind: "directory", Rule: "cache", TrashedAt: time.Now()})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	root := &scanner.Node{Path: "/fixture", Kind: "directory", Children: []*scanner.Node{{Path: "/fixture/cache", Name: "cache", Kind: "directory", Bytes: 30}}}
+	h := handler(&report.Snapshot{Scan: &scanner.Result{Root: root}}, "127.0.0.1:1234", "secret")
+	call := func(method, body, action string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, "http://127.0.0.1:1234/api/remembered", strings.NewReader(body))
+		r.AddCookie(&http.Cookie{Name: "omd", Value: "secret"})
+		r.Header.Set("Content-Type", "application/json")
+		r.Header.Set("X-OMD-Action", action)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	w := call("GET", "", "")
+	if w.Code != 200 || !strings.Contains(w.Body.String(), `"current_bytes":30`) || !strings.Contains(w.Body.String(), `"warning":true`) {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if w = call("POST", `{"forget_all":true}`, ""); w.Code != 403 {
+		t.Fatal("unauthenticated mutation", w.Code)
+	}
+	if w = call("POST", `{"paths":["/fixture/cache"]}`, "1"); w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	store, _ := remembered.Load(path)
+	if len(store.Items) != 0 {
+		t.Fatal("forget did not persist")
+	}
+	remembered.Update(path, func(store *remembered.Store) {
+		store.Remember(remembered.Entry{Path: "/fixture/a"})
+		store.Remember(remembered.Entry{Path: "/fixture/b"})
+	})
+	if w = call("POST", `{"forget_all":true}`, "1"); w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	store, _ = remembered.Load(path)
+	if len(store.Items) != 0 {
+		t.Fatal("forget all did not persist")
 	}
 }

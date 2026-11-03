@@ -43,7 +43,7 @@ func handler(s *report.Snapshot, host, token string) http.Handler {
 			http.Error(w, "invalid host", http.StatusForbidden)
 			return
 		}
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && (r.Method != http.MethodPost || (r.URL.Path != "/api/trash" && r.URL.Path != "/api/rescan")) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && (r.Method != http.MethodPost || (r.URL.Path != "/api/trash" && r.URL.Path != "/api/rescan" && r.URL.Path != "/api/remembered")) {
 			http.Error(w, "read-only", http.StatusMethodNotAllowed)
 			return
 		}

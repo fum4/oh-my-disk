@@ -458,7 +458,7 @@
 
       </div>
       <section id="scan-options" class="options-strip" aria-label="Scan and display settings" hidden>
-        <section id="desktop" hidden>
+        <section id="desktop" class="legacy-target" hidden>
           <div class="target-chip"
             ><svg class="i" aria-hidden="true">
               <use href="#regular-folder" /></svg
@@ -578,6 +578,7 @@
         </details>
       </div>
       <button id="scan-agent-link" class="link" hidden>Ask agent about this scan →</button>
+      <button id="remembered-overview" class="link" hidden></button>
       <div id="content-grid" class="grid">
         <section id="suggestions" class="card right">
           <div class="ch">
@@ -625,10 +626,15 @@
               </select></label
             >
           </div>
-          <div class="lh">
-            <span></span><span></span><span>Item</span><span>Safety</span
-            ><span class="rt">Score</span><span class="rt">Size</span>
-          </div>
+          <section id="remembered-card" class="banner-success" aria-label="Returning cleanup items" hidden></section>
+          <button id="manage-remembered-empty" class="link" hidden>Manage remembered</button>
+          <table class="cleanup-head" aria-label="Cleanup sort"><thead><tr class="lh">
+            <th aria-label="Selection"></th><th aria-label="Kind"></th>
+            <th><button data-cleanup-sort="name">Item</button></th>
+            <th><button data-cleanup-sort="safety">Safety</button></th>
+            <th class="rt"><button data-cleanup-sort="score">Score</button></th>
+            <th class="rt"><button data-cleanup-sort="size">Size</button></th>
+          </tr></thead></table>
           <div class="list" id="suggestion-list"></div>
           <div id="selection-bar" class="selbar" hidden>
             <div class="t">
@@ -721,12 +727,12 @@
                 <table>
                   <thead>
                     <tr>
-                      <th><button data-sort="name">Name ↕</button></th>
+                      <th><button data-sort="name">Name</button></th>
                       <th>Share</th>
-                      <th><button data-sort="bytes">Size ↕</button></th>
-                      <th><button data-sort="files">Files ↕</button></th>
+                      <th><button data-sort="bytes">Size</button></th>
+                      <th><button data-sort="files">Files</button></th>
                       <th>
-                        <button data-sort="modified">Modified ↕</button>
+                        <button data-sort="modified">Modified</button>
                       </th>
                     </tr>
                   </thead>
@@ -768,15 +774,16 @@
         <section id="agent-terminal" aria-label="Agent terminal" hidden><div id="terminal-screen"></div></section>
       </section>
       <footer>
-        <span id="scan-status">Local scan · no data leaves this device</span>
+        <div id="counting-slot"></div>
         <span>Allocated ≠ guaranteed reclaimable</span>
       </footer>
       <section id="counting-disclosure" aria-label="Scan accounting">
         <div class="counting-heading">
           <button class="link" id="details-toggle"></button>
-          <button id="notes-close" class="icon-action" aria-label="Close counting notes" hidden><svg class="i" aria-hidden="true"><use href="#regular-x"/></svg></button>
+          <span id="scan-status">Local scan · no data leaves this device</span>
         </div>
         <div class="notes-reveal"><aside id="notes" hidden>
+          <button id="notes-close" class="icon-action" aria-label="Close counting notes" hidden><svg class="i" aria-hidden="true"><use href="#regular-x"/></svg></button>
           <h3>What's included</h3>
           <div id="volume-values"></div>
           <div id="accounting"></div>
@@ -791,6 +798,11 @@
       <h2>End the running session?</h2><p id="agent-confirm-message">Switching agents ends the current conversation.</p>
       <div class="dialog-actions"><button id="agent-keep" class="btn sec">Keep session</button><button id="agent-replace" class="btn pri">End and continue</button></div>
     </dialog>
+    <dialog id="remembered-manager" aria-labelledby="remembered-title">
+      <h2 id="remembered-title">Remembered choices</h2>
+      <div id="remembered-paths"></div>
+      <div class="dialog-actions"><button id="forget-all" class="link">Forget all</button><button id="remembered-close" class="btn sec">Done</button></div>
+    </dialog>
     <dialog id="trash-confirm" aria-labelledby="trash-title" aria-describedby="confirm-total trash-summary">
       <div class="dialog-icon">
         <svg class="i" aria-hidden="true"><use href="#regular-trash" /></svg>
@@ -802,6 +814,7 @@
         You can restore these items from the Trash. Files are checked again
         before moving.
       </p>
+      <label class="remember-toggle"><input id="remember-choice" type="checkbox" checked> Remember this choice</label>
       <div class="dialog-actions">
         <button id="cancel-trash" class="btn sec">Cancel</button
         ><button id="confirm-trash" class="btn dan">

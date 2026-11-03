@@ -86,7 +86,12 @@ async function loadChildren(n, offset = 0) {
   if (offset) {
     n.children = [...(n.children || []), ...(data.children || [])];
     n.child_count = data.child_count;
-  } else Object.assign(n, data);
+  } else {
+    // Category API nodes carry filesystem-shaped data, but remain category views.
+    const category = n.category_name;
+    Object.assign(n, data);
+    if (category) { n.category_name = category; n.synthetic = true; }
+  }
   index(n, parents.get(n), colors.get(n));
   n.loaded = true;
 }
@@ -359,7 +364,7 @@ function render() {
   $("folder-name").textContent = displayName(current) || "/";
   $("folder-size").textContent = fmt(current.bytes);
   $("folder-actions").replaceChildren();
-  if (window.go?.main?.App && !current.synthetic)
+  if (window.go?.main?.App && realPath(current))
     $("folder-actions").append(itemActions(current.path));
   $("map-label").textContent =
     mode === "categories" ? "Category map" : "Space map";
@@ -380,6 +385,7 @@ function render() {
 }
 function renderTable() {
   $("explorer").classList.toggle("category-summary", mode === "categories" && current === root);
+  updateSortHeaders("[data-sort]", sortKey, sortAsc);
   const children = [...(current.children || [])];
   children.sort((a, b) => {
     let val;
@@ -423,7 +429,7 @@ function renderTable() {
     fill.style.background = dot.style.background;
     bar.append(fill);
     name.append(bar);
-    if (window.go?.main?.App) name.append(itemActions(n.path));
+    if (window.go?.main?.App && realPath(n)) name.append(itemActions(n.path));
     tr.append(
       name,
       dom(
@@ -645,6 +651,7 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
   resetExplorerScroll();
   shown = 200;
   render();
+  if ((root.child_count || 0) > (root.children || []).length && (sortKey !== "bytes" || sortAsc) && !root.synthetic) navigate(root);
 }
 function icon(name) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -703,26 +710,52 @@ function renderSuggestions() {
     name.setAttribute("aria-expanded", "false");
     name.setAttribute("aria-controls", id);
     card.onclick = () => {
-      details.hidden = !details.hidden;
-      name.setAttribute("aria-expanded", String(!details.hidden));
+      const opening = name.getAttribute("aria-expanded") !== "true";
+      name.setAttribute("aria-expanded", String(opening));
+      details.getAnimations?.().forEach(animation => animation.cancel());
+      if (opening) details.hidden = false;
+      const height = details.getBoundingClientRect().height;
+      if (reducedMotion() || !details.animate) details.hidden = !opening;
+      else {
+        const animation = details.animate(opening ? [{height:"0px",paddingTop:0,paddingBottom:0,opacity:0}, {height:height + "px",opacity:1}] : [{height:height + "px",opacity:1}, {height:"0px",paddingTop:0,paddingBottom:0,opacity:0}], {duration:180,easing:"ease-out"});
+        animation.onfinish = () => { details.hidden = !opening; };
+      }
     };
-    details.append(
-      dom("p", "", s.path),
-      dom("p", "", `Rule: ${s.rule}. ${s.explanation}`),
-      dom(
-        "p",
-        "",
-        `Score ${Math.round(s.score)}: ${s.personal ? "your files; age does not boost ranking" : s.safety === "cache" ? "safe cache" : s.safety === "reinstallable" ? "reinstallable data" : "review before deleting"}, ${fmt(s.bytes)} locally allocated, unused ${s.stale_days} days.${s.personal ? " Personal files are capped at 30. Synced changes can affect all devices." : s.rule === "big-unknown" || s.incomplete ? " Unrecognized or partial items are capped at 40." : ""}`,
-      ),
-    );
-    if (s.incomplete)
-      details.append(dom("p", "", "Partial scan: review before cleaning."));
-    if (s.project_path)
-      details.append(dom("p", "", "Project activity: " + s.project_path));
-    if (s.suggested_command)
-      details.append(dom("code", "", s.suggested_command));
-    if (window.go?.main?.App)
-      details.append(itemActions(s.path, s.suggested_command));
+    const pathLine = dom("div", "detail-path");
+    const pathText = dom("span", "ellipsized-path");
+    const slash = s.path.lastIndexOf("/");
+    pathText.append(dom("span", "path-prefix", s.path.slice(0, slash + 1)), dom("span", "path-tail", s.path.slice(slash + 1)));
+    pathText.title = s.path;
+    pathLine.append(pathText);
+    if (window.go?.main?.App) {
+      const reveal = itemActions(s.path);
+      reveal.lastElementChild?.remove();
+      pathLine.append(reveal);
+    }
+    const facts = dom("dl", "detail-facts");
+    facts.append(dom("dt", "", "Why"), dom("dd", "", s.explanation || s.rule),
+      dom("dt", "", "Score"), dom("dd", "num", `${Math.round(s.score)} · ${s.personal ? "your files" : s.safety === "cache" ? "safe cache" : s.safety === "reinstallable" ? "reinstallable data" : "review before cleaning"} · unused ${s.stale_days} days`));
+    if (s.incomplete) facts.append(dom("dt", "", "Coverage"), dom("dd", "", "Partial scan · review before cleaning"));
+    if (s.project_path) facts.append(dom("dt", "", "Project"), dom("dd", "", s.project_path));
+    details.append(pathLine, facts);
+    if (s.suggested_command) {
+      const terminal = dom("div", "detail-command");
+      const copy = dom("button", "icon-action");
+      copy.title = "Copy suggested command";
+      copy.setAttribute("aria-label", copy.title);
+      copy.append(icon("regular-copy"));
+      copy.onclick = async () => {
+        try {
+          if (window.go?.main?.App) await window.go.main.App.Copy(s.suggested_command);
+          else await navigator.clipboard.writeText(s.suggested_command);
+          copy.replaceChildren(icon("regular-check"));
+          copy.setAttribute("aria-label", "Copied"); copy.title = "Copied";
+          setTimeout(() => { copy.replaceChildren(icon("regular-copy")); copy.title = "Copy suggested command"; copy.setAttribute("aria-label", copy.title); }, 1600);
+        } catch (e) { showFeedback(String(e)); }
+      };
+      terminal.append(dom("span", "command-prompt", "$"), dom("code", "", s.suggested_command), copy);
+      details.append(terminal);
+    }
     title.append(
       name,
       dom("div", "d", `${categoryLabel(s.category)}, ${s.stale_days} days unused`),
@@ -782,6 +815,8 @@ function renderSuggestions() {
         "Showing the first 500 matches. Filter by category or safety to narrow the list.",
       ),
     );
+  updateSortHeaders("[data-cleanup-sort]", cleanupSort || suggestionSort, cleanupSort ? cleanupAsc : suggestionAsc);
+  renderRemembered();
   updateSelection();
   if (overview && restoreOverviewAfterFilter) {
     for (const [node, top] of overviewScroll) node.scrollTop = top;
@@ -807,23 +842,46 @@ $("treemap").onclick = () => {
 ["overview", "folders", "categories", "cleanup-tab", "agent"].forEach(
   (m) => ($(m).onclick = () => showMode(m)),
 );
-document.querySelectorAll("[data-sort]").forEach(
-  (b) =>
-    (b.onclick = async () => {
-      sortAsc =
-        sortKey === b.dataset.sort ? !sortAsc : b.dataset.sort === "name";
-      sortKey = b.dataset.sort;
-      try {
-        await loadChildren(current);
-        shown = 200;
-        resetExplorerScroll();
-        render();
-      } catch (e) {
-        $("scan-info").textContent = e.message;
-      }
-    }),
-);
+function realPath(n) { return !!n.path?.startsWith("/") && !n.synthetic && !n.other && !n.more_parent; }
+function middlePath(path) { return path.length > 86 ? path.slice(0, 36) + "…" + path.slice(-46) : path; }
+// Shared sortable header behavior for both explorer and cleanup tables.
+function updateSortHeaders(selector, key, asc) {
+  for (const button of document.querySelectorAll(selector)) {
+    if (!button.dataset.label) button.dataset.label = button.textContent.replace(/ [↕▴▾]$/, "");
+    const active = (button.dataset.sort || button.dataset.cleanupSort) === key;
+    button.replaceChildren(document.createTextNode(button.dataset.label));
+    if (active) button.append(dom("span", "sort-chevron", asc ? "▴" : "▾"));
+    button.closest("th").setAttribute("aria-sort", active ? (asc ? "ascending" : "descending") : "none");
+  }
+}
+for (const button of document.querySelectorAll("[data-sort]")) button.onclick = async () => {
+  sortAsc = sortKey === button.dataset.sort ? !sortAsc : button.dataset.sort === "name";
+  sortKey = button.dataset.sort;
+  try {
+    // Fully loaded and synthetic views can be sorted without a request. Only
+    // paginated filesystem/category nodes need the server's global ordering.
+    if ((current.child_count || 0) > (current.children || []).length && (!current.synthetic || current.category_name)) await loadChildren(current);
+    shown = 200; resetExplorerScroll(); render();
+  } catch (e) { showFeedback(e.message); }
+};
+let cleanupSort = "", cleanupAsc = false;
+for (const button of document.querySelectorAll("[data-cleanup-sort]")) button.onclick = () => {
+  cleanupAsc = cleanupSort === button.dataset.cleanupSort ? !cleanupAsc : button.dataset.cleanupSort === "name";
+  cleanupSort = button.dataset.cleanupSort;
+  sortCleanupItems(); renderSuggestions();
+};
+function sortCleanupItems() {
+  if (!cleanupSort) return;
+  const safety = {cache:3, reinstallable:2, "user-data":1, unknown:0};
+  const value = s => cleanupSort === "name" ? s.path.split("/").pop().toLocaleLowerCase() : cleanupSort === "safety" ? (s.personal || s.incomplete ? 0 : safety[s.safety] || 0) : cleanupSort === "size" ? s.bytes : s.score;
+  suggestionItems.sort((a,b) => {
+    const x=value(a), y=value(b);
+    const cmp = typeof x === "string" ? x.localeCompare(y) : x-y;
+    return (cleanupAsc ? 1 : -1)*cmp || a.path.localeCompare(b.path);
+  });
+}
 // One label for the disclosure trigger and its accessible close action.
+$("counting-slot").append($("counting-disclosure"));
 const COUNTING_LABEL = "How we counted";
 $("details-toggle").textContent = COUNTING_LABEL;
 $("notes-close").setAttribute("aria-label", "Close " + COUNTING_LABEL);
@@ -843,9 +901,11 @@ function toggleNotes(open) {
     panel.classList.add("open");
   } else {
     panel.classList.remove("open");
+    $("details-toggle").focus({preventScroll:true});
     notesTimer = setTimeout(() => { $("notes").hidden = true; }, reducedMotion() ? 0 : 180);
   }
 }
+document.addEventListener("click", e => { if ($("counting-disclosure").classList.contains("open") && !$("counting-disclosure").contains(e.target)) toggleNotes(false); });
 $("details-toggle").onclick = () => toggleNotes($("details-toggle").getAttribute("aria-expanded") !== "true");
 $("notes-close").onclick = () => { toggleNotes(false); $("details-toggle").focus(); };
 function noteRow(label, sentence, value) {
@@ -928,6 +988,7 @@ function loadSnapshot() {
         for (const v of values) select.add(new Option(id === "suggest-category" ? categoryLabel(v) : v, v));
         select.value = value;
       }
+      await refreshRemembered(true);
       await refreshSuggestions();
       renderOverview();
       showMode(mode);
@@ -971,6 +1032,7 @@ async function refreshSuggestions() {
     const items = await r.json();
     if (version !== suggestionVersion) return;
     suggestionItems = items || [];
+    sortCleanupItems();
     suggestionsShown = 100;
     renderSuggestions();
   } catch (e) {
@@ -987,6 +1049,7 @@ for (const b of document.querySelectorAll("[data-suggest-sort]")) {
     suggestionAsc =
       b.dataset.suggestSort === suggestionSort ? !suggestionAsc : false;
     suggestionSort = b.dataset.suggestSort;
+    cleanupSort = "";
     for (const c of document.querySelectorAll("[data-suggest-sort]")) {
       c.classList.toggle("active", c.dataset.suggestSort === suggestionSort);
       c.setAttribute(
@@ -1012,6 +1075,97 @@ for (const b of document.querySelectorAll("[data-suggest-sort]")) {
 }
 $("suggest-category").onchange = $("suggest-safety").onchange = () =>
   refreshSuggestions();
+let rememberedItems = [], rememberedMatches = [], rememberedSelectionPending = false;
+async function refreshRemembered(preselect = false) {
+  try {
+    const r = await fetch("/api/remembered");
+    if (!r.ok) throw Error(await r.text());
+    const data = await r.json();
+    rememberedItems = data.items || []; rememberedMatches = data.matches || [];
+    if (preselect) rememberedSelectionPending = true;
+    renderRemembered();
+  } catch (e) { showFeedback("Could not load remembered choices: " + e.message); }
+}
+async function forgetRemembered(path, all = false) {
+  try {
+    await action("/api/remembered", {paths:path ? [path] : [], forget_all:all});
+    if (all) for (const item of rememberedMatches) selected.delete(item.path);
+    else selected.delete(path);
+    await refreshRemembered(); renderRememberedManager(); updateSelection();
+  } catch (e) { showFeedback(String(e)); }
+}
+function renderRemembered() {
+  if (mode === "cleanup-tab" && rememberedSelectionPending) {
+    for (const item of rememberedMatches) selected.set(item.path, item.current_bytes);
+    rememberedSelectionPending = false;
+  }
+  document.querySelectorAll(".growth-tooltip").forEach(tip => tip.remove());
+  const card = $("remembered-card");
+  card.hidden = mode !== "cleanup-tab" || !rememberedMatches.length;
+  card.replaceChildren();
+  $("remembered-overview").hidden = mode !== "overview" || !rememberedMatches.length;
+  $("remembered-overview").textContent = `${rememberedMatches.length} items you cleaned before are back →`;
+  $("manage-remembered-empty").hidden = !rememberedItems.length || rememberedMatches.length > 0 || mode !== "cleanup-tab";
+  if (!rememberedMatches.length) return;
+  const heading = dom("div", "remembered-heading");
+  heading.append(dom("strong", "", `Back since last time · ${rememberedMatches.length} items · ${fmt(rememberedMatches.reduce((sum,item) => sum + item.current_bytes,0))}`));
+  const manage = dom("button", "link", "Manage remembered"); manage.onclick = openRememberedManager;
+  heading.append(manage); card.append(heading);
+  for (const [i,item] of rememberedMatches.entries()) {
+    const row = dom("div", "remembered-row");
+    const label = dom("label", "remembered-choice");
+    const text = dom("span", "remembered-name");
+    text.append(dom("strong", "", item.path.split("/").pop()), dom("span", "remembered-path", middlePath(item.path)));
+    text.title = item.path;
+    label.append(selectionBox({...item,bytes:item.current_bytes,kind:item.current_kind}), text, dom("span", "num", fmt(item.current_bytes)), dom("span", "remembered-growth num", (item.growth >= 0 ? "+" : "−") + fmt(Math.abs(item.growth))));
+    row.append(label);
+    if (item.warning) {
+      const warning = dom("span", "growth-warning"); warning.tabIndex = 0;
+      warning.setAttribute("aria-label", "Much bigger than last time");
+      warning.append(icon("fill-warning-circle"));
+      const tip = dom("span", "growth-tooltip", `This folder is much bigger than when you cleaned it (was ${fmt(item.bytes)}, now ${fmt(item.current_bytes)}). Check it before cleaning.`);
+      tip.id = "growth-warning-" + i; tip.setAttribute("role", "tooltip");
+      warning.setAttribute("aria-describedby", tip.id);
+      tip.hidden = true; document.body.append(tip);
+      const positionTip = () => {
+        tip.hidden = false;
+        const r = warning.getBoundingClientRect();
+        tip.style.left = Math.max(8, Math.min(r.right - 280, innerWidth - 288)) + "px";
+        tip.style.top = Math.max(8, r.top - 100) + "px";
+      };
+      warning.onpointerenter = warning.onfocus = positionTip;
+      warning.onpointerleave = () => { if (document.activeElement !== warning) tip.hidden = true; };
+      warning.onblur = () => { tip.hidden = true; };
+      row.append(warning);
+    }
+    const forget = dom("button", "link", "Forget"); forget.setAttribute("aria-label", "Forget " + item.path); forget.onclick = () => forgetRemembered(item.path); row.append(forget); card.append(row);
+  }
+  const clean = dom("button", "btn pri", "Clean again");
+  clean.disabled = !rememberedMatches.some(item => selected.has(item.path));
+  clean.onclick = () => {
+    // The confirmation contains only the checked returning items.
+    const checked = rememberedMatches.filter(item => selected.has(item.path));
+    selected.clear(); checked.forEach(item => selected.set(item.path,item.current_bytes));
+    updateSelection(); $("trash-selected").click();
+  };
+  card.append(clean);
+}
+function renderRememberedManager() {
+  const list = $("remembered-paths"); list.replaceChildren();
+  for (const item of rememberedItems) {
+    const row = dom("div", "remembered-managed");
+    const path = dom("span", "", item.path); path.title = item.path;
+    const forget = dom("button", "link", "Forget"); forget.setAttribute("aria-label", "Forget " + item.path); forget.onclick = () => forgetRemembered(item.path);
+    row.append(path,forget); list.append(row);
+  }
+  if (!rememberedItems.length) list.append(dom("p", "", "No remembered choices."));
+  $("forget-all").disabled = !rememberedItems.length;
+}
+function openRememberedManager() { renderRememberedManager(); $("remembered-manager").showModal(); }
+$("manage-remembered-empty").onclick = openRememberedManager;
+$("remembered-close").onclick = () => $("remembered-manager").close();
+$("forget-all").onclick = () => forgetRemembered("",true);
+$("remembered-overview").onclick = () => showMode("cleanup-tab",true);
 const selected = new Map();
 function selectionBox(n) {
   const box = dom("input");
@@ -1040,6 +1194,8 @@ function selectionBox(n) {
   return box;
 }
 function updateSelection() {
+  const cleanAgain = $("remembered-card").querySelector(".btn.pri");
+  if (cleanAgain) cleanAgain.disabled = !rememberedMatches.some(item => selected.has(item.path));
   for (const box of document.querySelectorAll("[data-selection-path]"))
     box.checked = selected.has(box.dataset.selectionPath);
   $("selection-bar").hidden = selected.size === 0;
@@ -1070,6 +1226,7 @@ $("clear-selection").onclick = () => {
 $("trash-selected").onclick = () => {
   $("confirm-total").textContent = $("selection-total").textContent;
   $("confirm-paths").textContent = [...selected.keys()].join("\n");
+  $("remember-choice").checked = true;
   $("trash-confirm").showModal();
 };
 $("cancel-trash").onclick = () => $("trash-confirm").close();
@@ -1078,9 +1235,10 @@ $("confirm-trash").onclick = async () => {
   b.disabled = true;
   const sizes = new Map(selected);
   try {
-    const result = await action("/api/trash", { paths: [...selected.keys()] });
+    const result = await action("/api/trash", { paths: [...selected.keys()], remember: $("remember-choice").checked });
     $("trash-confirm").close();
     await loadSnapshot();
+    if (result.memory_error) showFeedback("Items moved, but choices could not be remembered: " + result.memory_error);
     const message =
       (result.results || [])
         .map(
@@ -1318,7 +1476,9 @@ function renderOverview() {
   if (rest > 0)
     displayed.push({ name: "Everything else", bytes: rest, other: true });
   for (const n of displayed) {
-    const row = dom("button", "fr" + (n.other ? " muted" : ""));
+    const row = dom("div", "fr" + (n.other ? " muted" : ""));
+    row.tabIndex = 0; row.setAttribute("role", "button");
+    row.onkeydown = e => { if (e.target === row && ["Enter", " "].includes(e.key)) { e.preventDefault(); row.click(); } };
     const tile = dom("span", "tile"),
       track = dom("span", "track"),
       fill = dom("i");
@@ -1347,6 +1507,7 @@ function renderOverview() {
       showMode("folders", true);
       if (!n.other) navigate(n);
     };
+    if (window.go?.main?.App && realPath(n)) row.append(itemActions(n.path));
     list.append(row);
   }
   if (!displayed.length)
@@ -1541,7 +1702,7 @@ document.addEventListener("keydown", (e) => {
   const list = control.closest(
     "#suggestion-list, #overview-folders, #children",
   );
-  if (!list || !control.matches("button, input[type=checkbox]")) return;
+  if (!list || !control.matches("button, [role=button], input[type=checkbox]")) return;
   const rows = [...list.querySelectorAll(".it, .fr, tr")];
   const row = control.closest(".it, .fr, tr");
   let i = rows.indexOf(row);
@@ -1555,7 +1716,7 @@ document.addEventListener("keydown", (e) => {
             0,
             Math.min(rows.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)),
           );
-  const target = rows[i].matches("button")
+  const target = rows[i].matches("button, [role=button]")
     ? rows[i]
     : rows[i].querySelector(
         control.matches("input") ? "input:not(:disabled)" : "button",

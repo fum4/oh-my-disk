@@ -256,9 +256,7 @@ const wait = async (fn) => {
   assert.ok(copy.querySelector("svg use"));
   $("cleanup-tab").click();
   await wait(() => d.querySelector(".suggestion-details .item-actions"));
-  const cmd = [
-    ...d.querySelectorAll(".suggestion-details .item-actions button"),
-  ].find((b) => b.textContent === "Copy suggested command");
+  const cmd = d.querySelector('.detail-command button[aria-label="Copy suggested command"]');
   assert(cmd);
   await cmd.onclick();
   assert.equal(calls.at(-1)[0], "copy");

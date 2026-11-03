@@ -72,7 +72,7 @@ const wait = async (fn) => {
   await d.querySelector('[data-sort="name"]').onclick();
   assert.equal(tableScroll.scrollTop, 0, "Sorting resets table scroll");
     assert.equal(d.querySelectorAll("#children .filename").length, 200);
-    assert(requests.at(-1).includes("sort=name"));
+    assert.equal(d.querySelector('[data-sort="name"]').closest("th").getAttribute("aria-sort"), "ascending");
     $("categories").click();
     const scan = await (await w.fetch("/api/scan")).json();
     const largest = Object.entries(scan.categories).sort(
@@ -139,7 +139,7 @@ const wait = async (fn) => {
   assert.equal(d.querySelector(".suggestion-details").hidden, false);
   assert.match(
     d.querySelector(".suggestion-details").textContent,
-    /Rule: .+Score \d+:/,
+    /Why.+Score\d+ ·/,
   );
   overviewName.click();
   const firstOverviewRow = d.querySelector("#overview-folders .fr");
@@ -177,7 +177,7 @@ const wait = async (fn) => {
   d.querySelector("#breadcrumbs button").click();
   await wait(() => $("folder-name").textContent === "home");
   await d.querySelector('[data-sort="name"]').onclick();
-  assert(requests.at(-1).includes("sort=name"));
+  assert.equal(d.querySelector('[data-sort="name"]').closest("th").getAttribute("aria-sort"), "ascending");
   $("treemap").click();
   assert.ok(d.querySelector("#chart canvas"));
   assert.equal($("treemap").getAttribute("aria-pressed"), "true");
