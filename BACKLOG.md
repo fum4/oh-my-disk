@@ -13,7 +13,7 @@
 - [ ] "You could get back" banner: drop the "≥", and add more useful content because it feels too empty.
 - [ ] Finalize the app icon.
 - [ ] Calculate and show numbers consistently everywhere (e.g. a folder's disk share differs between charts and lists).
-- [ ] Categories: drill-down doesn't work (or isn't implemented).
+- [ ] Categories: drill-down works but takes a very long time; make it fast.
 
 ## UI polish
 
