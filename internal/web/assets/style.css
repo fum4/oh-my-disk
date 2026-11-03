@@ -3726,7 +3726,7 @@ footer { min-height: 20px; }
 #agent-page { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 #agent-page[hidden] { display: none; }
 body.agent-page-active .main-content { gap: 0; overflow: hidden; }
-body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-banner) { display: none !important; }
+body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-banner, #scan-strip) { display: none !important; }
 .agent-topbar { display: flex; align-items: center; gap: 16px; padding: 0 0 14px; flex: none; border-bottom: 1px solid var(--hair); }
 .agent-selectors #session-picker summary { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 9px; list-style: none; color: var(--label); font-size: var(--fs-13); }
 #session-picker summary::-webkit-details-marker { display: none; }
@@ -4155,23 +4155,30 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 /* Agent page shares the scanned-path title + subtitle with the other pages (hidden before a scan). */
 body.agent-page-active .bar.intro { margin-bottom: 16px; }
 
-/* "clearer" <-> "cleaner": one letter crossfades every 3s; the cell takes the wider glyph's width. */
-#launch-title .swap-letter { display: inline-grid; justify-items: center; vertical-align: baseline; }
+/* "clearer" <-> "cleaner": one letter crossfades every 3s. Both directions use the same
+   480ms ease-in-out (mirrored keyframes), and the cell's width moves between the measured
+   r and n widths in sync, so the trailing "er." follows the visible letter. */
+#launch-title .swap-letter { display: inline-grid; justify-items: start; width: var(--w-r, auto); vertical-align: baseline; animation: swap-width 6s ease-in-out infinite; }
 #launch-title .swap-letter > span { grid-area: 1 / 1; animation: swap-r 6s ease-in-out infinite; }
 #launch-title .swap-letter > .swap-n { animation-name: swap-n; opacity: 0; }
-body.page-hidden #launch-title .swap-letter > span, #welcome[hidden] #launch-title .swap-letter > span { animation-play-state: paused; }
+body.page-hidden #launch-title :is(.swap-letter, .swap-letter > span), #welcome[hidden] #launch-title :is(.swap-letter, .swap-letter > span) { animation-play-state: paused; }
+@keyframes swap-width {
+  0%, 42% { width: var(--w-r, auto); }
+  50%, 92% { width: var(--w-n, auto); }
+  100% { width: var(--w-r, auto); }
+}
 @keyframes swap-r {
-  0%, 46% { opacity: 1; transform: none; filter: none; }
-  54%, 96% { opacity: 0; transform: translateY(-0.18em); filter: blur(2px); }
+  0%, 42% { opacity: 1; transform: none; filter: none; }
+  50%, 92% { opacity: 0; transform: translateY(-0.18em); filter: blur(2px); }
   100% { opacity: 1; transform: none; filter: none; }
 }
 @keyframes swap-n {
-  0%, 46% { opacity: 0; transform: translateY(0.18em); filter: blur(2px); }
-  54%, 96% { opacity: 1; transform: none; filter: none; }
+  0%, 42% { opacity: 0; transform: translateY(0.18em); filter: blur(2px); }
+  50%, 92% { opacity: 1; transform: none; filter: none; }
   100% { opacity: 0; transform: translateY(0.18em); filter: blur(2px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #launch-title .swap-letter > span { animation: none; }
+  #launch-title :is(.swap-letter, .swap-letter > span) { animation: none; }
   #launch-title .swap-letter > .swap-n { opacity: 0; }
 }
 
@@ -4181,3 +4188,17 @@ body.agent-page-active #agent-page:not([hidden]) { display: contents; }
 body.agent-page-active #agent-topbar { order: 1; }
 body.agent-page-active .main-content > #access-banner { order: 2; margin-top: 12px; }
 body.agent-page-active :is(#agent-empty, #agent-terminal) { order: 3; }
+
+/* Scanning: the ring (target, phase, orbit with live count, stats, path, Cancel) fills the
+   content area on every page, pre- and post-scan, like before round 13. */
+.is-scanning :is(#content-grid, #welcome, #scan-options, #agent-page, #access-banner, footer, #remembered-overview) { display: none !important; }
+.is-scanning #scan-strip:not([hidden]) {
+  position: static; inset: auto; flex: 1; min-height: 0; padding: 12px 12px 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; border-radius: 0; background: transparent; text-align: center;
+}
+.is-scanning #scan-strip #scan-target, .is-scanning #scan-strip #scan-stats { display: block; }
+.is-scanning #scan-strip .scan-orbit { display: block; }
+.is-scanning #scan-strip #progress { font-size: var(--fs-15); white-space: normal; }
+.is-scanning #scan-strip #scan-path { flex: none; width: auto; display: block; }
+.is-scanning #scan-strip #cancel-scan { margin-top: 8px; }

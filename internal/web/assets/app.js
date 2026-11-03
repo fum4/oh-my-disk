@@ -1626,14 +1626,25 @@ function setLaunchTitle(text) {
   const swap = text === "Your disk, a little clearer.";
   title.classList.toggle("has-swap", swap);
   if (!swap) { title.textContent = text; return; }
-  if (title.querySelector(".swap-letter")) return;
+  if (title.querySelector(".swap-letter")) { measureSwapLetter(); return; }
   const cell = dom("span", "swap-letter");
   cell.append(dom("span", "swap-r", "r"), dom("span", "swap-n", "n"));
   const visual = dom("span", "");
   visual.setAttribute("aria-hidden", "true");
   visual.append("Your disk, a little clea", cell, "er.");
   title.replaceChildren(visual);
+  measureSwapLetter();
 }
+// The cell's width follows the visible glyph, so "er." always sits right after it.
+function measureSwapLetter() {
+  const cell = document.querySelector("#launch-title .swap-letter");
+  if (!cell) return;
+  const [r, n] = [...cell.children].map(c => c.getBoundingClientRect().width);
+  if (!r || !n) return;
+  cell.style.setProperty("--w-r", r + "px");
+  cell.style.setProperty("--w-n", n + "px");
+}
+document.fonts?.ready.then(measureSwapLetter);
 document.addEventListener("visibilitychange", () => document.body.classList.toggle("page-hidden", document.hidden));
 function renderHeading() {
   const root = snapshot?.scan?.root?.path || "";
@@ -1665,7 +1676,8 @@ function updateScanProgress(state) {
 function scanState(busy) {
   document.body.classList.toggle("is-scanning", busy);
   if (busy) {
-    (snapshot ? $("scan-options") : document.querySelector(".launch-card")).append(scanProgressStrip);
+    // The scanning ring takes over the content area on every page, as it always did.
+    if (scanProgressStrip.previousElementSibling !== $("scan-options")) $("scan-options").after(scanProgressStrip);
     toggleNotes(false);
     dismissedFeedback = "";
     showFeedback("");
