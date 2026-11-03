@@ -6,17 +6,18 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/fum4/oh-my-disk/internal/report"
-	"github.com/fum4/oh-my-disk/internal/rules"
-	"github.com/fum4/oh-my-disk/internal/scanner"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"runtime/pprof"
 	"strings"
 	"time"
+
+	"github.com/fum4/oh-my-disk/internal/memlimit"
+	"github.com/fum4/oh-my-disk/internal/report"
+	"github.com/fum4/oh-my-disk/internal/rules"
+	"github.com/fum4/oh-my-disk/internal/scanner"
 )
 
 func main() {
@@ -30,9 +31,7 @@ func main() {
 	heap := flag.String("heap", "", "heap profile")
 	cache := flag.String("cache", "", "cache output")
 	flag.Parse()
-	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(704 << 20)
-	}
+	memlimit.Apply()
 	*root, _ = filepath.Abs(*root)
 	if *cpu != "" {
 		f, e := os.Create(*cpu)

@@ -9,12 +9,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/fum4/oh-my-disk/internal/memlimit"
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/rules"
 	"github.com/fum4/oh-my-disk/internal/scanner"
@@ -61,9 +61,7 @@ deletion. MCP tools are read-only. Cache/output paths are excluded from scans.
 
 func main() {
 	// Bound default Go heap growth on multi-million-entry homes; honor user tuning.
-	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(704 << 20)
-	}
+	memlimit.Apply()
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintln(os.Stderr, "oh-my-disk:", err)
 		os.Exit(1)

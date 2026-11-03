@@ -3589,11 +3589,15 @@ body:has(#welcome:not([hidden])) #counting-disclosure { display: none; }
   white-space: normal;
 }
 .scan-orbit { position: relative; width: clamp(180px, 30vh, 280px); aspect-ratio: 1; margin: 12px 0 4px; flex: none; }
-#scan-spinner { display: block; width: 100%; height: 100%; margin: 0; overflow: visible; }
+/* Rotate the outer <svg> box, not the arc inside it: WebKit (the app's WKWebView) only
+   hands transform animations on CSS boxes to the compositor. An animated SVG child is
+   repainted from the web process main thread and can sit still while the app is busy. */
+#scan-spinner { display: block; width: 100%; height: 100%; margin: 0; overflow: visible; transform-origin: 50% 50%; will-change: transform; animation: scan-orbit 3.6s linear infinite; }
 #scan-spinner circle { fill: none; stroke-width: 12; }
 .scan-track { stroke: var(--c-free); }
-.scan-sweep { stroke: var(--c-files); stroke-linecap: round; stroke-dasharray: 210 780; transform-origin: center; animation: scan-orbit 3.6s linear infinite; }
-@keyframes scan-orbit { from { transform: rotate(-90deg); } to { transform: rotate(270deg); } }
+.scan-sweep { stroke: var(--c-files); stroke-linecap: round; stroke-dasharray: 210 780; transform: rotate(-90deg); transform-origin: 140px 140px; }
+@keyframes scan-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes scan-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 .scan-count { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
 .scan-count strong { font-size: clamp(28px, 3vw, 36px); font-weight: 600; letter-spacing: -1px; line-height: 1.2; }
 .scan-count span, #scan-stats { font-size: var(--fs-13); color: var(--label-2); }
@@ -3655,7 +3659,9 @@ footer { min-height: 20px; }
   .page-link { font-size: var(--fs-12); padding: 2px 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .scan-sweep { animation: none; transform: rotate(-90deg); }
+  /* Reduced motion: no rotation; the arc breathes slowly so the scan still reads as live. */
+  #scan-spinner { animation: none !important; will-change: auto; }
+  #scan-spinner .scan-sweep { animation: scan-pulse 2.4s ease-in-out infinite !important; }
   .notes-reveal, #counting-disclosure { transition: none; }
 }
 /* Reserve a complete header and at least one list row above the drawer. */

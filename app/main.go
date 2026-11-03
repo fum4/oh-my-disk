@@ -7,10 +7,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime/debug"
 	"sync"
 	"time"
 
+	"github.com/fum4/oh-my-disk/internal/memlimit"
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/rules"
 	"github.com/fum4/oh-my-disk/internal/scanner"
@@ -48,9 +48,7 @@ type App struct {
 }
 
 func main() {
-	if os.Getenv("GOMEMLIMIT") == "" {
-		debug.SetMemoryLimit(704 << 20)
-	}
+	memlimit.Apply()
 	a := &App{}
 	err := wails.Run(&options.App{
 		Title: "oh-my-disk", Width: 1280, Height: 900, MinWidth: 900, MinHeight: 650,
@@ -169,6 +167,8 @@ func (a *App) Scan(root string) error {
 }
 func (a *App) scan(ctx context.Context, root string) {
 	started := time.Now()
+	// The displayed scan stays live during a rescan; size the GC target above it.
+	memlimit.Apply()
 	defer func() { a.checkAccess(); a.mu.Lock(); a.status.Busy = false; a.cancel = nil; a.mu.Unlock() }()
 	fail := func(err error) {
 		a.mu.Lock()

@@ -62,8 +62,17 @@ splits, using aggregate accounting only when no descendant override exists.
 ## Final pipeline
 
 Default configuration: 2× CPU walk workers (28 here, capped at 64), 64 KiB bulk
-buffers, 704 MiB Go soft memory limit unless `GOMEMLIMIT` is already set. The
-limit controls Go heap growth; it is not an RSS cap. No file details are collapsed.
+buffers, 896 MiB Go soft memory limit (plus any heap already live, such as the
+displayed scan the app keeps during a rescan) unless `GOMEMLIMIT` is already set.
+The limit controls Go heap growth; it is not an RSS cap. No file details are collapsed.
+
+The limit was 704 MiB until round 21. Adding device/inode to each entry for Trash
+revalidation (16 B × ~6M entries) put the end-of-walk live heap (~634 MB) right at
+that limit, so the collector ran continuously: on the real home (6.01M entries)
+`GODEBUG=gctrace=1` showed 1,691 collections and 59 s user CPU per scan, against
+173 collections and 11 s before the change. At 896 MiB the same scan runs 10
+collections, 9 s user CPU, 29 s wall, 1.17 GB peak RSS (832 MiB: 15 collections,
+1.07 GB; 1 GiB: 11 collections, 1.35 GB).
 
 953,003-node fixture, same 208,896,000 bytes and same 2,000 ranked suggestions:
 
