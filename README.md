@@ -345,10 +345,35 @@ AMD64/ARM64. macOS CLI binaries preserve native Trash support. Windows is not
 supported yet. The app bundle, embedded CLI, and standalone CLIs carry the same
 release version (`oh-my-disk --version`).
 
-The workflow tests both platforms, creates the DMG, prepares a draft GitHub Release,
-and publishes through the commit-pinned `fum4/releases` action. Only after the R2
-publisher verifies the immutable files and updates the existing Nomadware releases
-catalogue does the GitHub Release become public. The shell installer is
+CI runs on pull requests and manual dispatch only, never again on the merge push.
+It includes release-version and trusted-retry regression tests, release shell lint,
+all four CLI release builds and universal DMG verification. CI artifact metadata
+uses the initial v1.0.0 as a fixture; production numbering remains tag-driven.
+Active workflows
+live in `.github/workflows/`; no activation copy step is needed.
+
+The release workflow tests both platforms, creates the DMG, and prepares a draft
+GitHub Release. One full-SHA checkout of `fum4/releases` into `.release-publisher`
+supplies both the local publishing action and its trusted `lib/common.sh` signature
+verifier, public key, platform list and public base URL. The pin is the reviewed
+merge revision of publisher PR #11; update this single workflow pin deliberately.
+
+Retries reuse the draft’s original five assets (DMGs are not reproducible).
+Before treating a publish as completed, and again before exposing GitHub downloads,
+verification requires a trusted signature, exact manifest coverage of four CLIs,
+the universal DMG and `RELEASE`, the requested package/tag binding, and a full
+read-back of every remote asset matching the draft bytes. Missing/extra entries,
+invalid signatures, mismatches and network errors fail closed; only a 404 for
+`latest` means a first publish. No uploaded artifact supplies a verification marker.
+
+When latest is the same or newer, verify the immutable historical version and
+skip publishing it (never roll latest backwards). A pinned mise setup action
+installs rclone from the publisher’s existing toolchain definition, then its
+`bin/publish --index-only` repairs the catalogue using the publishing secrets.
+Older/missing latest resumes normal
+publication. A historical GitHub retry is not marked latest. Only after verification
+and a successful catalogue update does the GitHub Release become public.
+The shell installer is
 `https://releases.nomadware.io/oh-my-disk/install.sh` after the first release.
 
 Provision `RELEASES_SIGNING_KEY`, `R2_RELEASES_ACCESS_KEY_ID`, and

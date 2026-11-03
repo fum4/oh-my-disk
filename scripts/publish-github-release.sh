@@ -36,12 +36,13 @@ NOTES
   done
   ;;
  finish)
-  # These are the exact publisher-signed sums, not a second unsigned manifest.
+  verified=$(mktemp -d)
+  trap 'rm -rf "$verified"' EXIT
+  latest=$(python3 scripts/verify-release.py verify "$verified")
   for name in SHA256SUMS SHA256SUMS.sig RELEASE; do
-   curl -fsSL "https://releases.nomadware.io/oh-my-disk/$RELEASE_VERSION/$name" -o "dist/$name"
-   gh release upload "$RELEASE_VERSION" "dist/$name" --clobber
+   gh release upload "$RELEASE_VERSION" "$verified/$name" --clobber
   done
-  gh release edit "$RELEASE_VERSION" --draft=false --latest
+  gh release edit "$RELEASE_VERSION" --draft=false --latest="$latest"
   ;;
  *) echo 'usage: publish-github-release.sh prepare|finish' >&2; exit 1 ;;
 esac

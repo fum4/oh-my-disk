@@ -2,7 +2,7 @@
 
 ## Top priority
 
-1. **Releases and CI.** Fix deploys and releases, run tests in CI, and ship builds for macOS, Linux and Windows.
+1. **Releases and CI.** Fix deploys and releases, run tests in CI, and ship builds for macOS and Linux. Windows remains deferred.
 2. **Publish to nomadware.io.** Publish in the existing releases catalogue first; a dedicated page is deferred.
 
 ## Distribution
