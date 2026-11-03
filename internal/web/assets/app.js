@@ -429,7 +429,7 @@ function renderTable() {
     fill.style.background = dot.style.background;
     bar.append(fill);
     name.append(bar);
-    if (window.go?.main?.App && realPath(n)) name.append(itemActions(n.path));
+    if (window.go?.main?.App && realPath(n)) entry.append(itemActions(n.path));
     tr.append(
       name,
       dom(
@@ -562,7 +562,7 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
   const agentPage = mode === "agent";
   document.body.classList.toggle("agent-page-active", agentPage);
   $("agent-page").hidden = !agentPage;
-  $("scan-agent-link").hidden = !snapshot || mode !== "overview";
+  $("scan-agent-link").hidden = !snapshot || mode === "agent";
   const launch = $("launch-cards");
   const launchSlot = !snapshot && agentPage ? $("agent-scan-slot") : $("welcome");
   if (launch.parentElement !== launchSlot) launchSlot.append(launch);
@@ -572,13 +572,7 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     if (id === mode) $(id).setAttribute("aria-current", "page");
     else $(id).removeAttribute("aria-current");
   });
-  $("view-title").textContent = {
-    overview: "Overview",
-    folders: "Folders",
-    categories: "Categories",
-    "cleanup-tab": "Cleanup",
-    agent: "Agent",
-  }[mode];
+  renderHeading();
   if (agentPage) {
     $("welcome").hidden = true;
     $("content-grid").hidden = true;
@@ -608,8 +602,6 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
       ],
     }[mode];
     const target = window.scanTargetLabel?.() || "Home";
-    $("scan-info").textContent =
-      "Scan " + target + " to see what’s taking space.";
     $("disk-caption").textContent = target + " is ready to scan";
     $("folder-choice").textContent = target;
     $("folder-picker").querySelector("summary").setAttribute("aria-label", "Choose scan folder, current: " + target);
@@ -617,16 +609,12 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     $("launch-title").textContent = landing ? "A place for every byte." : copy[0];
     $("launch-description").textContent = landing ? "Scan a folder to see what’s taking space." : copy[1];
     $("launch-cards").hidden = false;
-    if (document.body.classList.contains("is-scanning")) scanningHeader();
     window.agentViewChanged?.();
     document.querySelector(".view-switch").hidden = true;
     return;
   }
   $("welcome").hidden = true;
   $("content-grid").hidden = false;
-  $("scan-info").textContent = document.body.classList.contains("is-scanning")
-    ? "Scanning " + scanTarget + "…"
-    : {overview: lastScanSubtitle, folders: "Explore your folders by size.", categories: "See your space grouped by kind.", "cleanup-tab": "Review what you can safely clear."}[mode];
   window.agentViewChanged?.();
   $("overview-panel").hidden = mode !== "overview";
   $("explorer").hidden = mode === "cleanup-tab" || mode === "overview";
@@ -896,6 +884,8 @@ function toggleNotes(open) {
   $("notes").inert = !open;
   if (open) {
     $("notes").hidden = false;
+    applyNotesHeight();
+    $("notes-body").scrollTop = 0;
     // Establish the collapsed geometry before expanding the grid track.
     panel.getBoundingClientRect();
     panel.classList.add("open");
@@ -905,6 +895,44 @@ function toggleNotes(open) {
     notesTimer = setTimeout(() => { $("notes").hidden = true; }, reducedMotion() ? 0 : 180);
   }
 }
+// The counting panel opens upward; its top edge drags to resize, remembered across launches.
+const notesHeightKey = "omd.countingPanelHeight";
+function notesMaxHeight() {
+  const bottom = $("counting-disclosure").querySelector(".notes-reveal").getBoundingClientRect().bottom || innerHeight;
+  return Math.max(120, bottom - 64);
+}
+function setNotesHeight(h, save) {
+  const clamped = Math.round(Math.min(notesMaxHeight(), Math.max(120, h)));
+  $("notes").style.height = clamped + "px";
+  $("notes").style.maxHeight = "none";
+  if (save) try { localStorage.setItem(notesHeightKey, String(clamped)); } catch (_) {}
+}
+function applyNotesHeight() {
+  let h = 0;
+  try { h = Number(localStorage.getItem(notesHeightKey)) || 0; } catch (_) {}
+  if (h) setNotesHeight(h, false);
+  else { $("notes").style.height = ""; $("notes").style.maxHeight = ""; }
+}
+$("notes-resize").addEventListener("pointerdown", e => {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  const handle = e.currentTarget, startY = e.clientY, startH = $("notes").getBoundingClientRect().height;
+  handle.setPointerCapture(e.pointerId);
+  document.body.classList.add("notes-resizing");
+  const move = ev => setNotesHeight(startH + (startY - ev.clientY), false);
+  const up = ev => {
+    handle.removeEventListener("pointermove", move);
+    handle.removeEventListener("pointerup", up);
+    handle.removeEventListener("pointercancel", up);
+    document.body.classList.remove("notes-resizing");
+    setNotesHeight(startH + (startY - ev.clientY), true);
+  };
+  handle.addEventListener("pointermove", move);
+  handle.addEventListener("pointerup", up);
+  handle.addEventListener("pointercancel", up);
+});
+$("notes-resize").addEventListener("click", e => e.stopPropagation());
+addEventListener("resize", () => { if (!$("notes").hidden && $("notes").style.height) setNotesHeight(parseFloat($("notes").style.height), false); });
 document.addEventListener("click", e => { if ($("counting-disclosure").classList.contains("open") && !$("counting-disclosure").contains(e.target)) toggleNotes(false); });
 $("details-toggle").onclick = () => toggleNotes($("details-toggle").getAttribute("aria-expanded") !== "true");
 $("notes-close").onclick = () => { toggleNotes(false); $("details-toggle").focus(); };
@@ -995,8 +1023,6 @@ function loadSnapshot() {
       showMode(mode);
     })
     .catch((e) => {
-      $("scan-info").textContent =
-        "No scan is open. Choose a folder or scan again.";
       $("content-grid").hidden = true;
       $("welcome").hidden = false;
       showFeedback(e.message);
@@ -1492,9 +1518,12 @@ function renderOverview() {
         (n.bytes / Math.max(1, folders[0]?.bytes || scan.bytes)) * 100,
       ) + "%";
     track.append(fill);
+    const label = dom("span", "n");
+    label.append(dom("span", "nt", n.name));
+    if (window.go?.main?.App && realPath(n)) label.append(itemActions(n.path));
     row.append(
       tile,
-      dom("span", "n", n.name),
+      label,
       track,
       dom(
         "span",
@@ -1508,7 +1537,6 @@ function renderOverview() {
       showMode("folders", true);
       if (!n.other) navigate(n);
     };
-    if (window.go?.main?.App && realPath(n)) row.append(itemActions(n.path));
     list.append(row);
   }
   if (!displayed.length)
@@ -1551,9 +1579,56 @@ function showFeedback(message, kind = "error") {
   banner.append(close);
   if (kind !== "error") feedbackTimer = setTimeout(() => { dismissedFeedback = key; showFeedback(""); }, 6000);
 }
+// Quiet bottom-right confirmations for finished exports; errors keep the banner.
+function showToast(message, path = "") {
+  let stack = $("toasts");
+  if (!stack) { stack = dom("div"); stack.id = "toasts"; stack.setAttribute("role", "status"); stack.setAttribute("aria-live", "polite"); document.body.append(stack); }
+  const toast = dom("div", "toast");
+  toast.append(icon("fill-check-circle"), dom("span", "toast-copy", message));
+  toast.querySelector(".toast-copy").title = path || message;
+  const app = window.go?.main?.App;
+  if (path?.startsWith("/") && app?.Reveal) {
+    const reveal = dom("button", "toast-action", "Show in Finder");
+    reveal.onclick = () => app.Reveal(path).catch(e => showFeedback(String(e)));
+    toast.append(reveal);
+  }
+  const close = dom("button", "icon-action toast-close");
+  close.setAttribute("aria-label", "Dismiss");
+  close.append(icon("regular-x"));
+  let timer;
+  const dismiss = () => {
+    clearTimeout(timer);
+    if (!toast.isConnected) return;
+    if (reducedMotion() || !toast.animate) { toast.remove(); return; }
+    toast.animate([{opacity: 1, transform: "none"}, {opacity: 0, transform: "translateY(6px)"}], {duration: 160, easing: "ease-in"}).onfinish = () => toast.remove();
+  };
+  const arm = () => { clearTimeout(timer); timer = setTimeout(dismiss, 5000); };
+  close.onclick = dismiss;
+  toast.onmouseenter = () => clearTimeout(timer);
+  toast.onmouseleave = arm;
+  toast.append(close);
+  stack.append(toast);
+  if (!reducedMotion()) toast.animate?.([{opacity: 0, transform: "translateY(8px)"}, {opacity: 1, transform: "none"}], {duration: 200, easing: "ease-out"});
+  arm();
+  return toast;
+}
 const scanProgressStrip = $("scan-strip");
 let scanTarget = "Home", scanCounterTimer, displayedEntries = 0, desiredEntries = 0;
-function scanningHeader() { $("scan-info").textContent = "Scanning " + scanTarget + "…"; }
+function scanningHeader() { if (snapshot) $("scan-info").textContent = "Scanning " + scanTarget + "…"; }
+// The heading is the scanned folder; before any results it is empty and takes no space.
+function renderHeading() {
+  const root = snapshot?.scan?.root?.path || "";
+  document.querySelector(".bar.intro").hidden = !root;
+  const title = $("view-title");
+  if (!root) { title.replaceChildren(); title.removeAttribute("title"); $("scan-info").textContent = ""; return; }
+  const home = window.scanHome || "";
+  const shown = home && root === home ? "~/" : home && root.startsWith(home + "/") ? "~" + root.slice(home.length) : root;
+  const cut = shown.length > 1 ? shown.replace(/\/$/, "").lastIndexOf("/") : -1;
+  const head = cut > 0 ? shown.slice(0, cut + 1) : "", tail = cut > 0 ? shown.slice(cut + 1) : shown;
+  title.replaceChildren(dom("span", "path-head", head), dom("span", "path-tail", tail));
+  title.title = root;
+  $("scan-info").textContent = document.body.classList.contains("is-scanning") ? "Scanning " + scanTarget + "…" : lastScanSubtitle;
+}
 function updateScanProgress(state) {
   const phase = (state.phase || "walking").toLowerCase();
   $("progress").textContent = !state.busy ? state.phase :
@@ -1760,5 +1835,13 @@ if (window.ResizeObserver) {
 
 if (window.ResizeObserver) new ResizeObserver(() => {
   const list = $("suggestion-list");
-  $("suggestions").style.setProperty("--cleanup-gutter", (list.offsetWidth - list.clientWidth) + "px");
+  $("suggestions").style.setProperty("--cleanup-gutter", (list.offsetWidth - list.clientWidth + parseFloat(getComputedStyle(list).paddingRight)) + "px");
 }).observe($("suggestion-list"));
+
+// The Folders/Categories scrollbar track starts below the sticky header.
+if (window.ResizeObserver) {
+  const scroller = document.querySelector(".table-scroll"), head = scroller && scroller.querySelector("thead");
+  if (head) new ResizeObserver(() => {
+    scroller.style.setProperty("--scroll-head", Math.ceil(head.getBoundingClientRect().height + parseFloat(getComputedStyle(scroller).paddingTop)) + "px");
+  }).observe(head);
+}

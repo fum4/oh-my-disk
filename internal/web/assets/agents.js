@@ -16,6 +16,7 @@
     sessionRunning = false,
     sessionChoice = "",
     activeAgent = "",
+    launched = null,
     contextRevision = null;
   const error = (e) => { showFeedback(String(e)); if (mode === "agent") $("terminal-status").textContent = String(e); };
   function select(name) {
@@ -24,6 +25,56 @@
     $("agent-picker").open = false;
     render();
     $("agent-picker").querySelector("summary").focus();
+  }
+  const pref = (kind, name) => { try { return localStorage.getItem("omd-agent-" + kind + ":" + name) || ""; } catch { return ""; } };
+  const setPref = (kind, name, value) => { try { localStorage.setItem("omd-agent-" + kind + ":" + name, value); } catch {} };
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+  function modelFor(name) {
+    const d = definitions.find(d => d.name === name);
+    if (!d) return null;
+    const models = d.models || [];
+    const saved = pref("model", name);
+    const model = d.modelOverride || (models.some(m => m.id === saved) ? saved : d.defaultModel || models[0]?.id || "");
+    const efforts = d.efforts || [];
+    const savedEffort = pref("effort", name);
+    const effort = efforts.length ? (efforts.includes(savedEffort) ? savedEffort : d.defaultEffort || efforts[0]) : "";
+    const label = models.find(m => m.id === model)?.label || model;
+    return { d, model, effort, label };
+  }
+  function renderModel() {
+    const picker = $("model-picker");
+    const m = modelFor(sessionChoice);
+    picker.hidden = !m || !(m.d.models || []).length || !installed[sessionChoice];
+    if (picker.hidden) { $("model-hint").hidden = true; return; }
+    const locked = !!m.d.modelOverride;
+    $("model-choice").textContent = m.label;
+    $("effort-choice").textContent = m.effort ? cap(m.effort) : "";
+    $("effort-choice").hidden = !m.effort;
+    const summary = picker.querySelector("summary");
+    summary.title = locked ? "Set by " + m.d.modelEnv : "";
+    const signature = JSON.stringify([sessionChoice, m.d.models, m.model, m.effort, locked]);
+    if ($("model-options").dataset.state !== signature) {
+      $("model-options").dataset.state = signature;
+      const option = (label, pressed, disabled, onClick) => {
+        const b = dom("button", "agent-option");
+        b.append(dom("span", "agent-option-label", label));
+        b.setAttribute("aria-pressed", String(pressed));
+        b.disabled = disabled;
+        b.onclick = onClick;
+        return b;
+      };
+      $("model-options").replaceChildren(...m.d.models.map(x => option(x.label, x.id === m.model, locked, () => {
+        setPref("model", sessionChoice, x.id); render();
+      })));
+      const efforts = m.d.efforts || [];
+      $("effort-section").hidden = !efforts.length;
+      $("effort-options").replaceChildren(...efforts.map(e => option(cap(e), e === m.effort, false, () => {
+        setPref("effort", sessionChoice, e); render();
+      })));
+      $("model-note").hidden = !locked;
+      $("model-note").textContent = locked ? "Set by " + m.d.modelEnv + "." : "";
+    }
+    $("model-hint").hidden = !(sessionRunning && launched && launched.name === sessionChoice && (launched.model !== m.model || launched.effort !== m.effort));
   }
   function renderOptions(picker, options, selected, allowNone, choose) {
     const signature = JSON.stringify([definitions, installed, selected]);
@@ -87,6 +138,7 @@
       if (hadSession) launch(name);
     });
     $("session-choice").textContent = names[sessionChoice] || "Choose agent";
+    renderModel();
     mark("session-mark", sessionChoice);
     $("agent-running-dot").hidden = !sessionRunning;
     $("terminal-close").disabled = !sessionRunning || opening;
@@ -97,7 +149,7 @@
     $("agent-start").textContent = ready ? "Start session" : "Start without a scan";
     $("agent-start").disabled = !app || !installed[sessionChoice] || opening;
     $("agent-desktop-hint").hidden = !!app;
-    $("scan-agent-link").textContent = "Ask " + (names[sessionChoice || selected] || "agent") + " about this scan →";
+    $("scan-agent-link").title = "Ask " + (names[sessionChoice || selected] || "your agent") + " about this scan";
     $("plain-scan").disabled = busy || opening;
     if (mode === "agent") requestAnimationFrame(resize);
   }
@@ -149,9 +201,19 @@
       brightCyan: "#a4dce8", brightWhite: "#ffffff",
     };
   }
+  // The PTY always gets the fitted size, including changes that land while the agent is starting.
+  let sentSize = "";
+  function syncSize() {
+    if (!term || !sessionRunning) return;
+    const size = term.cols + "x" + term.rows;
+    if (size === sentSize) return;
+    sentSize = size;
+    app.ResizeAgent(term.cols, term.rows).catch(error);
+  }
   function resize() {
     if (!term || mode !== "agent" || $("agent-terminal").hidden) return;
     fit.fit();
+    syncSize();
   }
   async function openScanAgent(n) {
     showMode("agent");
@@ -202,9 +264,7 @@
         term.loadAddon(renderer);
       } catch { renderer?.dispose(); }
       fit.fit();
-      term.onResize(({ cols, rows }) => {
-        if (sessionRunning) app.ResizeAgent(cols, rows).catch(error);
-      });
+      term.onResize(syncSize);
       term.attachCustomKeyEventHandler((e) => {
         if (
           e.type === "keydown" &&
@@ -227,12 +287,18 @@
         }
         return true;
       });
-      await app.StartAgent(n, prompt, term.cols, term.rows);
+      const chosen = modelFor(n);
+      fit.fit();
+      sentSize = term.cols + "x" + term.rows;
+      if (app.StartAgentWith) await app.StartAgentWith(n, chosen?.model || "", chosen?.effort || "", prompt, term.cols, term.rows);
+      else await app.StartAgent(n, prompt, term.cols, term.rows);
+      launched = { name: n, model: chosen?.model || "", effort: chosen?.effort || "" };
       if (gen !== generation) {
         await app.CloseAgent();
         return;
       }
       sessionRunning = true;
+      resize();
       term.onData((data) => app.WriteAgent(data).catch(error));
       document.fonts?.ready.then(() => { if (gen === generation) resize(); });
       $("terminal-status").textContent = "Running";
@@ -282,7 +348,7 @@
     if (sessionRunning && !await confirmEnd("Restarting ends the current conversation and loads your latest scan.")) return;
     await launch(sessionChoice);
   };
-  window.agentViewChanged = render;
+  window.agentViewChanged = () => { render(); if (mode === "agent") requestAnimationFrame(resize); };
   const scan = $("hub-scan").onclick;
   $("hub-scan").onclick = async () => {
     if (mode === "agent") showMode("overview");
@@ -314,6 +380,8 @@
   $("plain-scan").onclick = () => $("hub-scan").onclick();
   floatingMenu($("agent-picker"), () => detect());
   floatingMenu($("session-picker"), () => detect());
+  floatingMenu($("model-picker"));
+  $("model-hint").onclick = () => $("terminal-restart").click();
   $("session-picker").querySelector("summary").onclick = e => { if (opening) e.preventDefault(); };
   $("terminal-close").onclick = () => close().catch(error);
   $("terminal-copy").onclick = () =>

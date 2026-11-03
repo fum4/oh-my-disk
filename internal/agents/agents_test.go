@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -153,7 +154,7 @@ func TestRegistry(t *testing.T) {
 func TestSingleEntryAgent(t *testing.T) {
 	original := registry
 	defer func() { registry = original }()
-	registry = append(Registry(), Definition{Name: "future", Label: "Future agent", Icon: "F", Command: "future-cli", InstallURL: "https://example.com/install", Fallback: "/bundled/future", Launch: func(binary, dir, prompt string) []string { return []string{binary, dir, prompt} }})
+	registry = append(Registry(), Definition{Name: "future", Label: "Future agent", Icon: "F", Command: "future-cli", InstallURL: "https://example.com/install", Fallback: "/bundled/future", Launch: func(binary, dir, prompt string, _ Options) []string { return []string{binary, dir, prompt} }})
 	missing := func(name string) (string, error) {
 		if name != "future-cli" {
 			t.Fatalf("wrong command %q", name)
@@ -204,5 +205,60 @@ func TestExplicitModelsAndOverrides(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func flagValue(args []string, flag string) string {
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == flag {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+func TestChosenModelAndEffort(t *testing.T) {
+	t.Setenv("OMD_CODEX_MODEL", "")
+	t.Setenv("OMD_CLAUDE_MODEL", "")
+	args, _ := ArgsWith("codex", "/binary", "/session", "prompt", Options{Model: "gpt-6-luna", Effort: "high"})
+	if flagValue(args, "-m") != "gpt-6-luna" || !slices.Contains(args, "model_reasoning_effort=high") {
+		t.Fatal(args)
+	}
+	args, _ = ArgsWith("claude", "/binary", "/session", "prompt", Options{Model: "sonnet"})
+	if flagValue(args, "--model") != "sonnet" {
+		t.Fatal(args)
+	}
+	// Malformed or flag-like values and unknown efforts fall back to the defaults.
+	for _, bad := range []string{"--dangerously-bypass", "a b", "x;rm", strings.Repeat("a", 65)} {
+		args, _ = ArgsWith("codex", "/binary", "/session", "prompt", Options{Model: bad, Effort: "ultra"})
+		if flagValue(args, "-m") != DefaultCodexModel || !slices.Contains(args, "model_reasoning_effort=medium") {
+			t.Fatal(bad, args)
+		}
+	}
+	// The env override wins over the picker.
+	t.Setenv("OMD_CLAUDE_MODEL", "opus")
+	args, _ = ArgsWith("claude", "/binary", "/session", "prompt", Options{Model: "fable"})
+	if flagValue(args, "--model") != "opus" {
+		t.Fatal(args)
+	}
+}
+
+func TestParseCodexModels(t *testing.T) {
+	data := []byte(`{"models":[{"slug":"gpt-6-astra","display_name":"GPT-6-Astra","visibility":"list"},{"slug":"gpt-reserve","visibility":"hide"},{"slug":"gpt-6.1-sol","display_name":"GPT-6.1-Sol","visibility":"list"},{"slug":"bad slug","visibility":"list"}]}`)
+	got := ParseCodexModels(data)
+	want := []Model{{"gpt-6.1-sol", "GPT-6.1-Sol"}, {"gpt-6-astra", "GPT-6-Astra"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatal(got)
+	}
+	if got = ParseCodexModels([]byte(`{"models":[{"slug":"gpt-x","visibility":"list"}]}`)); got[0].ID != DefaultCodexModel || got[1].Label != "gpt-x" {
+		t.Fatal(got)
+	}
+	if ParseCodexModels([]byte("not json")) != nil {
+		t.Fatal("garbage accepted")
+	}
+	for _, d := range Registry() {
+		if len(d.Models) == 0 || d.Models[0].ID != d.DefaultModel || d.ModelEnv == "" {
+			t.Fatalf("%s: default model must lead the picker: %+v", d.Name, d.Models)
+		}
 	}
 }

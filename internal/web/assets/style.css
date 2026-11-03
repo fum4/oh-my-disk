@@ -3703,7 +3703,8 @@ footer { min-height: 20px; }
   --banner-fill: var(--success-bg);
   background: var(--success-bg);
   color: var(--success-text);
-  box-shadow: inset 0 0 0 1px var(--success-border);
+  box-shadow: none;
+  border: 0;
 }
 #suggestions .gain :is(.k, .v, .l) { color: var(--success-text); }
 .banner-success > .i { color: var(--success-icon); }
@@ -3752,7 +3753,7 @@ body.agent-page-active .main-content > :not(#agent-page) { display: none !import
   .agent-topbar { gap: 4px; }
   .agent-topbar .btn { width: 32px; min-width: 32px; padding: 8px; }
   .agent-action-label { display: none; }
-  #agent-page #agent-terminal { padding: 12px; }
+  #agent-page #agent-terminal { padding: 12px var(--scroll-inset) 12px 12px; }
 }
 
 #agent-page #terminal-screen, #agent-page #terminal-screen .xterm-viewport { background: var(--terminal-bg); }
@@ -4040,3 +4041,117 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 @media (prefers-color-scheme: dark) { :root { --command-prompt: #a1a2ad; } }
 /* Rescan progress stops one toolbar gap before the Rescan split button, whatever its width. */
 #scan-options #scan-strip { right: calc(var(--scan-split-width, 146px) + 12px); }
+
+/* Round 16: model picker, a quiet ghost dropdown beside the agent picker. */
+.agent-topbar #model-picker { margin-left: -12px; }
+.agent-topbar #model-picker summary { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 9px; list-style: none; color: var(--label); font-size: var(--fs-13); cursor: pointer; }
+#model-picker summary::-webkit-details-marker { display: none; }
+#model-picker summary:hover, #model-picker[open] summary { background: var(--fill); }
+#effort-choice { color: var(--label-2); }
+#effort-choice::before { content: "·"; margin-right: 6px; color: var(--label-3, var(--label-2)); }
+#model-picker .agent-menu { width: 220px; }
+#model-picker .agent-option { padding: 8px 10px; font-size: var(--fs-13); }
+#model-picker .agent-option:disabled { color: var(--label-2); cursor: default; }
+#effort-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--hair); }
+.model-menu-label { padding: 6px 10px 4px; color: var(--label-2); font-size: var(--fs-11, 11px); font-weight: 600; }
+#model-note { margin: 4px 0 0; padding: 6px 10px 4px; color: var(--label-2); font-size: var(--fs-12); }
+.model-hint { border: 0; background: none; padding: 4px 8px; border-radius: 6px; color: var(--label-2); font: inherit; font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
+.model-hint:hover { background: var(--fill); color: var(--label); }
+
+/* Round 16: folder-row actions sit right after the name, shown on hover/focus, no reflow. */
+.fr .n { display: flex; align-items: center; min-width: 0; overflow: visible; }
+.fr .n .nt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr .n .item-actions { position: relative; inset: auto; z-index: 1; display: flex; flex: none; flex-wrap: nowrap; gap: 2px; width: 0; margin: 0 0 0 6px; overflow: visible; background: none; opacity: 0; pointer-events: none; }
+#children .file-entry .item-actions { position: static; display: flex; flex: none; flex-wrap: nowrap; gap: 2px; margin: 0 0 0 -2px; min-height: 0; opacity: 0; pointer-events: none; }
+#children td:first-child { padding-right: 12px; }
+#children td:first-child > .file-entry { min-width: 0; }
+:is(.fr .n, #children .file-entry) .item-actions .icon-action { width: 24px; height: 24px; min-height: 24px; border-radius: 6px; color: var(--label-2); background: transparent; }
+:is(.fr .n, #children .file-entry) .item-actions .icon-action .i { width: 15px; height: 15px; }
+:is(.fr .n, #children .file-entry) .item-actions .icon-action:hover { color: var(--label); background: var(--fill); }
+.fr:is(:hover, :focus-within) .n .item-actions, #children tr:is(:hover, :focus-within) .file-entry .item-actions { opacity: 1; pointer-events: auto; }
+@media (hover: none) { .fr .n .item-actions, #children .file-entry .item-actions { opacity: 1; pointer-events: auto; } }
+
+/* Round 16: the heading is the scanned folder path, middle-truncated, primary text. */
+#view-title { display: flex; min-width: 0; max-width: 100%; color: var(--label); white-space: nowrap; }
+#view-title .path-head { flex: 0 1 auto; min-width: 1.5em; overflow: hidden; text-overflow: ellipsis; }
+#view-title .path-tail { flex: 0 0 auto; max-width: 70%; overflow: hidden; text-overflow: ellipsis; }
+#view-title .path-head:empty { display: none; }
+#scan-info:empty { display: none; }
+.bar.intro[hidden] { display: none !important; }
+#scan-agent-link[hidden] { display: none; }
+
+/* Round 16: the close button stays pinned while the counting notes scroll. */
+#notes { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+#notes[hidden] { display: none; }
+#notes > #notes-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 16px; }
+#notes-body > h3:first-of-type { margin-top: 0; padding-right: 32px; }
+#notes-body > :last-child { padding-bottom: 0; }
+#notes-close { position: absolute; top: 8px; right: 12px; z-index: 2; background: var(--surface-deep); border-radius: 6px; }
+#notes-close:hover { background: linear-gradient(var(--fill), var(--fill)), var(--surface-deep); }
+
+/* Round 16: a quiet top-edge handle resizes the counting panel upward. */
+#notes-resize { position: absolute; top: 0; left: 12px; right: 48px; height: 6px; z-index: 3; cursor: ns-resize; touch-action: none; }
+#notes-resize::after { content: ""; position: absolute; left: 50%; top: 2px; width: 32px; height: 3px; margin-left: -16px; border-radius: 2px; background: var(--label-3); opacity: 0; transition: opacity 120ms ease; }
+#notes-resize:hover::after, .notes-resizing #notes-resize::after { opacity: .6; }
+.notes-resizing, .notes-resizing * { cursor: ns-resize !important; user-select: none; }
+
+/* Round 16: the open counting tab keeps a continuous outline; hover never covers its borders. */
+#details-toggle::before, #details-toggle:not(:disabled):hover::before { inset: 0; }
+#details-toggle[aria-expanded="true"]:hover { background: linear-gradient(var(--fill), var(--fill)), var(--surface-deep); color: var(--label); }
+#details-toggle[aria-expanded="true"]::after {
+  top: -1px; right: -9px; width: 9px; height: 9px;
+  background:
+    radial-gradient(circle at 100% 100%, transparent 8px, var(--hair-2) 8px, var(--hair-2) 9px, transparent 9px),
+    radial-gradient(circle at 100% 100%, transparent 8px, var(--surface-deep) 8px);
+}
+
+/* Round 16: a location's remove button darkens its row only slightly on hover. */
+:root { --location-remove-hover: rgba(0, 0, 0, 0.07); }
+@media (prefers-color-scheme: dark) { :root { --location-remove-hover: rgba(0, 0, 0, 0.16); } }
+.location-row .location-remove:hover { background: var(--location-remove-hover); }
+.location-row .location-remove::before, .location-row .location-remove:hover::before { inset: 0; background: transparent; }
+
+/* Round 16: each split segment hovers as its own rounded pill; the divider is a short inset line. */
+#rescan-picker summary, #scan-options #rescan-picker summary { border-radius: var(--scan-control-radius); box-shadow: none; }
+#rescan-picker { position: relative; }
+#rescan-picker::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 1px; z-index: 1; background: var(--hair-2); pointer-events: none; }
+#scan-options #rescan-picker::before { background: #ffffff30; }
+.scan-split:has(#hub-scan:hover, #rescan-picker summary:hover, #rescan-picker[open]) #rescan-picker::before { opacity: 0; }
+.scan-split :is(#hub-scan, #rescan-picker summary)::before, .scan-split :is(#hub-scan, #rescan-picker summary):hover::before { inset: 0; }
+
+/* Round 16: an expanded cleanup row and its details read as one block; items sit 1px apart. */
+.suggestion-card:has(.item-name[aria-expanded="true"]), .suggestion-card:has(.item-name[aria-expanded="true"]):hover { background: var(--fill); border-radius: 8px 8px 0 0; }
+.suggestion-card:has(.item-name[aria-expanded="true"])::before { display: none; }
+.suggestion-details { margin: 0; }
+.suggestion-details + .suggestion-card { margin-top: 1px; }
+
+/* Round 16: export confirmations are bottom-right toasts. */
+#toasts { position: fixed; right: 20px; bottom: 20px; z-index: 10001; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; max-width: min(420px, calc(100vw - 40px)); padding: 8px 8px 8px 12px; border-radius: 10px; background: var(--card); color: var(--label); border: 1px solid var(--hair-2); box-shadow: 0 8px 24px #0000002e; font-size: var(--fs-13); }
+.toast > .i { flex: none; width: 16px; height: 16px; color: var(--success-icon); }
+.toast-copy { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toast-action { flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: 6px; background: var(--fill); color: var(--label); font: inherit; font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
+.toast-action:hover { background: var(--fill-2, var(--fill)); }
+.toast .toast-close { flex: none; width: 24px; height: 24px; min-height: 24px; border-radius: 6px; color: var(--label-2); background: transparent; }
+.toast .toast-close .i { width: 12px; height: 12px; }
+.toast .toast-close:hover { color: var(--label); background: var(--fill); }
+/* Closed, the counting button is a plain rounded pill; the flat-topped tab is only for the open panel. */
+#details-toggle:not([aria-expanded="true"]) { border-radius: 8px; }
+
+/* Round 16: slim classic scrollbars sit in their own gutter so thumbs never cover numbers. */
+::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 6px; background: color-mix(in srgb, var(--label) 22%, transparent); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--label) 36%, transparent); }
+/* One scrollbar treatment for every scrollable card: the track sits --scroll-inset from the
+   card's outer right edge, clears the rounded corners and any sticky header, and lives in a
+   reserved gutter so it never covers content. */
+:root { --scroll-inset: var(--s6); --scroll-track-block: 6px; }
+.scroll-area { scrollbar-gutter: stable; }
+.scroll-area::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }
+.table-scroll.scroll-area::-webkit-scrollbar-track { margin-top: calc(var(--scroll-head, 25px) + var(--scroll-track-block)); }
+#notes > #notes-body.scroll-area { margin-right: calc(var(--scroll-inset) - 1px); padding: 12px 8px 12px calc(var(--scroll-inset) - 1px); }
+#suggestions .list.scroll-area, #overview-folders.scroll-area { padding-right: 4px; }
+#notes-body.scroll-area::-webkit-scrollbar-track { margin-top: 36px; margin-bottom: 12px; }
+#agent-page #agent-terminal { padding-right: var(--scroll-inset); }
+#terminal-screen .xterm-viewport::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }

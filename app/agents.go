@@ -32,6 +32,11 @@ type TerminalOutput struct {
 
 func (a *App) Agents() []agents.CLI { return agents.Detect() }
 func (a *App) StartAgent(name, prompt string, cols, rows uint16) error {
+	return a.StartAgentWith(name, "", "", prompt, cols, rows)
+}
+
+// StartAgentWith launches with the Agent page model and reasoning choices.
+func (a *App) StartAgentWith(name, model, effort, prompt string, cols, rows uint16) error {
 	a.agentMu.Lock()
 	defer a.agentMu.Unlock()
 	if a.terminal != nil {
@@ -83,7 +88,7 @@ func (a *App) StartAgent(name, prompt string, cols, rows uint16) error {
 			return err
 		}
 	}
-	args, err := agents.Args(name, binary, dir, prompt)
+	args, err := agents.ArgsWith(name, binary, dir, prompt, agents.Options{Model: model, Effort: effort})
 	if err != nil {
 		return err
 	}

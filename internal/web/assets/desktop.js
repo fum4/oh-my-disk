@@ -147,9 +147,7 @@ if (nativeApp) {
     $(id).onclick = async () => {
       try {
         const path = await nativeApp.Export(summary);
-        if (path) {
-          showFeedback("Exported to " + path, "success");
-        }
+        if (path) showToast("Saved " + path.split("/").pop(), path);
       } catch (e) {
         reportError(e);
       }
