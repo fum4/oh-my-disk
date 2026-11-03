@@ -559,13 +559,12 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
   if (!document.body.classList.contains("is-scanning")) $("hub-scan").replaceChildren(
     icon("regular-arrow-clockwise"), document.createTextNode(snapshot ? "Rescan" : "Scan"), dom("span", "kbd", "⌘R"));
   $("scan-options").hidden = !snapshot;
-  const agentPage = mode === "agent";
+  // Before a scan the Agent page is the shared launch hero, like every other page;
+  // the session view (header, selectors, terminal) appears once there is a scan.
+  const agentPage = mode === "agent" && (!!snapshot || !!window.agentSessionActive?.());
   document.body.classList.toggle("agent-page-active", agentPage);
   $("agent-page").hidden = !agentPage;
   $("scan-agent-link").hidden = !snapshot || mode === "agent";
-  const launch = $("launch-cards");
-  const launchSlot = !snapshot && agentPage ? $("agent-scan-slot") : $("welcome");
-  if (launch.parentElement !== launchSlot) launchSlot.append(launch);
   $("rescan-picker").open = false;
   ["overview", "folders", "categories", "cleanup-tab", "agent"].forEach((id) => {
     $(id).classList.toggle("active", id === mode);
@@ -600,12 +599,16 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
         "Make room for what’s next.",
         "Find caches and other cleanup candidates, with guidance for every choice.",
       ],
+      agent: [
+        "Ask an agent about your disk.",
+        "Scan first to give your agent a clear picture of your disk.",
+      ],
     }[mode];
     const target = window.scanTargetLabel?.() || "Home";
     $("disk-caption").textContent = target + " is ready to scan";
     $("folder-choice").textContent = target;
     $("folder-picker").querySelector("summary").setAttribute("aria-label", "Choose scan folder, current: " + target);
-    $("launch-title").textContent = copy[0];
+    setLaunchTitle(copy[0]);
     $("launch-description").textContent = copy[1];
     $("launch-cards").hidden = false;
     window.agentViewChanged?.();
@@ -1615,6 +1618,23 @@ const scanProgressStrip = $("scan-strip");
 let scanTarget = "Home", scanCounterTimer, displayedEntries = 0, desiredEntries = 0;
 function scanningHeader() { if (snapshot) $("scan-info").textContent = "Scanning " + scanTarget + "…"; }
 // The heading is the scanned folder; before any results it is empty and takes no space.
+// Overview's hero title gently alternates "clearer" / "cleaner": only the fifth
+// letter changes, crossfading inside a fixed-width cell so nothing else moves.
+function setLaunchTitle(text) {
+  const title = $("launch-title");
+  title.setAttribute("aria-label", text);
+  const swap = text === "Your disk, a little clearer.";
+  title.classList.toggle("has-swap", swap);
+  if (!swap) { title.textContent = text; return; }
+  if (title.querySelector(".swap-letter")) return;
+  const cell = dom("span", "swap-letter");
+  cell.append(dom("span", "swap-r", "r"), dom("span", "swap-n", "n"));
+  const visual = dom("span", "");
+  visual.setAttribute("aria-hidden", "true");
+  visual.append("Your disk, a little clea", cell, "er.");
+  title.replaceChildren(visual);
+}
+document.addEventListener("visibilitychange", () => document.body.classList.toggle("page-hidden", document.hidden));
 function renderHeading() {
   const root = snapshot?.scan?.root?.path || "";
   document.querySelector(".bar.intro").hidden = !root;

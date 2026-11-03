@@ -145,19 +145,7 @@
     $("terminal-restart").disabled = !app || !installed[sessionChoice] || opening;
     $("terminal-restart").hidden = !term;
     $("agent-empty").hidden = !!term;
-    // Before a scan the Agent page has no session header: the CLI and model
-    // pickers sit under the scan bar, followed by Open Last Scan and any warning.
-    const prescan = mode === "agent" && !ready && !term;
-    const selectors = $("agent-selectors"), banner = $("access-banner");
-    $("agent-topbar").hidden = prescan;
-    if (prescan) {
-      if (selectors.nextElementSibling !== $("open-last")) $("open-last").before(selectors);
-      if (banner.previousElementSibling !== $("open-last")) $("open-last").after(banner);
-    } else {
-      if (selectors.parentElement !== $("agent-topbar")) $("agent-topbar").prepend(selectors);
-      if (banner.nextElementSibling !== $("welcome")) $("welcome").before(banner);
-    }
-    $("agent-nudge").textContent = ready ? "Your scan is ready. Ask what’s taking space or where to start." : "Scan first to give your agent a clear picture of your disk.";
+    $("agent-nudge").textContent = ready ? "Your scan is ready. Ask what’s taking space or where to start." : "Start a session to talk with your agent.";
     $("agent-start").textContent = "Start session";
     $("agent-start").disabled = !app || !installed[sessionChoice] || opening;
     $("agent-start").hidden = !ready;
@@ -361,6 +349,7 @@
     if (sessionRunning && !await confirmEnd("Restarting ends the current conversation and loads your latest scan.")) return;
     await launch(sessionChoice);
   };
+  window.agentSessionActive = () => !!term;
   window.agentViewChanged = () => { render(); if (mode === "agent") requestAnimationFrame(resize); };
   const scan = $("hub-scan").onclick;
   $("hub-scan").onclick = async () => {
