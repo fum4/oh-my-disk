@@ -3726,9 +3726,9 @@ footer { min-height: 20px; }
 #agent-page { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 #agent-page[hidden] { display: none; }
 body.agent-page-active .main-content { gap: 0; overflow: hidden; }
-body.agent-page-active .main-content > :not(#agent-page) { display: none !important; }
+body.agent-page-active .main-content > :not(#agent-page, .bar.intro) { display: none !important; }
 .agent-topbar { display: flex; align-items: center; gap: 16px; padding: 0 0 14px; flex: none; border-bottom: 1px solid var(--hair); }
-.agent-topbar #session-picker summary { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 9px; list-style: none; color: var(--label); font-size: var(--fs-13); }
+.agent-selectors #session-picker summary { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 9px; list-style: none; color: var(--label); font-size: var(--fs-13); }
 #session-picker summary::-webkit-details-marker { display: none; }
 #session-picker summary:hover { background: var(--fill); }
 #session-mark { display: inline-flex; }
@@ -4043,8 +4043,8 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 #scan-options #scan-strip { right: calc(var(--scan-split-width, 146px) + 12px); }
 
 /* Round 16: model picker, a quiet ghost dropdown beside the agent picker. */
-.agent-topbar #model-picker { margin-left: -12px; }
-.agent-topbar #model-picker summary { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 9px; list-style: none; color: var(--label); font-size: var(--fs-13); cursor: pointer; }
+.agent-selectors #model-picker { margin-left: -12px; }
+.agent-selectors #model-picker summary { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border-radius: 9px; list-style: none; color: var(--label); font-size: var(--fs-13); cursor: pointer; }
 #model-picker summary::-webkit-details-marker { display: none; }
 #model-picker summary:hover, #model-picker[open] summary { background: var(--fill); }
 #effort-choice { color: var(--label-2); }
@@ -4155,3 +4155,19 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 #notes-body.scroll-area::-webkit-scrollbar-track { margin-top: 36px; margin-bottom: 12px; }
 #agent-page #agent-terminal { padding-right: var(--scroll-inset); }
 #terminal-screen .xterm-viewport::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }
+
+/* Agent page before a scan: no session header; CLI + model sit under the scan bar. */
+.agent-selectors { display: flex; align-items: center; gap: 16px; }
+#agent-topbar[hidden] { display: none; }
+.launch-card .agent-selectors { margin-top: 16px; justify-content: center; }
+.launch-card .agent-selectors #session-picker summary,
+.launch-card .agent-selectors #model-picker summary { height: 32px; color: var(--label-2); font-size: var(--fs-12); }
+.launch-card .agent-selectors #session-picker summary:hover,
+.launch-card .agent-selectors #model-picker summary:hover,
+.launch-card .agent-selectors #model-picker[open] summary { color: var(--label); }
+#agent-scan-slot #open-last { margin-top: 8px; color: var(--label-2); }
+#agent-scan-slot #open-last:hover { color: var(--label); }
+#agent-scan-slot #access-banner { margin: 24px 0 0; width: 100%; max-width: 560px; text-align: left; }
+#agent-start[hidden] { display: none; }
+/* Agent page shares the scanned-path title + subtitle with the other pages (hidden before a scan). */
+body.agent-page-active .bar.intro { margin-bottom: 16px; }

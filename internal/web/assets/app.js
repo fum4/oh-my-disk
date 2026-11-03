@@ -605,9 +605,8 @@ function showMode(next, fromOverview = false, historyNavigation = false) {
     $("disk-caption").textContent = target + " is ready to scan";
     $("folder-choice").textContent = target;
     $("folder-picker").querySelector("summary").setAttribute("aria-label", "Choose scan folder, current: " + target);
-    const landing = mode === "overview";
-    $("launch-title").textContent = landing ? "A place for every byte." : copy[0];
-    $("launch-description").textContent = landing ? "Scan a folder to see what’s taking space." : copy[1];
+    $("launch-title").textContent = copy[0];
+    $("launch-description").textContent = copy[1];
     $("launch-cards").hidden = false;
     window.agentViewChanged?.();
     document.querySelector(".view-switch").hidden = true;
