@@ -14,7 +14,7 @@ import (
 func main() {
 	const size = 1024
 	im := image.NewNRGBA(image.Rect(0, 0, size, size))
-	palette := []color.NRGBA{{182, 152, 242, 255}, {126, 109, 217, 255}, {113, 151, 239, 255}, {94, 199, 203, 255}, {198, 164, 243, 255}, {148, 120, 219, 255}}
+	palette := []color.NRGBA{{244, 244, 246, 255}, {190, 191, 198, 255}, {218, 219, 224, 255}, {138, 139, 147, 255}, {244, 244, 246, 255}, {190, 191, 198, 255}}
 	for y := 0; y < size; y++ {
 		for x := 0; x < size; x++ {
 			var rr, gg, bb, aa float64
@@ -26,7 +26,7 @@ func main() {
 					c := color.NRGBA{}
 					if distance < 0 {
 						t := py / 1024
-						c = color.NRGBA{uint8(31 - 11*t), uint8(32 - 10*t), uint8(55 - 17*t), 255}
+						c = color.NRGBA{uint8(28 - 14*t), uint8(29 - 14*t), uint8(34 - 16*t), 255}
 						r := math.Hypot(px-512, py-512)
 						angle := math.Atan2(py-512, px-512) + math.Pi
 						if r > 143 && r < 359 {
@@ -42,13 +42,13 @@ func main() {
 							}
 						}
 						if r < 116 {
-							c = color.NRGBA{211, 195, 250, 255}
+							c = color.NRGBA{244, 244, 246, 255}
 						}
 						if r < 57 {
-							c = color.NRGBA{39, 34, 64, 255}
+							c = color.NRGBA{20, 21, 26, 255}
 						}
 						if math.Hypot(px-512, py-505) < 15 {
-							c = color.NRGBA{182, 152, 242, 255}
+							c = color.NRGBA{138, 139, 147, 255}
 						}
 					}
 					rr += float64(c.R) * float64(c.A) / 255
