@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oh-my-disk-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Check publishing configuration
+        env:
+          SIGNING_KEY: ${{ secrets.RELEASES_SIGNING_KEY }}
+          ACCESS_KEY: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          SECRET_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
+        run: |
+          test -n "$SIGNING_KEY" && test -n "$ACCESS_KEY" && test -n "$SECRET_KEY" || {
+            echo '::error::Provision Nomadware publishing secrets using fum4/releases secrets:gh-push.'
+            exit 1
+          }
+      - name: Validate Linux
+        run: |
+          go build ./...
+          go test -race ./...
+          go vet ./...
+          python3 -m unittest discover -s scripts -p 'test_release_*.py'
+      - name: Select release version
+        id: version
+        run: echo "version=$(python3 scripts/release-version.py)" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+      - name: Validate macOS
+        run: |
+          go test -race ./...
+          go vet ./...
+      - name: Build universal app and release assets
+        run: |
+          make app-universal
+          ./scripts/package-release.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out trusted release publisher
+        uses: actions/checkout@v4
+        with:
+          repository: fum4/releases
+          ref: c0160088f704756b93bf260fe7ff3b5787c686c8
+          path: .release-publisher
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist/release
+      - name: Prepare resumable GitHub release
+        run: ./scripts/publish-github-release.sh prepare
+      - name: Detect completed Nomadware publish on retries
+        id: published
+        run: |
+          done=$(python3 scripts/verify-release.py detect)
+          echo "done=$done" >> "$GITHUB_OUTPUT"
+      - name: Publish signed checksums, binaries and DMG to Nomadware
+        if: steps.published.outputs.done != 'true'
+        uses: ./.release-publisher
+        with:
+          package: oh-my-disk
+          version: ${{ needs.prepare.outputs.version }}
+          dist: dist/release
+          signing-key: ${{ secrets.RELEASES_SIGNING_KEY }}
+          r2-access-key-id: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          r2-secret-access-key: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
+      - name: Install publisher toolchain for catalogue repair
+        if: steps.published.outputs.done == 'true'
+        uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d
+        with:
+          working_directory: .release-publisher
+          install_args: rclone
+      - name: Repair catalogue on completed publish retries
+        if: steps.published.outputs.done == 'true'
+        env:
+          RELEASES_SIGNING_KEY: ${{ secrets.RELEASES_SIGNING_KEY }}
+          R2_RELEASES_ACCESS_KEY_ID: ${{ secrets.R2_RELEASES_ACCESS_KEY_ID }}
+          R2_RELEASES_SECRET_ACCESS_KEY: ${{ secrets.R2_RELEASES_SECRET_ACCESS_KEY }}
+        run: ./.release-publisher/bin/publish --index-only
+      - name: Publish GitHub release
+        run: ./scripts/publish-github-release.sh finish

@@ -1,0 +1,94 @@
+name: CI
+on: [pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  infra:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@6be3c7ed4c21d4f76b208d351d95aac273ebb76d
+      - name: Validate Terraform without state or credentials
+        run: mise run tf:check
+
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: go build ./...
+      - name: Test with race detector
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Read release publisher pin
+        id: publisher
+        run: |
+          python3 -c 'import os, pathlib, re; pin = re.search(r"ref: ([a-f0-9]{40})", pathlib.Path(".github/workflows/release.yml").read_text()).group(1); print("ref=" + pin, file=open(os.environ["GITHUB_OUTPUT"], "a"))'
+      - uses: actions/checkout@v4
+        with:
+          repository: fum4/releases
+          ref: ${{ steps.publisher.outputs.ref }}
+          path: .release-publisher
+          persist-credentials: false
+      - name: Release script regression tests
+        run: python3 -m unittest discover -s scripts -p "test_release_*.py"
+      - name: Lint release shell scripts
+        if: runner.os == 'Linux'
+        run: shellcheck scripts/package-release.sh scripts/publish-github-release.sh scripts/build-app.sh
+      - name: Build CLI artifact
+        shell: bash
+        run: |
+          mkdir -p dist
+          go build -trimpath -o dist/oh-my-disk .
+          tar -czf "oh-my-disk-$(go env GOOS)-$(go env GOARCH).tar.gz" -C dist oh-my-disk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ runner.os }}-${{ runner.arch }}
+          path: oh-my-disk-*.tar.gz
+          if-no-files-found: error
+
+  desktop:
+    needs: test
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_VERSION: v1.0.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.10'
+      - name: Build universal macOS app
+        run: make app-universal
+      - name: Build four CLI release targets and verify DMG
+        run: ./scripts/package-release.sh
+      - name: Verify app signature and architectures
+        run: |
+          codesign --verify --deep --strict build/bin/oh-my-disk.app
+          lipo build/bin/oh-my-disk.app/Contents/MacOS/oh-my-disk -verify_arch arm64 x86_64
+          lipo build/bin/oh-my-disk.app/Contents/MacOS/oh-my-disk-cli -verify_arch arm64 x86_64
+      - name: Package app
+        run: ditto -c -k --sequesterRsrc --keepParent build/bin/oh-my-disk.app oh-my-disk-macos-universal.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-universal
+          path: |
+            oh-my-disk-macos-universal.zip
+            dist/release/*
+          if-no-files-found: error

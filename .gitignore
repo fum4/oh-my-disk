@@ -1,0 +1,14 @@
+/oh-my-disk
+/.build/
+/.fixtures/
+*.test
+/build/bin/
+/app/frontend/
+
+/dist/
+/scripts/__pycache__/
+
+# Generated icon design comparisons; generators remain in scripts/.
+/build/icon-variants/
+/build/icon-palettes/
+/build/icon-colorful/

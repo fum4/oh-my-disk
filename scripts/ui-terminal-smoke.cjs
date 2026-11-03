@@ -1,0 +1,43 @@
+// Exercise the actual vendored xterm parser, without mocking its buffer or ANSI handling.
+const assert = require("node:assert/strict");
+const { Terminal } = require("../internal/web/assets/vendor/xterm.js");
+const { Unicode11Addon } = require("../internal/web/assets/vendor/addon-unicode11.js");
+(async () => {
+  const term = new Terminal({ cols: 40, rows: 6, scrollback: 10000, allowProposedApi: true });
+  term.loadAddon(new Unicode11Addon());
+  term.unicode.activeVersion = "11";
+  const write = data => new Promise(resolve => term.write(data, resolve));
+  const line = row => term.buffer.active.getLine(row).translateToString(true);
+  await write("prior shell output");
+  await write("\x1b[?1049h\x1b[2J\x1b[H\x1b[38;2;120;180;240m╭─ Claude · Codex ─╮\x1b[0m\r\n中文 🙂");
+  assert.equal(term.buffer.active.type, "alternate");
+  assert.equal(line(0), "╭─ Claude · Codex ─╮");
+  assert.equal(term.buffer.active.getLine(0).getCell(0).getFgColor(), 0x78b4f0);
+  assert.equal(line(1), "中文 🙂");
+  assert.equal(term.buffer.active.getLine(1).getCell(0).getWidth(), 2);
+  assert.equal(term.buffer.active.getLine(1).getCell(5).getWidth(), 2);
+  // Streaming UTF-8 can split a glyph across PTY reads.
+  const split = Buffer.from("界");
+  await write("\x1b[3;1H");
+  await write(split.subarray(0, 1));
+  await write(split.subarray(1));
+  assert.equal(line(2), "界");
+  await write("\x1b[2J\x1b[H╭─ Redrawn ─╮\r\n│ ready    │");
+  assert.equal(line(0), "╭─ Redrawn ─╮");
+  assert.equal(line(2), "");
+  term.resize(100, 30);
+  assert.equal(term.cols, 100);
+  assert.equal(term.rows, 30);
+  let response = "";
+  term.onData(data => response += data);
+  await write("\x1b[6n");
+  assert.match(response, /\x1b\[\d+;\d+R/);
+  await write("\x1b[?1049l");
+  assert.equal(term.buffer.active.type, "normal");
+  assert.equal(line(0), "prior shell output");
+  await write("\r\n" + "scrollback line\r\n".repeat(120));
+  assert.ok(term.buffer.active.baseY > 0);
+  assert.ok(term.buffer.active.length > term.rows);
+  term.dispose();
+  console.log("PASS: real xterm alternate screen, full redraw, truecolor, box drawing, Unicode 11 widths, split UTF-8, resize, terminal query response, normal-screen restoration and scrollback.");
+})().catch(error => { console.error(error); process.exit(1); });
