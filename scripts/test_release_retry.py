@@ -70,7 +70,9 @@ class ReleaseRetryTest(unittest.TestCase):
             raise subprocess.CalledProcessError(1, "sig_verify")
         return ""
 
-    def urlopen(self, url, timeout):
+    def urlopen(self, request, timeout):
+        self.assertEqual(request.get_header("User-agent"), "oh-my-disk-release-verifier/1.0")
+        url = request.full_url
         self.assertEqual(timeout, 60)
         name = url.rsplit("/", 1)[1]
         self.requests.append(name)
