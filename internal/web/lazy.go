@@ -2,13 +2,16 @@ package web
 
 import (
 	"encoding/json"
+	"net/http"
+	"slices"
+	"sort"
+	"strconv"
+	"sync"
+
 	"github.com/fum4/oh-my-disk/internal/agents"
 	"github.com/fum4/oh-my-disk/internal/report"
 	"github.com/fum4/oh-my-disk/internal/rules"
 	"github.com/fum4/oh-my-disk/internal/scanner"
-	"net/http"
-	"sort"
-	"strconv"
 )
 
 func param(r *http.Request, name string, def, min, max int) (int, bool) {
@@ -87,6 +90,45 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 		budget := 1200
 		respond(w, visible(t, int32(id), depth, offset, limit, &budget, key, asc))
 	})
+	// The tree is immutable for this API instance. Keep one index and a
+	// bounded set of immutable sorted orders for pagination and revisits.
+	var indexOnce sync.Once
+	index := make(map[string][]int32)
+	type categorySort struct {
+		name, key string
+		asc       bool
+	}
+	var categoryMu sync.Mutex
+	orders := make(map[categorySort][]int32)
+	var recent []categorySort
+	categoryIDs := func(name, key string, asc bool) []int32 {
+		indexOnce.Do(func() {
+			for id := int32(0); id < t.Count; id++ {
+				e := t.At(id)
+				if e.OwnBytes > 0 && int(e.Category) < len(t.Categories) {
+					category := t.Categories[e.Category]
+					index[category] = append(index[category], id)
+				}
+			}
+		})
+		query := categorySort{name, key, asc}
+		categoryMu.Lock()
+		defer categoryMu.Unlock()
+		if ids, ok := orders[query]; ok {
+			recent = slices.DeleteFunc(recent, func(entry categorySort) bool { return entry == query })
+			recent = append(recent, query)
+			return ids
+		}
+		ids := slices.Clone(index[name])
+		orderIds(t, ids, key, asc, true)
+		if len(recent) == 4 {
+			delete(orders, recent[0])
+			recent = recent[1:]
+		}
+		recent = append(recent, query)
+		orders[query] = ids
+		return ids
+	}
 	mux.HandleFunc("/api/category", func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("name")
 		if _, ok := s.Categories[name]; !ok {
@@ -99,19 +141,12 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 			http.Error(w, "invalid offset/limit", 400)
 			return
 		}
-		ids := []int32{}
-		for id := int32(0); id < t.Count; id++ {
-			e := t.At(id)
-			if e.OwnBytes > 0 && int(e.Category) < len(t.Categories) && t.Categories[e.Category] == name {
-				ids = append(ids, id)
-			}
-		}
 		key, asc, ok := sortParams(r)
 		if !ok {
 			http.Error(w, "invalid sort", 400)
 			return
 		}
-		orderIds(t, ids, key, asc, true)
+		ids := categoryIDs(name, key, asc)
 		n := &scanner.Node{Name: name, Path: name, Kind: "directory", Bytes: s.Categories[name], ChildCount: len(ids), ChildOffset: offset}
 		if offset > len(ids) {
 			offset = len(ids)
@@ -176,6 +211,19 @@ func sortParams(r *http.Request) (string, bool, bool) {
 	return key, r.URL.Query().Get("asc") == "1", key == "bytes" || key == "name" || key == "files" || key == "modified"
 }
 func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
+	// Materialize each path at most once, and only when a primary key ties.
+	var paths map[int32]string
+	path := func(id int32) string {
+		if paths == nil {
+			paths = make(map[int32]string, len(ids))
+		}
+		if value, ok := paths[id]; ok {
+			return value
+		}
+		value := t.Path(id)
+		paths[id] = value
+		return value
+	}
 	sort.Slice(ids, func(i, j int) bool {
 		a, b := ids[i], ids[j]
 		cmp := 0
@@ -210,7 +258,7 @@ func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
 		}
 		if cmp == 0 {
 			if own {
-				return t.LessPath(a, b)
+				return path(a) < path(b)
 			}
 			return t.Name(a) < t.Name(b)
 		}

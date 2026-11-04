@@ -426,7 +426,7 @@
       </symbol>
     </svg>
     <aside class="side">
-      <div class="side-brand"><img src="/brand-icon.png" alt="" width="24" height="24" draggable="false" /><span>oh-my-disk</span></div>
+      <div class="side-brand">oh-my-disk</div>
       <nav class="group" aria-label="Main navigation">
         <button id="overview" class="nv active">
           <svg class="i" aria-hidden="true">
@@ -700,7 +700,7 @@
             </div>
             <div class="fh">
               <span></span><span>Folder</span><span></span
-              ><span class="rt">Share</span><span class="rt">Size</span>
+              ><span class="rt">Share of scan</span><span class="rt">Size</span>
             </div>
             <div id="overview-folders" class="scroll-area"></div>
           </section>
@@ -743,7 +743,7 @@
                   <thead>
                     <tr>
                       <th><button data-sort="name">Name</button></th>
-                      <th>Share</th>
+                      <th id="explorer-share">Share</th>
                       <th><button data-sort="bytes">Size</button></th>
                       <th><button data-sort="files">Files</button></th>
                       <th>
@@ -777,9 +777,9 @@
           </details>
           <button id="model-hint" class="model-hint" hidden>Restart to apply</button>
           </div>
-          <span id="terminal-status" role="status">Ready</span>
+          <span id="terminal-status" role="status"></span>
           <div class="sp"></div>
-          <button id="agent-start" class="btn pri" hidden>Start session</button>
+          <button id="agent-start" class="btn pri" hidden>Ask agent</button>
           <button id="terminal-restart" class="btn ghost" aria-label="Restart session" title="Restart session"><svg class="i" aria-hidden="true"><use href="#regular-arrow-clockwise"/></svg><span class="agent-action-label">Restart session</span></button>
           <button id="terminal-close" class="btn ghost" aria-label="Stop session" title="Stop session" hidden><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.75"/></svg><span class="agent-action-label">Stop</span></button>
           <button id="terminal-copy" hidden>Copy</button><button id="terminal-paste" hidden>Paste</button>
