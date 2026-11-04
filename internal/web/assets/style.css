@@ -279,19 +279,6 @@ main {
   height: 24px;
   margin-bottom: var(--s4);
 }
-.step {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--fill-2);
-  color: var(--label-2);
-  font-size: var(--fs-12);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
 .ch h2 {
   font-size: var(--fs-15);
   font-weight: 600;
@@ -913,9 +900,6 @@ button:hover {
   position: sticky;
   bottom: 0;
   z-index: 2;
-}
-.full-view .ch .step {
-  display: none;
 }
 .suggestion-controls {
   display: flex;
@@ -1962,8 +1946,7 @@ dialog {
   .card {
     padding: 16px;
   }
-  .ch .r,
-  .ch .step {
+  .ch .r {
     display: none;
   }
   .ch {
@@ -2775,7 +2758,6 @@ body:has(#welcome:not([hidden])) #hub-scan {
   }
   .lg .d,
   .lh,
-  .step,
   .ch .r {
     display: none;
   }
@@ -2880,7 +2862,6 @@ button.agent-option:hover, .agent-option[aria-pressed="true"] { background: var(
 #suggestions > .gain { order: 1; }
 #suggestions > :not(.ch):not(.gain) { order: 3; }
 #suggestions .gain .v { font-size: var(--fs-40); }
-#suggestions .step, .overview-left .step { display: none; }
 #suggestions .cnt, #suggestions .ba { display: none; }
 /* Put the cleanup opportunity first in both reading and visual order. */
 #content-grid:not(.full-view) #suggestions { grid-column: 1; grid-row: 1; }
