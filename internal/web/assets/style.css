@@ -474,6 +474,7 @@ main {
   font-weight: 600;
   font-size: var(--fs-13);
   text-align: right;
+  white-space: nowrap;
 }
 /* folders */
 .fh,
@@ -1040,6 +1041,14 @@ select:hover {
 .map-panel {
   min-width: 0;
 }
+.panel-top > span {
+  white-space: nowrap;
+}
+.panel-top > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .panel-top {
   display: flex;
   justify-content: space-between;
@@ -1378,27 +1387,9 @@ dialog pre {
     margin: 8px;
     padding: 12px;
   }
-  .side .group {
-    display: flex;
-    margin-top: 8px;
-    flex-wrap: wrap;
-  }
   .side .group + .group,
   .vol {
     display: none;
-  }
-  .nv {
-    width: auto;
-    flex: 1;
-    justify-content: center;
-    padding: 0 4px;
-    font-size: var(--fs-12);
-  }
-  .nv .ct {
-    display: none;
-  }
-  .nv svg {
-    width: 14px;
   }
   .main-content {
     padding: 12px;
@@ -1850,9 +1841,6 @@ dialog {
   }
   .title {
     flex-basis: 100%;
-  }
-  .side .group {
-    gap: 2px;
   }
 }
 .badge.personal svg {
@@ -2954,6 +2942,7 @@ body:has(#welcome:not([hidden])) .scan-split,
 @media (min-width: 701px) and (max-width: 1150px) {
   .ring { grid-template-columns: 120px minmax(0, 1fr); gap: 12px; }
   .rc { width: 120px; height: 120px; }
+  .rc .v { font-size: var(--fs-17); }
 }
 @media (max-height: 760px) {
   .ring { display: flex; gap: 12px; }
@@ -2968,7 +2957,8 @@ body:has(#welcome:not([hidden])) .scan-split,
   .bar .sp { display: none; }
   .scan-split .kbd { display: none; }
   .ring { display: flex; }
-  .rc { width: 150px; height: 150px; }
+  .rc { width: 120px; height: 120px; }
+  .rc .v { font-size: var(--fs-17); }
   .options-strip { gap: 6px; }
   .options-strip .export-cards { margin-left: 0; }
 }
