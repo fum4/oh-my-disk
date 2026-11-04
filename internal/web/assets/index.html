@@ -534,10 +534,12 @@
         <h2 id="scan-target">Home</h2>
         <p id="progress" role="status" aria-live="polite">Walking folders…</p>
         <div class="scan-orbit">
-          <svg id="scan-spinner" viewBox="0 0 280 280" role="progressbar" aria-label="Scanning folders">
-            <circle class="scan-track" cx="140" cy="140" r="124"/>
-            <circle class="scan-sweep" cx="140" cy="140" r="124"/>
-          </svg>
+          <div id="scan-rotor">
+            <svg id="scan-spinner" viewBox="0 0 280 280" role="progressbar" aria-label="Scanning folders">
+              <circle class="scan-track" cx="140" cy="140" r="124"/>
+              <circle class="scan-sweep" cx="140" cy="140" r="124"/>
+            </svg>
+          </div>
           <div class="scan-count"><strong id="scan-count" class="num">0</strong><span>items</span></div>
         </div>
         <p id="scan-stats" class="num">0 folders · 0/s</p>

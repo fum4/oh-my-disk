@@ -2996,10 +2996,11 @@ body:has(#welcome:not([hidden])) #counting-disclosure { display: none; }
   white-space: normal;
 }
 .scan-orbit { position: relative; width: clamp(180px, 30vh, 280px); aspect-ratio: 1; margin: 12px 0 4px; flex: none; }
-/* Rotate the outer <svg> box, not the arc inside it: WebKit (the app's WKWebView) only
-   hands transform animations on CSS boxes to the compositor. An animated SVG child is
-   repainted from the web process main thread and can sit still while the app is busy. */
-#scan-spinner { display: block; width: 100%; height: 100%; margin: 0; overflow: visible; transform-origin: 50% 50%; will-change: transform; animation: scan-orbit 3.6s linear infinite; }
+/* Animate a plain HTML box wrapping the static SVG. WebKit (the app's WKWebView) hands
+   transform and opacity animations on HTML boxes to the compositor; animating the <svg>
+   root or its children left the ring frozen at its first frame during a scan. */
+#scan-rotor { width: 100%; height: 100%; transform-origin: 50% 50%; will-change: transform; animation: scan-orbit 3.6s linear infinite; }
+#scan-spinner { display: block; width: 100%; height: 100%; margin: 0; overflow: visible; }
 #scan-spinner circle { fill: none; stroke-width: 12; }
 .scan-track { stroke: var(--c-free); }
 .scan-sweep { stroke: var(--c-files); stroke-linecap: round; stroke-dasharray: 210 780; transform: rotate(-90deg); transform-origin: 140px 140px; }
@@ -3057,8 +3058,7 @@ footer { min-height: 20px; }
 }
 @media (prefers-reduced-motion: reduce) {
   /* Reduced motion: no rotation; the arc breathes slowly so the scan still reads as live. */
-  #scan-spinner { animation: none !important; will-change: auto; }
-  #scan-spinner .scan-sweep { animation: scan-pulse 2.4s ease-in-out infinite !important; }
+  #scan-rotor { animation: scan-pulse 2.4s ease-in-out infinite !important; will-change: opacity; }
 }
 /* Reserve a complete header and at least one list row above the drawer. */
 #agent-terminal { max-height: min(50vh, calc(100dvh - 440px)); }
