@@ -82,15 +82,31 @@ function chartTooltip(node, label, bytes) {
 let navigationVersion = 0;
 const categoryOrders = new WeakMap();
 const explorerOrder = () => sortKey + ":" + sortAsc;
+const SLOW_LOAD_MS = 500;
+let loadsInFlight = 0;
+// The spinner only appears for loads the user would otherwise wonder about.
+async function withLoadingIndicator(load) {
+  loadsInFlight++;
+  const timer = setTimeout(() => { $("explorer-loading").hidden = false; }, SLOW_LOAD_MS);
+  try {
+    return await load();
+  } finally {
+    clearTimeout(timer);
+    if (!--loadsInFlight) $("explorer-loading").hidden = true;
+  }
+}
 async function loadChildren(n, offset = 0) {
   if (n.synthetic && !n.category_name) return;
   const order = explorerOrder();
   const url = n.category_name
     ? `/api/category?name=${encodeURIComponent(n.category_name)}&offset=${offset}&sort=${sortKey}&asc=${Number(sortAsc)}`
     : `/api/node?id=${n.id}&depth=3&offset=${offset}&sort=${sortKey}&asc=${Number(sortAsc)}`;
-  const r = await fetch(url);
+  const r = await withLoadingIndicator(() => fetch(url).then(async response => {
+    // Include the body: a large response is part of what the user waits for.
+    return { ok: response.ok, status: response.status, data: response.ok ? await response.json() : null };
+  }));
   if (!r.ok) throw Error("Unable to load folder: " + r.status);
-  const data = await r.json();
+  const data = r.data;
   if (n.category_name && (order !== explorerOrder() || (offset &&
       (categoryOrders.get(n) !== order || n.children.length !== offset)))) return;
   if (offset) {

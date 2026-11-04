@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +106,49 @@ func TestLazyPagesAndBudget(t *testing.T) {
 		if page.ChildCount != 17500 || len(page.Children) != 2 || page.Children[0].Path != tc.firstPath {
 			t.Fatalf("incorrect category page for %q: %+v", tc.query, page)
 		}
+	}
+	// Pages crossing the selected prefix stay in one global order, with no repeats.
+	seen := map[string]bool{}
+	previous := int64(1 << 62)
+	for offset := 0; offset < 3000; offset += 500 {
+		var page scanner.Node
+		json.Unmarshal(get(fmt.Sprintf("/api/category?name=unknown&limit=500&offset=%d", offset)).Body.Bytes(), &page)
+		if len(page.Children) != 500 {
+			t.Fatalf("offset %d: %d children", offset, len(page.Children))
+		}
+		for _, c := range page.Children {
+			if seen[c.Path] || c.Bytes > previous {
+				t.Fatalf("offset %d: %s repeated or out of order", offset, c.Path)
+			}
+			seen[c.Path] = true
+			previous = c.Bytes
+		}
+	}
+}
+
+func TestFirstIdsMatchesFullSortPrefix(t *testing.T) {
+	ids := make([]int32, 5000)
+	for i := range ids {
+		ids[i] = int32((i * 2654435761) % 5000)
+	}
+	// Heavy primary-key ties, like millions of one-block files, with an id tie-break.
+	less := func(a, b int32) bool {
+		if a%7 != b%7 {
+			return a%7 < b%7
+		}
+		return a < b
+	}
+	input := slices.Clone(ids)
+	want := slices.Clone(ids)
+	sort.Slice(want, func(i, j int) bool { return less(want[i], want[j]) })
+	for _, k := range []int{1, 2, 199, 200, 1000, 2500, 4999, 5000, 9000} {
+		got := firstIds(ids, k, less)
+		if !slices.Equal(got, want[:min(k, len(want))]) {
+			t.Fatalf("k=%d: wrong prefix", k)
+		}
+	}
+	if !slices.Equal(ids, input) {
+		t.Fatal("firstIds reordered the shared category index")
 	}
 }
 

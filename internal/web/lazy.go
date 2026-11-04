@@ -14,6 +14,9 @@ import (
 	"github.com/fum4/oh-my-disk/internal/scanner"
 )
 
+// categoryPrefix is how many ids a category order selects up front: several pages.
+const categoryPrefix = 1000
+
 func param(r *http.Request, name string, def, min, max int) (int, bool) {
 	s := r.URL.Query().Get(name)
 	if s == "" {
@@ -101,7 +104,10 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 	var categoryMu sync.Mutex
 	orders := make(map[categorySort][]int32)
 	var recent []categorySort
-	categoryIDs := func(name, key string, asc bool) []int32 {
+	// categoryIDs returns at least the first `need` ids in order, and the category's
+	// total. A category can hold millions of entries and a page shows 200, so only
+	// the requested prefix is ever ordered.
+	categoryIDs := func(name, key string, asc bool, need int) ([]int32, int) {
 		indexOnce.Do(func() {
 			for id := int32(0); id < t.Count; id++ {
 				e := t.At(id)
@@ -111,23 +117,24 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 				}
 			}
 		})
+		all := index[name]
 		query := categorySort{name, key, asc}
 		categoryMu.Lock()
 		defer categoryMu.Unlock()
-		if ids, ok := orders[query]; ok {
+		ids, cached := orders[query]
+		if cached {
 			recent = slices.DeleteFunc(recent, func(entry categorySort) bool { return entry == query })
-			recent = append(recent, query)
-			return ids
-		}
-		ids := slices.Clone(index[name])
-		orderIds(t, ids, key, asc, true)
-		if len(recent) == 4 {
+		} else if len(recent) == 4 {
 			delete(orders, recent[0])
 			recent = recent[1:]
 		}
 		recent = append(recent, query)
-		orders[query] = ids
-		return ids
+		if !cached || (len(ids) < need && len(ids) < len(all)) {
+			// Select ahead so paging through a category does not reselect every page.
+			ids = firstIds(all, max(2*need, categoryPrefix), idLess(t, key, asc, true))
+			orders[query] = ids
+		}
+		return ids, len(all)
 	}
 	mux.HandleFunc("/api/category", func(w http.ResponseWriter, r *http.Request) {
 		name := r.URL.Query().Get("name")
@@ -146,8 +153,8 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 			http.Error(w, "invalid sort", 400)
 			return
 		}
-		ids := categoryIDs(name, key, asc)
-		n := &scanner.Node{Name: name, Path: name, Kind: "directory", Bytes: s.Categories[name], ChildCount: len(ids), ChildOffset: offset}
+		ids, total := categoryIDs(name, key, asc, offset+limit)
+		n := &scanner.Node{Name: name, Path: name, Kind: "directory", Bytes: s.Categories[name], ChildCount: total, ChildOffset: offset}
 		if offset > len(ids) {
 			offset = len(ids)
 		}
@@ -211,21 +218,40 @@ func sortParams(r *http.Request) (string, bool, bool) {
 	return key, r.URL.Query().Get("asc") == "1", key == "bytes" || key == "name" || key == "files" || key == "modified"
 }
 func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
-	// Materialize each path at most once, and only when a primary key ties.
-	var paths map[int32]string
-	path := func(id int32) string {
-		if paths == nil {
-			paths = make(map[int32]string, len(ids))
-		}
-		if value, ok := paths[id]; ok {
-			return value
-		}
-		value := t.Path(id)
-		paths[id] = value
-		return value
+	less := idLess(t, key, asc, own)
+	sort.Slice(ids, func(i, j int) bool { return less(ids[i], ids[j]) })
+}
+
+// firstIds returns the k first ids under less, leaving ids untouched. Each compaction
+// raises the bar, so nearly every later id is rejected by a single comparison.
+func firstIds(ids []int32, k int, less func(a, b int32) bool) []int32 {
+	if k >= len(ids) {
+		out := slices.Clone(ids)
+		sort.Slice(out, func(i, j int) bool { return less(out[i], out[j]) })
+		return out
 	}
-	sort.Slice(ids, func(i, j int) bool {
-		a, b := ids[i], ids[j]
+	kept := make([]int32, 0, 2*k)
+	compact := func() {
+		sort.Slice(kept, func(i, j int) bool { return less(kept[i], kept[j]) })
+		kept = kept[:min(k, len(kept))]
+	}
+	full := false
+	for _, id := range ids {
+		if full && !less(id, kept[k-1]) {
+			continue
+		}
+		kept = append(kept, id)
+		if len(kept) == 2*k {
+			compact()
+			full = true
+		}
+	}
+	compact()
+	return kept
+}
+
+func idLess(t *scanner.Tree, key string, asc, own bool) func(a, b int32) bool {
+	return func(a, b int32) bool {
 		cmp := 0
 		switch key {
 		case "name":
@@ -258,7 +284,7 @@ func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
 		}
 		if cmp == 0 {
 			if own {
-				return path(a) < path(b)
+				return t.LessPath(a, b)
 			}
 			return t.Name(a) < t.Name(b)
 		}
@@ -266,7 +292,7 @@ func orderIds(t *scanner.Tree, ids []int32, key string, asc, own bool) {
 			return cmp < 0
 		}
 		return cmp > 0
-	})
+	}
 }
 
 func volume(s *report.Snapshot) *report.Volume {
