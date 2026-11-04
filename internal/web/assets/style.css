@@ -111,8 +111,8 @@
   :root {
     --window: #1c1e24;
     --card: #2b2e35;
-    --fill: #333439;
-    --fill-2: #3e3f45;
+    --fill: #363941;
+    --fill-2: #434650;
     --sidebar-active: rgba(255, 255, 255, 0.07);
     --sidebar-hover: rgba(255, 255, 255, 0.045);
     --hair: #e6eaff16;
@@ -120,7 +120,7 @@
     --label: #eeeef1;
     --label-2: #b3b4bd;
     --label-3: #9899a4;
-    --surface-deep: #17181b;
+    --surface-deep: #181a1f;
     --blue: #6ca5ff;
     --blue-hover: #4388ee;
     --blue-tint: #293c59;
@@ -140,7 +140,7 @@
     --select-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cpath fill='%23b3b4bd' d='M213.66,101.66l-80,80a8,8,0,0,1-11.32,0l-80-80A8,8,0,0,1,53.66,90.34L128,164.69l74.34-74.35a8,8,0,0,1,11.32,11.32Z'/%3E%3C/svg%3E");
     --c-files: #6793ec;
     --c-sys: #747680;
-    --c-free: #3c3e45;
+    --c-free: #3a3d45;
     --shadow-card:
       0 0 0 0.5px #ffffff0d, 0 1px 2px #0002, 0 4px 16px -4px #0003;
     --shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.45);
@@ -624,7 +624,7 @@ main {
   top: 0;
   bottom: 0;
   width: 7.8%;
-  background: var(--label);
+  background: var(--label-2);
   border-radius: var(--r-xs) 0 0 var(--r-xs);
 }
 .babar .add {
@@ -1252,8 +1252,8 @@ dialog pre {
   width: 40px;
   height: 40px;
   border-radius: var(--r-md);
-  background: #fdecea;
-  color: var(--red);
+  background: color-mix(in srgb, var(--error-foreground) 12%, var(--card));
+  color: var(--error-foreground);
 }
 .dialog-icon svg {
   width: 24px;
@@ -1469,15 +1469,6 @@ dialog pre {
   }
   .vol {
     background: #ffffff08;
-  }
-  .gain {
-    background: linear-gradient(180deg, #3b3225, #383025);
-  }
-  .babar .now {
-    background: #b3b4bd;
-  }
-  .dialog-icon {
-    background: #512e2a;
   }
   .sw {
     box-shadow: none !important;
@@ -3235,7 +3226,6 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 .is-scanning .it .d { color: var(--label-2); background: transparent; }
 .is-scanning .rc svg { opacity: 1; }
 .is-scanning .rc .t { visibility: visible; }
-.dialog-icon { background: color-mix(in srgb, var(--error-foreground) 12%, var(--card)); color: var(--error-foreground); }
 
 .files-panel table { border-collapse: separate; border-spacing: 0; }
 .item-name:hover::before { background: var(--fill); }
