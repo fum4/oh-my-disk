@@ -105,7 +105,7 @@ async function loadChildren(n, offset = 0) {
   index(n, parents.get(n), colors.get(n));
   n.loaded = true;
 }
-async function navigate(n) {
+async function navigate(n, located = "") {
   if (n.more_parent) {
     try {
       const p = n.more_parent;
@@ -124,6 +124,7 @@ async function navigate(n) {
     if (!n.synthetic || (n.category_name && categoryOrders.get(n) !== explorerOrder())) await loadChildren(n);
     if (version !== navigationVersion) return;
     current = n;
+    locatedPath = located;
     resetExplorerScroll();
     shown = 200;
     $("tooltip").hidden = true;
@@ -133,6 +134,28 @@ async function navigate(n) {
   }
 }
 
+// Opens a scanned item in Folders, keeping every ancestor in the breadcrumbs. A file
+// opens its folder with its row marked, since only folders can be drilled into.
+let locatedPath = "";
+async function openInFolders(path) {
+  const r = await fetch(`/api/locate?path=${encodeURIComponent(path)}`);
+  if (r.status === 404) throw Error("This item is no longer in the scan. Rescan to refresh.");
+  if (!r.ok) throw Error("Unable to open folder: " + r.status);
+  const chain = await r.json();
+  showMode("folders", mode === "overview");
+  let node = root;
+  for (const step of chain.slice(1)) {
+    const known = (node.children || []).find(c => c.id === step.id);
+    if (!known) {
+      parents.set(step, node);
+      colors.set(step, colors.get(node));
+    }
+    node = known || step;
+  }
+  if (node.kind === "directory") await navigate(node);
+  else await navigate(parents.get(node) || root, path);
+  document.querySelector("#children .located-row")?.scrollIntoView({ block: "nearest" });
+}
 function ordered(n) {
   return [...(n.children || [])].sort(
     (a, b) => b.bytes - a.bytes || a.name.localeCompare(b.name),
@@ -413,7 +436,7 @@ function renderTable() {
   const body = $("children");
   body.replaceChildren();
   for (const n of children.slice(0, shown)) {
-    const tr = dom("tr"),
+    const tr = dom("tr", n.path === locatedPath ? "located-row" : undefined),
       name = dom("td"),
       b = dom(n.kind === "directory" || n.synthetic ? "button" : "span", "file-label"),
       dot = dom("i", "dot");
@@ -562,6 +585,7 @@ document.addEventListener("keydown", e => {
 function resetExplorerScroll() { document.querySelector(".table-scroll").scrollTop = 0; }
 function showMode(next, fromOverview = false, historyNavigation = false) {
   if (next !== mode) {
+    locatedPath = "";
     if (next !== "overview") restoreOverviewAfterFilter = false;
     if (fromOverview && mode === "overview" && !historyNavigation) {
       overviewScroll = captureScroll();
@@ -776,11 +800,18 @@ function renderSuggestions() {
     pathText.append(dom("span", "path-prefix", s.path.slice(0, slash + 1)), dom("span", "path-tail", s.path.slice(slash + 1)));
     pathText.title = s.path;
     pathLine.append(pathText);
-    if (window.go?.main?.App) {
-      const reveal = itemActions(s.path);
-      reveal.lastElementChild?.remove();
-      pathLine.append(reveal);
-    }
+    const actions = window.go?.main?.App ? itemActions(s.path) : dom("div", "item-actions");
+    if (window.go?.main?.App) actions.lastElementChild?.remove();
+    const openFolder = dom("button", "icon-action");
+    openFolder.title = "Open in Folders";
+    openFolder.setAttribute("aria-label", openFolder.title);
+    openFolder.append(icon("regular-folder-open"));
+    openFolder.onclick = e => {
+      e.stopPropagation();
+      openInFolders(s.path).catch(err => showToast(err.message, "", "error"));
+    };
+    actions.prepend(openFolder);
+    pathLine.append(actions);
     const facts = dom("dl", "detail-facts");
     facts.append(dom("dt", "", "Why"), dom("dd", "", s.explanation || s.rule),
       dom("dt", "", "Score"), dom("dd", "num", `${Math.round(s.score)} · ${s.personal ? "your files" : s.safety === "cache" ? "safe cache" : s.safety === "reinstallable" ? "reinstallable data" : "review before cleaning"} · unused ${s.stale_days} days`));

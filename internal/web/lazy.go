@@ -90,6 +90,19 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 		budget := 1200
 		respond(w, visible(t, int32(id), depth, offset, limit, &budget, key, asc))
 	})
+	mux.HandleFunc("/api/locate", func(w http.ResponseWriter, r *http.Request) {
+		id := t.Find(r.URL.Query().Get("path"))
+		if id < 0 {
+			http.Error(w, "path is not in this scan", 404)
+			return
+		}
+		chain := []*scanner.Node{}
+		for ; id >= 0; id = t.At(id).Parent {
+			chain = append(chain, t.View(id, 0, 0))
+		}
+		slices.Reverse(chain)
+		respond(w, chain)
+	})
 	// The tree is immutable for this API instance. Keep one index and a
 	// bounded set of immutable sorted orders for pagination and revisits.
 	var indexOnce sync.Once

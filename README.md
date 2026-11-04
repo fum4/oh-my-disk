@@ -64,7 +64,7 @@ Finder** and **Copy path** actions. Suggested commands can be copied as text.
 **Export JSON** writes the full tree; **Export LLM summary** writes a bounded
 summary with up to 50 top entries and 50 cleanup suggestions. Both use native save dialogs and refuse to overwrite an
 existing file, even if the save dialog offers Replace. Choose a new filename.
-Select folder table rows or Cleanup suggestions with checkboxes. The sticky selection bar shows count and total size; **Move to Trash** opens a dialog listing every path and the total. Nothing moves until you confirm. Per-item failures remain visible. Successful moves trigger a fresh scan to update totals.
+Each cleanup suggestion's details also have **Open in Folders**, which jumps to that folder in the explorer with its breadcrumbs; a file opens its folder with its row marked. Select folder table rows or Cleanup suggestions with checkboxes. The sticky selection bar shows count and total size; **Move to Trash** opens a dialog listing every path and the total. Nothing moves until you confirm. Per-item failures remain visible. Successful moves trigger a fresh scan to update totals.
 
 The app probes protected `~/Library` folders. If macOS denies access, a banner
 links to **System Settings → Privacy & Security → Full Disk Access**. Enable the
