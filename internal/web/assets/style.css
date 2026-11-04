@@ -95,7 +95,8 @@
   --motion-panel: 180ms; /* keep in step with the hide timer in toggleNotes (app.js) */
   --ease: ease;
   /* layout */
-  --cleanup-columns: 18px 28px minmax(0, 1fr) 80px 44px 72px;
+  --cleanup-columns: 18px 28px minmax(0, 1fr) 80px 56px 72px;
+  --scrollbar-size: 10px; /* the gutter ::-webkit-scrollbar reserves */
   --scan-control-height: 36px;
   --scan-control-radius: var(--r-ctl);
   --scroll-inset: var(--s6);
@@ -355,6 +356,7 @@ main {
   gap: var(--s4);
 }
 .card {
+  min-width: 0;
   background: var(--card);
   border-radius: var(--r-card);
   box-shadow: var(--shadow-card);
@@ -438,7 +440,7 @@ main {
   gap: var(--s3);
   align-items: center;
   padding: 10px 0;
-  border-bottom: 0.5px solid var(--hair);
+  border-bottom: var(--hairline) solid var(--hair);
 }
 .li:last-child {
   border-bottom: 0;
@@ -474,19 +476,24 @@ main {
   font-size: var(--fs-12);
   color: var(--label-2);
   font-weight: 500;
-  padding-bottom: var(--s2);
-  border-bottom: 0.5px solid var(--hair);
+  /* Same inset as the rows: list padding + row padding, plus the scrollbar gutter on the right. */
+  padding: 0 calc(var(--s3) + var(--scrollbar-size)) var(--s2) var(--s3);
+  border-bottom: var(--hairline) solid var(--hair-2);
 }
-.fh .rt,
-.fr .rt {
+.fh .rt {
+  /* Too wide for its column: stays on one line and grows left over the empty bar column. */
+  justify-self: end;
   text-align: right;
+  white-space: nowrap;
 }
 .fr {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
   height: 48px;
-  border-bottom: 0.5px solid var(--hair);
-}
-.fr:last-child {
-  border-bottom: 0;
+  padding: 0 var(--s2);
+  border-radius: var(--r-ctl);
+  text-align: left;
 }
 .tile {
   width: 28px;
@@ -503,7 +510,12 @@ main {
   height: 16px;
 }
 .fr .n {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: visible;
   font-weight: 500;
+  white-space: nowrap;
 }
 .fr .p {
   color: var(--label-2);
@@ -516,7 +528,7 @@ main {
 .track {
   height: 6px;
   border-radius: var(--r-full);
-  background: var(--fill);
+  background: var(--fill-2);
 }
 .track i {
   display: block;
@@ -636,7 +648,7 @@ main {
 .lh,
 .it {
   display: grid;
-  grid-template-columns: 18px 28px 1fr 80px 32px 64px;
+  grid-template-columns: var(--cleanup-columns);
   gap: var(--s3);
   align-items: center;
 }
@@ -644,8 +656,8 @@ main {
   font-size: var(--fs-12);
   color: var(--label-2);
   font-weight: 500;
-  padding: var(--s2) var(--s2);
-  border-bottom: 0.5px solid var(--hair);
+  padding: var(--s2);
+  border-bottom: var(--hairline) solid var(--hair-2);
 }
 .lh .rt,
 .it .rt {
@@ -655,18 +667,11 @@ main {
   margin: 0 calc(-1 * var(--s2));
 }
 .it {
+  position: relative;
+  flex-shrink: 0;
   height: 58px;
   padding: 0 var(--s2);
   border-radius: var(--r-ctl);
-  position: relative;
-}
-.it + .it:before {
-  content: "";
-  position: absolute;
-  left: 74px;
-  right: 8px;
-  top: 0;
-  border-top: 0.5px solid var(--hair);
 }
 .it .tile {
   background: var(--fill);
@@ -680,9 +685,12 @@ main {
   text-overflow: ellipsis;
 }
 .it .d {
+  overflow: hidden;
+  margin-top: 2px;
   font-size: var(--fs-12);
   color: var(--label-2);
-  margin-top: 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .badge {
   display: inline-flex;
@@ -819,19 +827,6 @@ button:hover {
   min-height: 0;
   overflow: auto;
 }
-.fr {
-  width: 100%;
-  text-align: left;
-  border-radius: 0;
-}
-.fr:hover {
-  border-radius: var(--r-ctl);
-}
-.fr .n {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .seg button {
   height: 24px;
   padding: 0 12px;
@@ -862,17 +857,6 @@ button:hover {
   overflow: auto;
   flex: 1;
 }
-.it {
-  height: 58px;
-  flex-shrink: 0;
-}
-.it:hover {
-  background: var(--fill);
-}
-.it:hover:before,
-.it:hover + .it:before {
-  display: none;
-}
 .it input,
 .files-panel input {
   appearance: none;
@@ -902,11 +886,6 @@ button:hover {
 .it:has(input:checked) .tile {
   background: var(--blue-tint);
   color: var(--blue);
-}
-.it .d {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .item-title {
   min-width: 0;
@@ -1060,21 +1039,6 @@ select {
 #explorer {
   min-width: 0;
 }
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding-bottom: 16px;
-  color: var(--label-2);
-}
-.breadcrumbs button {
-  padding: 4px 8px;
-  overflow-wrap: anywhere;
-  max-width: 100%;
-  text-align: left;
-  color: var(--blue);
-}
 .workspace {
   display: grid;
   grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.3fr);
@@ -1086,7 +1050,8 @@ select {
 .panel-top {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--s4);
+  margin-inline: -12px; /* cancels .map-panel's canvas inset: labels sit on the column edge */
   font-size: var(--fs-12);
   color: var(--label-2);
 }
@@ -1122,6 +1087,8 @@ select {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  /* Lines up with the table cells below it: left cell inset, right cell inset + scrollbar gutter. */
+  padding: 0 calc(var(--s2) + var(--scrollbar-size)) 0 var(--s2);
 }
 .eyebrow {
   font-size: var(--fs-12);
@@ -1180,12 +1147,17 @@ th:nth-child(4) {
 th:last-child {
   width: 15%;
 }
+#explorer-share {
+  /* Wider than its column: one line, growing left over the free space in Name. */
+  direction: rtl;
+  white-space: nowrap;
+}
 th button {
   font-size: var(--fs-12);
   padding: 8px 0;
 }
 td {
-  border-top: 0.5px solid var(--hair);
+  border-top: var(--hairline) solid var(--hair);
   padding: 12px 4px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -1194,28 +1166,16 @@ td {
 td:first-child {
   text-align: left;
 }
-td:first-child > button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-align: left;
-  max-width: calc(100% - 26px);
-  padding: 4px;
-}
 .filename {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-td:first-child > input {
-  vertical-align: middle;
-  margin-right: 4px;
-}
 .size-bar {
   height: 6px;
   border-radius: var(--r-full);
-  background: var(--fill);
-  margin: 4px 0 0 30px;
+  background: var(--fill-2); /* --fill disappeared against the hovered row */
+  margin: var(--s1) 0 0 28px;
   overflow: hidden;
 }
 .size-bar i {
@@ -1362,13 +1322,8 @@ dialog pre {
   }
   .fh,
   .fr {
-    grid-template-columns: 28px minmax(80px, 1fr) minmax(24px, 0.6fr) 40px 68px;
-    gap: 8px;
-  }
-  .lh,
-  .it {
-    grid-template-columns: 18px 28px minmax(0, 1fr) 74px 30px 60px;
-    gap: 8px;
+    grid-template-columns: 28px minmax(80px, 1fr) minmax(24px, 0.6fr) 48px 72px;
+    gap: var(--s2);
   }
   .tools .cnt {
     display: none;
@@ -1425,16 +1380,6 @@ dialog pre {
   .bar {
     margin-bottom: 12px;
   }
-  .fh,
-  .fr {
-    grid-template-columns: 28px 136px 1fr 48px 80px;
-    gap: 12px;
-  }
-  .lh,
-  .it {
-    grid-template-columns: 18px 28px minmax(0, 1fr) 80px 32px 64px;
-    gap: 12px;
-  }
 }
 @media (max-width: 700px) {
   .side {
@@ -1477,9 +1422,6 @@ dialog pre {
   .bar .btn svg {
     display: none;
   }
-  .card {
-    padding: 16px;
-  }
   .ring {
     grid-template-columns: 1fr;
     gap: 0;
@@ -1489,15 +1431,9 @@ dialog pre {
   }
   .fh,
   .fr {
-    grid-template-columns: 28px minmax(70px, 1fr) minmax(20px, 0.6fr) 40px 64px;
-    gap: 8px;
+    grid-template-columns: 28px minmax(70px, 1fr) minmax(20px, 0.6fr) 48px 68px;
+    gap: var(--s2);
   }
-  .lh,
-  .it {
-    grid-template-columns: 18px 24px minmax(0, 1fr) 68px 28px 54px;
-    gap: 6px;
-  }
-  .lh,
   .it .s {
     font-size: var(--fs-12);
   }
@@ -1511,9 +1447,6 @@ dialog pre {
   }
   .badge svg {
     width: 12px;
-  }
-  .it .d {
-    font-size: var(--fs-12);
   }
   .selbar .t {
     flex-basis: 100%;
@@ -1616,16 +1549,8 @@ dialog pre {
 #children td {
   padding: 8px 4px;
 }
-#children td:first-child > button {
-  padding: 0;
-  min-height: 20px;
-}
-#children .item-actions {
-  display: none;
-}
-#children tr:hover .item-actions,
-#children tr:focus-within .item-actions {
-  display: flex;
+#children tr:first-child td {
+  border-top: 0;
 }
 .suggestion-controls {
   flex-wrap: wrap;
@@ -1692,9 +1617,6 @@ a:focus-visible,
 }
 .grid {
   margin-bottom: 0;
-}
-.card {
-  min-width: 0;
 }
 .folder-card {
   display: flex;
@@ -1764,33 +1686,7 @@ thead {
   top: 0;
   z-index: 2;
   background: var(--card);
-  box-shadow: 0 1px var(--hair-2);
-}
-th button {
-  min-height: 32px;
-}
-#children td:first-child {
-  position: relative;
-  padding-right: 68px;
-}
-#children td:first-child > button {
-  max-width: calc(100% - 26px);
-  min-height: 28px;
-}
-#children .item-actions {
-  display: flex;
-  position: absolute;
-  right: 4px;
-  top: 8px;
-  margin: 0;
-  flex-wrap: nowrap;
-  opacity: 0;
-  pointer-events: none;
-}
-#children tr:hover .item-actions,
-#children tr:focus-within .item-actions {
-  opacity: 1;
-  pointer-events: auto;
+  box-shadow: 0 var(--hairline) var(--hair-2);
 }
 .item-actions .icon-action {
   display: inline-flex;
@@ -1811,9 +1707,6 @@ th button {
   padding: 4px 8px;
   border-radius: var(--r-sm);
   z-index: 3;
-}
-.size-bar {
-  margin-left: 28px;
 }
 .map-panel {
   display: flex;
@@ -1971,13 +1864,8 @@ dialog {
   }
   .fh,
   .fr {
-    grid-template-columns: 24px minmax(40px, 1fr) minmax(12px, 0.3fr) 40px 60px;
-    gap: 6px;
-  }
-  .lh,
-  .it {
-    grid-template-columns: 18px 24px minmax(0, 1fr) 68px 28px 54px;
-    gap: 6px;
+    grid-template-columns: 28px minmax(40px, 1fr) minmax(12px, 0.3fr) 48px 64px;
+    gap: var(--s2);
   }
   .it .tile {
     width: 24px;
@@ -2073,12 +1961,6 @@ dialog {
 }
 .icon-action {
   position: relative;
-}
-@media (hover: none) {
-  #children .item-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 .vbar i,
 .babar i {
@@ -3160,9 +3042,7 @@ button:not(:disabled):hover::before, summary:hover::before { inset: -1px; }
 .rc .t { inset: 0; text-align: center; gap: var(--s1); }
 .rc .u, .rc .pill { margin-top: 0; }
 .ring { grid-template-columns: 180px minmax(0, 1fr); gap: 20px; }
-#overview-folders { padding: 1px 3px; }
-.fr, .fr:hover { border-radius: var(--r-ctl); padding: 0 8px; border-bottom: 0; }
-.fh { padding-left: 11px; padding-right: 11px; }
+#overview-folders { padding: 2px var(--s1); }
 .agent-menu.floating-menu {
   position: fixed; right: auto; bottom: auto; z-index: 10000;
   max-width: calc(100vw - 24px); overflow-y: auto; overscroll-behavior: contain;
@@ -3179,7 +3059,7 @@ button:not(:disabled):hover::before, summary:hover::before { inset: -1px; }
 #rescan-new { margin-top: 4px; }
 .options-strip {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px;
-  flex: none; padding: 0 0 10px; border-bottom: 1px solid var(--hair);
+  flex: none; padding: 0 0 10px; border-bottom: var(--hairline) solid var(--hair-2);
   font-size: var(--fs-12); --wails-draggable: no-drag;
 }
 .options-strip #desktop { flex: 1; min-width: 120px; max-width: 240px; }
@@ -3231,7 +3111,7 @@ body:has(#welcome:not([hidden])) .scan-split,
 
 .banner button, #scan-strip button, #rescan-picker summary { border: 0; }
 #rescan-picker summary { box-shadow: inset 1px 0 var(--hair-2); }
-.agent-option, .it, .location-row { border-radius: var(--r-ctl); }
+.agent-option, .location-row { border-radius: var(--r-ctl); }
 
 /* Round 10: one scan command, focused progress, and disclosures that own their content. */
 .gh, .segment-label, .scan-command-bar #agent-analyze { color: var(--label-2); }
@@ -3279,7 +3159,6 @@ body:has(#welcome:not([hidden])) #counting-disclosure { display: none; }
 .bar .title { position: relative; }
 #overview-back { display: flex; width: max-content; margin: -4px 0 4px -8px; font-size: var(--fs-12); color: var(--label-2); }
 .page-link { gap: 6px; cursor: pointer; white-space: nowrap; font-size: var(--fs-12); }
-.breadcrumbs button { color: var(--label); cursor: pointer; border-radius: var(--r-sm); }
 .breadcrumbs button:hover { background: var(--fill); }
 .breadcrumbs button[aria-current] { font-weight: 600; }
 .category-summary :is(th, td):nth-child(n+4) { display: none; }
@@ -3376,7 +3255,7 @@ footer { min-height: 20px; }
 #agent-page[hidden] { display: none; }
 body.agent-page-active .main-content { gap: 0; overflow: hidden; }
 body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-banner, #scan-strip) { display: none !important; }
-.agent-topbar { display: flex; align-items: center; gap: 16px; padding: 0 0 14px; flex: none; border-bottom: 1px solid var(--hair); }
+.agent-topbar { display: flex; align-items: center; gap: 16px; padding: 0 0 14px; flex: none; border-bottom: var(--hairline) solid var(--hair-2); }
 .agent-selectors #session-picker summary { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: var(--r-ctl); list-style: none; color: var(--label); font-size: var(--fs-13); }
 #session-picker summary::-webkit-details-marker { display: none; }
 #session-picker summary:hover { background: var(--fill); }
@@ -3431,13 +3310,18 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 .feedback-copy { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 #scan-feedback { align-items: center; flex-wrap: wrap; }
 #open-last { align-self: flex-start; flex: none; }
+/* -10px cancels the 2px scroll inset and the button's 8px, so crumb text sits on the card edge. */
 .breadcrumbs {
-  flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
-  max-width: 100%; height: 44px; min-height: 44px; padding: 2px 2px 8px;
-  overscroll-behavior: contain;
+  display: flex; align-items: center; gap: var(--s2);
+  flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; overscroll-behavior: contain;
+  height: 44px; min-height: 44px; margin-left: -10px; padding: 2px 2px var(--s2);
+  color: var(--label-2);
 }
 .breadcrumbs > * { flex: none; }
-.breadcrumbs button { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.breadcrumbs button {
+  max-width: 280px; padding: var(--s1) var(--s2); overflow: hidden; border-radius: var(--r-sm);
+  color: var(--label); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+}
 #tooltip { max-width: min(380px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); overflow: auto; overflow-wrap: anywhere; pointer-events: auto; }
 .legend > span { min-width: 0; max-width: 100%; }
 .legend .legend-label { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font-weight: 400; }
@@ -3450,18 +3334,16 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #children td:nth-child(3) { font-weight: 600; }
 #children tr:hover { background: transparent; }
 #children tr:hover td { background: var(--fill); }
-#children td:first-child { border-radius: var(--r-ctl) 0 0 var(--r-ctl); }
-#children td:last-child { border-radius: 0 var(--r-ctl) var(--r-ctl) 0; }
+#children tr:hover td:first-child { border-radius: var(--r-ctl) 0 0 var(--r-ctl); }
+#children tr:hover td:last-child { border-radius: 0 var(--r-ctl) var(--r-ctl) 0; }
 .table-scroll { padding: 1px 4px; }
-/* Header and rows share one inset and reserve the actual scrollbar width. */
-#suggestions .lh, #suggestions .it { grid-template-columns: 18px 28px minmax(0, 1fr) 80px 40px 64px; padding-left: 8px; padding-right: 8px; }
 #suggestions .list { margin: 0; padding: 0; }
+/* The header stops where the rows do, before the scrollbar gutter. */
 #suggestions .lh { margin-right: var(--cleanup-gutter, 0px); }
 .side .nv.active:hover { background: color-mix(in srgb, var(--sidebar-active) 85%, var(--label) 4%); }
 /* Row spacing leaves room for the same 1px paint growth as standalone controls. */
 :is(.fr, .nv, .agent-option, .item-name, th button)::before { content: ""; }
 :is(.fr, .nv, .agent-option, .item-name, th button):hover::before { inset: -1px; }
-#overview-folders, .agent-menu { padding-block: 2px; }
 .scan-split, .scan-split #hub-scan { border-radius: var(--scan-control-radius); }
 #rescan-picker summary { border-radius: 0 var(--scan-control-radius) var(--scan-control-radius) 0; }
 #hub-scan, #rescan-picker summary { height: var(--scan-control-height); min-height: var(--scan-control-height); }
@@ -3480,7 +3362,6 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #scan-strip #scan-path { flex: 1; width: auto; }
 #scan-strip #cancel-scan { margin: 0; }
 @media (max-width: 700px) {
-  #suggestions .lh, #suggestions .it { grid-template-columns: 18px 24px minmax(0, 1fr) 68px 40px 54px; }
   #scan-strip #scan-path { display: none; }
 }
 
@@ -3539,9 +3420,8 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 .scan-command-bar #scan-agent-slot { min-width: 0; flex: 0 1 auto; }
 .scan-command-bar #agent-choice { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .scan-command-bar #plain-scan { flex: none; }
-#suggestions .lh, #suggestions .it { grid-template-columns: var(--cleanup-columns); gap: 12px; padding-left: 8px; padding-right: 8px; }
 .cleanup-head { flex: none; width: 100%; border-spacing: 0; border-collapse: separate; }
-.cleanup-head thead { display: block; }
+.cleanup-head thead { display: block; box-shadow: none; }
 .cleanup-head th { width: auto; padding: 0; text-align: left; min-width: 0; }
 .cleanup-head th.rt { text-align: right; }
 .cleanup-head th button { min-height: 28px; padding: 4px 0; width: 100%; justify-content: flex-start; text-align: inherit; display: inline-flex; align-items: center; gap: 3px; color: var(--label-2); }
@@ -3550,7 +3430,7 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 th button { position: relative; color: var(--label-2); }
 th button:hover { background: var(--fill); color: var(--label); }
 .files-panel th { padding: 0 4px; }
-.suggestion-details { padding: 12px 8px 16px 78px; background: var(--fill); border-top: 1px solid var(--hair); border-bottom: 0; border-radius: 0 0 var(--r-ctl) var(--r-ctl); overflow: hidden; }
+.suggestion-details { padding: 12px 8px 16px 78px; background: var(--fill); border-top: var(--hairline) solid var(--hair); border-bottom: 0; border-radius: 0 0 var(--r-ctl) var(--r-ctl); overflow: hidden; }
 .detail-path { display: flex; align-items: center; gap: 8px; min-width: 0; margin-bottom: 8px; }
 .detail-path > span { font: var(--fs-11) var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .detail-path .item-actions { margin: 0; flex: none; }
@@ -3562,9 +3442,6 @@ th button:hover { background: var(--fill); color: var(--label); }
 .detail-command code { flex: 1; min-width: 0; white-space: pre; overflow-x: auto; color: var(--label); }
 .icon-action, .detail-command .icon-action { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; min-height: 28px; padding: 0; flex: none; color: var(--label-2); background: transparent; }
 .icon-action:hover { color: var(--label); background: var(--fill); }
-.fr { position: relative; }
-.fr .item-actions { position: absolute; right: 8px; margin: 0; background: var(--card); border-radius: var(--r-sm); opacity: 0; pointer-events: none; }
-.fr:hover .item-actions, .fr:focus-within .item-actions { opacity: 1; pointer-events: auto; }
 .fr:hover .n, .item-name:hover, .file-label:hover, .filename:hover { color: var(--label); }
 /* Accounting is a fixed trigger with an upward overlay and a joined button tab. */
 #counting-slot { min-width: 0; }
@@ -3582,7 +3459,7 @@ th button:hover { background: var(--fill); color: var(--label); }
 #notes > h3:first-of-type { margin-top: 0; padding-right: 32px; }
 #remembered-card { order: -1 !important; flex: none; max-height: 42vh; overflow: auto; padding: 16px; border-radius: var(--r-md); margin-bottom: 16px; }
 .remembered-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-.remembered-row { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--success-border); }
+.remembered-row { display: flex; align-items: center; gap: 8px; border-top: var(--hairline) solid var(--success-border); }
 .remembered-choice { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; padding: 10px 0; cursor: pointer; }
 .remembered-choice input { width: 18px; height: 18px; flex: none; accent-color: var(--primary); }
 .remembered-name { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 4px; }
@@ -3596,11 +3473,11 @@ th button:hover { background: var(--fill); color: var(--label); }
 .remember-toggle { display: flex; align-items: center; gap: 8px; margin: 16px 0; color: var(--label); font-size: var(--fs-13); }
 #remembered-manager { width: min(640px, calc(100vw - 48px)); }
 #remembered-paths { max-height: 50vh; overflow: auto; margin: 16px 0; }
-.remembered-managed { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--hair); }
+.remembered-managed { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: var(--hairline) solid var(--hair); }
 .remembered-managed > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font: var(--fs-11) var(--mono); }
 @media (max-width: 700px) {
   :root { --cleanup-columns: 18px 24px minmax(0, 1fr) 68px 40px 58px; }
-  #suggestions .lh, #suggestions .it { gap: 8px; }
+  .lh, .it { gap: var(--s2); }
   .suggestion-details { padding-left: 66px; }
   .notes-reveal { width: min(640px, calc(100vw - 48px)); }
   .scan-command-bar .kbd { display: none; }
@@ -3612,7 +3489,6 @@ th button:hover { background: var(--fill); color: var(--label); }
 #remembered-card .btn.pri { background: var(--primary); color: var(--on-primary); }
 #remembered-card .btn.pri:hover { background: var(--primary-hover); }
 #scan-feedback > .icon-action { margin-left: auto; }
-#suggestions .lh { display: grid; }
 .location-remove.icon-action { width: 20px; height: 20px; min-height: 20px; }
 .detail-path > .ellipsized-path { display: flex; overflow: hidden; }
 .path-prefix { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -3623,7 +3499,6 @@ th button:hover { background: var(--fill); color: var(--label); }
 #scan-feedback > .icon-action:hover { color: var(--label); background: var(--fill); }
 
 /* Round 15: div rows keep their hover paint out of flow, so ::before never takes a grid column. */
-.fr { isolation: isolate; }
 .fr::before { position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; background: inherit; }
 .fr .p, .fr .s { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .folder-card #overview-folders { flex: 0 1 auto; }
@@ -3666,14 +3541,13 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 #model-picker .agent-menu { width: 220px; }
 #model-picker .agent-option { padding: 8px 10px; font-size: var(--fs-13); }
 #model-picker .agent-option:disabled { color: var(--label-2); cursor: default; }
-#effort-section { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--hair); }
+#effort-section { margin-top: 4px; padding-top: 4px; border-top: var(--hairline) solid var(--hair); }
 .model-menu-label { padding: 6px 10px 4px; color: var(--label-2); font-size: var(--fs-11); font-weight: 600; }
 #model-note { margin: 4px 0 0; padding: 6px 10px 4px; color: var(--label-2); font-size: var(--fs-12); }
 .model-hint { border: 0; background: none; padding: 4px 8px; border-radius: var(--r-sm); color: var(--label-2); font: inherit; font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
 .model-hint:hover { background: var(--fill); color: var(--label); }
 
 /* Round 16: folder-row actions sit right after the name, shown on hover/focus, no reflow. */
-.fr .n { display: flex; align-items: center; min-width: 0; overflow: visible; }
 .fr .n .nt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fr .n .item-actions { position: relative; inset: auto; z-index: 1; display: flex; flex: none; flex-wrap: nowrap; gap: 2px; width: 0; margin: 0 0 0 6px; overflow: visible; background: none; opacity: 0; pointer-events: none; }
 #children .file-entry .item-actions { position: static; display: flex; flex: none; flex-wrap: nowrap; gap: 2px; margin: 0 0 0 -2px; min-height: 0; opacity: 0; pointer-events: none; }
@@ -3762,7 +3636,7 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 .scroll-area::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }
 .table-scroll.scroll-area::-webkit-scrollbar-track { margin-top: calc(var(--scroll-head, 25px) + var(--scroll-track-block)); }
 #notes > #notes-body.scroll-area { margin-right: calc(var(--scroll-inset) - 1px); padding: 12px 8px 12px calc(var(--scroll-inset) - 1px); }
-#suggestions .list.scroll-area, #overview-folders.scroll-area { padding-right: 4px; }
+#suggestions .list.scroll-area { padding-right: var(--s1); }
 #notes-body.scroll-area::-webkit-scrollbar-track { margin-top: 36px; margin-bottom: 12px; }
 #agent-page #agent-terminal { padding-right: var(--scroll-inset); }
 #terminal-screen .xterm-viewport::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }
