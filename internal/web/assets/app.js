@@ -1542,8 +1542,18 @@ function renderOverview() {
     document.createTextNode(reclaimDisplay[0]),
     dom("small", "", reclaimDisplay[1]),
   );
-  $("reclaim-note").textContent = "Safe caches and reinstallable data only." +
-    (notCounted > 0 ? ` Another ${fmt(notCounted)} in your own files and unrecognized folders isn't counted.` : "");
+  $("reclaim-note").replaceChildren(dom("p", "", "Only caches and data you can rebuild or download again."));
+  if (notCounted > 0) {
+    const more = dom("p", "", `Another ${fmt(notCounted)} can be cleaned after you review it. `);
+    const review = dom("button", "link", "Review it");
+    // Largest lists personal files and unrecognized folders, which Best leaves out.
+    review.onclick = () => {
+      if (suggestionSort !== "size") document.querySelector('[data-suggest-sort="size"]').click();
+      $("review-cleanup").click();
+    };
+    more.append(review);
+    $("reclaim-note").append(more);
+  }
   $("rail-count").textContent =
     suggestionCount + (suggestionCount === 1 ? " suggestion" : " suggestions");
   $("free-now").textContent = v ? gb(free) : "—";

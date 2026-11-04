@@ -510,9 +510,14 @@ main {
   margin-top: 2px;
 }
 .reclaim-note {
-  margin-top: 2px;
+  display: grid;
+  gap: 2px;
+  margin-top: var(--s1);
   font-size: var(--fs-12);
   color: var(--label-2);
+}
+.reclaim-note .link {
+  font-size: inherit;
 }
 .gain .v small {
   font-size: var(--fs-17);

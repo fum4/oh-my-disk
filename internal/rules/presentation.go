@@ -16,7 +16,7 @@ func CleanupScore(raw float64) float64 {
 	return 100 * raw / (raw + 1e9)
 }
 
-// Reclaimable reports whether a suggestion counts toward "You could get back":
+// Reclaimable reports whether a suggestion counts toward "Safe clean":
 // complete, regenerable and not personal. Anything else is listed for review only.
 func (s Suggestion) Reclaimable() bool {
 	return !s.Incomplete && !PersonalData(s.Path) && (s.Safety == "cache" || s.Safety == "reinstallable")
