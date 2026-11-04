@@ -464,11 +464,13 @@ main {
 .li .n {
   font-weight: 500;
   font-size: var(--fs-13);
+  line-height: 18px;
 }
 .li .d {
   font-size: var(--fs-12);
+  line-height: 16px;
   color: var(--label-2);
-  margin-top: 1px;
+  margin-top: 2px;
 }
 .li .v {
   font-weight: 600;
@@ -727,6 +729,7 @@ main {
   overflow: hidden;
   margin-top: 2px;
   font-size: var(--fs-12);
+  line-height: 16px;
   color: var(--label-2);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -910,7 +913,7 @@ input[type="checkbox"]:checked:after {
   text-align: left;
   width: 100%;
   padding: 0;
-  line-height: 1.4;
+  line-height: 18px;
 }
 .item-name:hover {
   background: transparent;
@@ -3141,8 +3144,6 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 
 @media (max-width: 700px) {
   #scan-options #web-scan { min-width: 0; flex: 1; }
-  #scan-options .web-target { gap: 0; font-size: 0; }
-  #scan-options .web-target input { width: 100%; font-size: var(--fs-12); }
 }
 #suggestions .gain .babar .add { background: var(--success-icon); }
 #scan-options #web-scan-status { display: none; }
@@ -3309,6 +3310,8 @@ th button:hover { background: var(--fill); color: var(--label); }
 @media (max-width: 1000px) {
   :root { --cleanup-columns: 18px minmax(0, 1fr) 64px 60px; }
   .it .tile, .it .sc, .cleanup-head th:nth-child(2), .cleanup-head th:nth-child(5) { display: none; }
+  #scan-options .web-target { gap: 0; font-size: 0; }
+  #scan-options .web-target input { width: 100%; font-size: var(--fs-12); }
 }
 #remembered-paths { max-height: 50vh; overflow: auto; margin: 16px 0; }
 .remembered-managed { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: var(--hairline) solid var(--hair); }
