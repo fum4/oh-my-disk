@@ -260,6 +260,12 @@ normal pretty JSON writer, final uses compact streaming JSON:
 | Peak RSS, load + full export process | 2,621 MiB | 183 MiB |
 
 Raw measurements: `.build/baseline-export.txt`, `.build/cache-export.txt`.
+Category drill-down orders only the page's prefix instead of the whole category.
+On a real 1.72M-entry home over local HTTP, first open went from 967 ms to 96 ms
+(`unknown`), 718 ms to 49 ms (`caches`) and 1,166 ms to 65 ms (project artifacts);
+the first re-sort went from 728 ms to 50 ms. Jumping to offset 20,000, a hundred
+pages of **More**, costs 1.7 s; the explorer shows a spinner past 500 ms.
+
 The before export measurement calls the original `report.LoadCache`, `Export`
 and `WriteJSON` directly, with stdout redirected to `/dev/null`. The final
 measurement uses `cmd/perf -load .build/final-cache/latest.bin -export`.

@@ -4226,6 +4226,7 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) button:hover { color: v
 .detail-command .command-run:hover:not(:disabled) { color: var(--green); background: var(--fill); }
 .detail-command .command-run:disabled { opacity: .45; cursor: default; }
 .detail-command .command-run.running { opacity: 1; }
+#explorer-loading { flex: none; margin: 0 var(--s2) 0 auto; align-self: center; }
 .run-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--green) 28%, transparent); border-top-color: var(--green); animation: spin .8s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .run-spinner { animation: run-pulse 1.6s ease-in-out infinite !important; border-color: var(--green); } }
 @keyframes run-pulse { 50% { opacity: .35; } }
