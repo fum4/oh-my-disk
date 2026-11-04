@@ -3328,6 +3328,7 @@ th button:hover { background: var(--fill); color: var(--label); }
 #scan-feedback > .icon-action:hover { color: var(--label); background: var(--fill); }
 
 /* Round 15: div rows keep their hover paint out of flow, so ::before never takes a grid column. */
+.fr:hover { background: var(--fill); }
 .fr::before { position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit; background: inherit; }
 .fr .p, .fr .s { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .folder-card #overview-folders { flex: 0 1 auto; }
