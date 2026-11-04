@@ -12,10 +12,14 @@
   --font:
     -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui,
     sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --fs-11: 11px;
   --fs-12: 12px;
   --fs-13: 13px;
   --fs-15: 15px;
   --fs-17: 17px;
+  --fs-20: 20px;
+  --fs-24: 24px;
   --fs-28: 28px;
   --fs-40: 40px;
   /* space (4pt) */
@@ -37,27 +41,101 @@
   --hair-2: rgba(18, 22, 38, 0.12);
   --label: #1d1d1f;
   --label-2: #5f6068;
-  --label-3: #83848b;
+  --label-3: #6c6e78;
+  --surface-deep: #e8e8ed;
   /* accent + semantic */
   --blue: #0a66e8;
   --blue-hover: #0959cc;
   --blue-tint: #e8f0fd;
+  --primary: #0a66e8;
+  --primary-hover: #0959cc;
+  --on-primary: #ffffff;
   --green: #1d7a3e;
   --green-tint: #e6f4ea;
   --amber: #965a00;
   --amber-tint: #fdf1dc;
   --red: #d92d20;
   --red-hover: #c4271b;
+  --success-bg: var(--green-tint);
+  --success-text: var(--green);
+  --success-icon: var(--green);
+  --success-border: color-mix(in srgb, var(--green) 28%, var(--success-bg));
+  --error-foreground: #b42318;
+  --focus-ring: #0a66e8;
+  --checkbox-boundary: #737580;
+  --command-prompt: #5c5d65;
+  --location-remove-hover: rgba(0, 0, 0, 0.07);
+  --terminal-bg: #fafbfc;
+  --terminal-text: #262d38;
   /* chart */
   --c-files: #3b6fe0;
   --c-clean: #ff9f0a;
   --c-sys: #b4b5bc;
   --c-free: #ececf0;
-  --r-card: 16px;
-  --r-ctl: 8px;
+  /* radius: one per role; a nested surface uses outer minus padding */
+  --r-xs: 4px; /* checkboxes, tiny icon buttons */
+  --r-sm: 6px; /* controls nested in a 2px well, small icon buttons, tiles */
+  --r-ctl: 8px; /* buttons, inputs, rows */
+  --r-md: 12px; /* panels nested in a card, menus, toasts */
+  --r-card: 16px; /* cards, dialogs */
+  --r-full: 999px; /* pills, progress bars */
+  --hairline: 0.5px;
   --shadow-card:
     0 0 0 0.5px rgba(18, 22, 38, 0.07), 0 1px 2px rgba(18, 22, 38, 0.05),
     0 4px 16px -4px rgba(18, 22, 38, 0.07);
+  /* motion */
+  --motion-fast: 150ms;
+  --motion-panel: 180ms; /* keep in step with the hide timer in toggleNotes (app.js) */
+  --ease: ease;
+  /* layout */
+  --cleanup-columns: 18px 28px minmax(0, 1fr) 80px 44px 72px;
+  --scan-control-height: 36px;
+  --scan-control-radius: var(--r-ctl);
+  --scroll-inset: var(--s6);
+  --scroll-track-block: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --window: #1c1e24;
+    --card: #2b2e35;
+    --fill: #333439;
+    --fill-2: #3e3f45;
+    --sidebar-active: rgba(255, 255, 255, 0.07);
+    --sidebar-hover: rgba(255, 255, 255, 0.045);
+    --hair: #e6eaff16;
+    --hair-2: #e6eaff2b;
+    --label: #eeeef1;
+    --label-2: #b3b4bd;
+    --label-3: #9899a4;
+    --surface-deep: #17181b;
+    --blue: #6ca5ff;
+    --blue-hover: #4388ee;
+    --blue-tint: #293c59;
+    --primary: #1764cf;
+    --primary-hover: #2371dc;
+    --green: #83cc99;
+    --green-tint: #263f31;
+    --amber: #e6bc78;
+    --amber-tint: #493a25;
+    --error-foreground: #ffaaa2;
+    --focus-ring: #8bb8ff;
+    --checkbox-boundary: #a1a3ae;
+    --command-prompt: #a1a2ad;
+    --location-remove-hover: rgba(0, 0, 0, 0.16);
+    --terminal-bg: #15181e;
+    --terminal-text: #e4e7ed;
+    --c-files: #6793ec;
+    --c-sys: #747680;
+    --c-free: #3c3e45;
+    --shadow-card:
+      0 0 0 0.5px #ffffff0d, 0 1px 2px #0002, 0 4px 16px -4px #0003;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-panel: 0ms;
+  }
 }
 * {
   box-sizing: border-box;
@@ -1478,31 +1556,6 @@ dialog pre {
   }
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --window: #202124;
-    --card: #292a2e;
-    --fill: #333439;
-    --fill-2: #3e3f45;
-    --sidebar-active: rgba(255, 255, 255, 0.07);
-    --sidebar-hover: rgba(255, 255, 255, 0.045);
-    --hair: rgba(230, 234, 255, 0.08);
-    --hair-2: rgba(230, 234, 255, 0.15);
-    --label: #eeeef1;
-    --label-2: #b3b4bd;
-    --label-3: #9899a4;
-    --blue: #6ca5ff;
-    --blue-hover: #4388ee;
-    --blue-tint: #293c59;
-    --green: #83cc99;
-    --green-tint: #263f31;
-    --amber: #e6bc78;
-    --amber-tint: #493a25;
-    --c-files: #6793ec;
-    --c-sys: #747680;
-    --c-free: #3c3e45;
-    --shadow-card:
-      0 0 0 0.5px #ffffff0d, 0 1px 2px #0002, 0 4px 16px -4px #0003;
-  }
   body {
     background: linear-gradient(160deg, #252d3d, #292a32 45%, #332c32);
   }
@@ -1891,14 +1944,6 @@ dialog {
   max-height: calc(100dvh - 32px);
   overflow: auto;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --window: #1c1e24;
-    --card: #2b2e35;
-    --hair: #e6eaff16;
-    --hair-2: #e6eaff2b;
-  }
-}
 @media (min-width: 701px) and (max-width: 1350px) {
   .workspace {
     grid-template-columns: minmax(200px, 0.65fr) minmax(0, 1.35fr);
@@ -2087,11 +2132,6 @@ dialog {
     flex: none;
     min-height: 560px;
     height: 560px;
-  }
-}
-@media (prefers-color-scheme: light) {
-  :root {
-    --label-3: #6c6e78;
   }
 }
 
@@ -3238,10 +3278,6 @@ body:has(#welcome:not([hidden])) .scan-split,
 .agent-option, .it, .location-row { border-radius: 8px; }
 
 /* Round 10: one scan command, focused progress, and disclosures that own their content. */
-:root { --surface-deep: #e8e8ed; --on-primary: #ffffff; }
-@media (prefers-color-scheme: dark) {
-  :root { --surface-deep: #17181b; }
-}
 .gh, .segment-label, .scan-command-bar #agent-analyze { color: var(--label-2); }
 .kbd, .btn.sec .kbd { color: var(--label-2); opacity: 1; }
 .btn.pri .kbd { color: var(--on-primary); opacity: 1; }
@@ -3353,30 +3389,8 @@ footer { min-height: 20px; }
   .overview-left { grid-template-rows: minmax(0, 1fr); }
 }
 .nav-chevron { width: 12px; height: 12px; transform: rotate(-90deg); }
-:root { --primary: #0a66e8; --primary-hover: #0959cc; }
-@media (prefers-color-scheme: dark) {
-  :root { --primary: #1764cf; --primary-hover: #2371dc; }
-}
 
 /* Round 11: one results action row, a persistent Agent workspace, semantic success. */
-:root {
-  --success-bg: #e8f4ec;
-  --success-border: #b9dcc5;
-  --success-text: #245d37;
-  --success-icon: #267a43;
-  --terminal-bg: #fafbfc;
-  --terminal-text: #262d38;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --success-bg: #192d25;
-    --success-border: #2d5140;
-    --success-text: #b8dec7;
-    --success-icon: #80c69d;
-    --terminal-bg: #15181e;
-    --terminal-text: #e4e7ed;
-  }
-}
 #scan-feedback.banner-success, #trash-results.banner-success, .banner-success, #suggestions .gain {
   --banner-color: var(--success-icon);
   --banner-fill: var(--success-bg);
@@ -3455,21 +3469,6 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #scan-options #web-scan-status { display: none; }
 
 /* Round 13: accessible contrast, bounded paths and stable in-place progress. */
-:root {
-  --motion-fast: 150ms;
-  --focus-ring: #0a66e8;
-  --checkbox-boundary: #737580;
-  --error-foreground: #b42318;
-  --scan-control-height: 36px;
-  --scan-control-radius: var(--r-ctl);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --focus-ring: #8bb8ff;
-    --checkbox-boundary: #a1a3ae;
-    --error-foreground: #ffaaa2;
-  }
-}
 .it input:checked, .files-panel input:checked { background: var(--primary); }
 #desktop-error, #trash-results.banner-error, .banner-error { color: var(--error-foreground); }
 #scan-feedback.banner-error, .banner-error { --banner-color: var(--error-foreground); color: var(--error-foreground); }
@@ -3527,9 +3526,6 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
   #suggestions .lh, #suggestions .it { grid-template-columns: 18px 24px minmax(0, 1fr) 68px 40px 54px; }
   #scan-strip #scan-path { display: none; }
 }
-@media (prefers-reduced-motion: reduce) {
-  :root { --motion-fast: 0ms; }
-}
 
 /* Progress occupies existing command space so scan transitions keep card geometry. */
 #scan-options, .launch-card { position: relative; }
@@ -3561,13 +3557,6 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 .pill.warn { background: var(--amber-tint); color: var(--amber); }
 
 /* Round 14: remembered cleanup and quiet, aligned controls. */
-:root {
-  --success-bg: var(--green-tint);
-  --success-text: var(--green);
-  --success-icon: var(--green);
-  --success-border: color-mix(in srgb, var(--green) 28%, var(--success-bg));
-  --cleanup-columns: 18px 28px minmax(0, 1fr) 80px 44px 72px;
-}
 .badge.safe { background: var(--success-bg); color: var(--success-text); }
 .link, a, footer button, .agent-option a,
 .item-actions button, .item-name:hover { color: var(--label); }
@@ -3714,9 +3703,6 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 #counting-disclosure { position: static; }
 #counting-disclosure .notes-reveal { left: 0; right: 0; width: auto; bottom: calc(100% - 1px); }
 #notes { inset: auto; width: 100%; max-height: min(400px, 55vh); border-radius: 12px 12px 12px 0; }
-/* Muted prompt token: AA on the command box in both themes. */
-:root { --command-prompt: #5c5d65; }
-@media (prefers-color-scheme: dark) { :root { --command-prompt: #a1a2ad; } }
 /* Rescan progress stops one toolbar gap before the Rescan split button, whatever its width. */
 #scan-options #scan-strip { right: calc(var(--scan-split-width, 146px) + 12px); }
 
@@ -3784,8 +3770,6 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 }
 
 /* Round 16: a location's remove button darkens its row only slightly on hover. */
-:root { --location-remove-hover: rgba(0, 0, 0, 0.07); }
-@media (prefers-color-scheme: dark) { :root { --location-remove-hover: rgba(0, 0, 0, 0.16); } }
 .location-row .location-remove:hover { background: var(--location-remove-hover); }
 .location-row .location-remove::before, .location-row .location-remove:hover::before { inset: 0; background: transparent; }
 
@@ -3824,7 +3808,6 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 /* One scrollbar treatment for every scrollable card: the track sits --scroll-inset from the
    card's outer right edge, clears the rounded corners and any sticky header, and lives in a
    reserved gutter so it never covers content. */
-:root { --scroll-inset: var(--s6); --scroll-track-block: 6px; }
 .scroll-area { scrollbar-gutter: stable; }
 .scroll-area::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }
 .table-scroll.scroll-area::-webkit-scrollbar-track { margin-top: calc(var(--scroll-head, 25px) + var(--scroll-track-block)); }
