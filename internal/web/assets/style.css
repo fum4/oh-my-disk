@@ -206,11 +206,13 @@ svg.i {
   display: flex;
   align-items: center;
   gap: var(--s2);
+  width: 100%;
   height: 32px;
   padding: 0 var(--s2);
   border-radius: var(--r-ctl);
   color: var(--label);
   font-size: var(--fs-13);
+  text-align: left;
 }
 .nv svg {
   color: var(--blue);
@@ -636,12 +638,38 @@ main {
   justify-content: space-between;
   margin: var(--s4) 0 var(--s2);
 }
-.seg {
+.seg,
+.view-switch {
   display: inline-flex;
-  background: var(--fill);
-  border-radius: var(--r-ctl);
-  padding: 2px;
+  flex: none;
   gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-ctl);
+  background: var(--fill);
+}
+.seg button,
+.view-switch button {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 var(--s3);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-12);
+  font-weight: 500;
+  color: var(--label-2);
+  white-space: nowrap;
+}
+.seg button:not(.active):hover,
+.view-switch button:not(.active):hover {
+  background: var(--fill-2);
+  color: var(--label);
+}
+.seg button.active,
+.view-switch button.active {
+  background: var(--card);
+  color: var(--label);
+  box-shadow:
+    0 0 0 0.5px var(--hair),
+    0 1px 2px rgba(18, 22, 38, 0.08);
 }
 .tools .cnt {
   font-size: var(--fs-12);
@@ -727,18 +755,24 @@ main {
   font-size: var(--fs-13);
 }
 .selbar {
-  margin-top: auto;
   display: flex;
+  flex: none;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--s3);
+  gap: var(--s2);
+  margin-top: var(--s4);
   padding: var(--s3) var(--s3) var(--s3) var(--s4);
   border-radius: var(--r-md);
   background: var(--window);
   box-shadow: inset 0 0 0 0.5px var(--hair);
 }
+.selbar .t {
+  flex: 1;
+  min-width: 150px;
+}
 .selbar .t b {
   display: block;
-  font-size: var(--fs-13);
+  font-size: var(--fs-12);
   font-weight: 600;
 }
 .selbar .t span {
@@ -746,7 +780,7 @@ main {
   color: var(--label-2);
 }
 .selbar .sp {
-  flex: 1;
+  display: none;
 }
 /* Live application adaptations; the component values above come from Calm v2. */
 button,
@@ -784,10 +818,6 @@ button:where(:not(:disabled)):hover {
 .side {
   width: 240px;
 }
-.nv {
-  width: 100%;
-  text-align: left;
-}
 .nv.active {
   background: var(--sidebar-active);
   font-weight: 600;
@@ -801,12 +831,6 @@ button:where(:not(:disabled)):hover {
 }
 .title {
   min-width: 0;
-}
-.link {
-  color: var(--blue);
-  font-weight: 500;
-  white-space: nowrap;
-  padding: 4px 0 4px 12px;
 }
 .grid {
   grid-template-columns: minmax(0, 1fr) 536px;
@@ -829,22 +853,6 @@ button:where(:not(:disabled)):hover {
 .folder-card {
   min-height: 0;
   overflow: auto;
-}
-.seg button {
-  height: 24px;
-  padding: 0 12px;
-  border-radius: var(--r-sm);
-  font-size: var(--fs-12);
-  font-weight: 500;
-  color: var(--label-2);
-  white-space: nowrap;
-}
-.seg button.active {
-  background: var(--card);
-  color: var(--label);
-  box-shadow:
-    0 0 0 0.5px var(--hair),
-    0 1px 2px rgba(18, 22, 38, 0.08);
 }
 .tools {
   gap: 8px;
@@ -915,22 +923,6 @@ input[type="checkbox"]:checked:after {
 .suggestion-details code {
   font: var(--fs-12) var(--mono);
   white-space: pre-wrap;
-}
-.selbar {
-  flex-wrap: wrap;
-  flex: none;
-  margin-top: 16px;
-  gap: 8px;
-}
-.selbar .t {
-  flex: 1;
-  min-width: 150px;
-}
-.selbar .sp {
-  display: none;
-}
-.selbar .t b {
-  font-size: var(--fs-12);
 }
 .gain .v small {
   margin-left: 4px;
@@ -1031,18 +1023,6 @@ select:hover {
 }
 .empty .btn {
   margin-top: 16px;
-}
-.view-switch {
-  display: flex;
-  gap: 4px;
-  order: 2;
-}
-.view-switch button {
-  padding: 6px 12px;
-}
-.view-switch .active {
-  background: var(--card);
-  box-shadow: var(--shadow-card);
 }
 #explorer {
   min-width: 0;
@@ -1211,7 +1191,6 @@ footer {
 }
 footer button {
   font-size: var(--fs-12);
-  color: var(--blue);
 }
 #notes {
   font-size: var(--fs-12);
@@ -1482,9 +1461,6 @@ dialog pre {
   .side {
     background: rgba(37, 39, 46, 0.72);
   }
-  .nv.active {
-    background: var(--sidebar-active);
-  }
   .vol {
     background: #ffffff08;
   }
@@ -1570,22 +1546,6 @@ button:disabled,
 .btn:disabled,
 input:disabled {
   cursor: default;
-}
-.nv + .nv {
-  margin-top: 2px;
-}
-.link {
-  min-height: 28px;
-  padding: 0 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-}
-.seg button,
-.view-switch button {
-  min-height: 28px;
-  height: 28px;
 }
 .main-content {
   overflow: hidden;
@@ -1697,18 +1657,7 @@ thead {
   max-width: 100% !important;
 }
 .view-switch {
-  order: 0;
   align-self: center;
-  display: inline-flex;
-  gap: 2px;
-  background: var(--fill);
-  padding: 2px;
-  border-radius: var(--r-ctl);
-  margin-top: 12px;
-  flex: none;
-}
-.view-switch button {
-  padding: 0 12px;
 }
 .legend {
   justify-content: center;
@@ -1757,10 +1706,6 @@ footer {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 12px;
-}
-footer button {
-  min-height: 28px;
-  padding: 0 4px;
 }
 #notes {
   flex: none;
@@ -1924,9 +1869,6 @@ dialog {
   }
   .side .group {
     gap: 2px;
-  }
-  .nv + .nv {
-    margin-top: 0;
   }
 }
 .badge.personal svg {
@@ -2107,22 +2049,16 @@ select,
 }
 .link,
 footer button {
-  padding: 3px 10px;
-  min-height: 24px;
-  line-height: 18px;
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  color: var(--blue);
+  min-height: 24px;
+  padding: 3px var(--s2);
   border-radius: var(--r-sm);
-}
-.link:hover,
-footer button:hover {
-  background: color-mix(in srgb, var(--blue) 12%, transparent);
-}
-.link:active,
-footer button:active {
-  background: color-mix(in srgb, var(--blue) 20%, transparent);
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
 }
 footer {
   position: static;
@@ -2741,7 +2677,6 @@ body:has(#welcome:not([hidden])) footer { visibility: hidden; }
   flex-direction: column;
   gap: 3px;
 }
-.side .nv + .nv { margin-top: 0; }
 #scan-another { margin-top: 3px; }
 .side .nv:hover,
 .location-remove:hover { transform: none; }
@@ -2986,7 +2921,6 @@ button::before, summary::before {
   transition: inset var(--motion-fast) ease, background-color var(--motion-fast) ease;
 }
 button:not(:disabled):hover::before, summary:hover::before { inset: -1px; }
-:is(.fr, .nv, .agent-option, .item-name, th button)::before { content: none; }
 .location-remove { display: flex; align-items: center; justify-content: center; line-height: 1; }
 .location-remove .i { display: block; width: 12px; height: 12px; }
 .location-remove::before { content: none; }
@@ -3109,7 +3043,7 @@ body:has(#welcome:not([hidden])) #counting-disclosure { display: none; }
 
 .bar .title { position: relative; }
 #overview-back { display: flex; width: max-content; margin: -4px 0 4px -8px; font-size: var(--fs-12); color: var(--label-2); }
-.page-link { gap: 6px; cursor: pointer; white-space: nowrap; font-size: var(--fs-12); }
+.page-link { gap: 6px; margin-right: calc(-1 * var(--s2)); font-size: var(--fs-12); }
 .breadcrumbs button:hover { background: var(--fill); }
 .breadcrumbs button[aria-current] { font-weight: 600; }
 .category-summary :is(th, td):nth-child(n+4) { display: none; }
@@ -3125,7 +3059,7 @@ footer { min-height: 20px; }
 #counting-disclosure.open { background: var(--surface-deep); }
 .counting-heading { display: flex; align-items: center; justify-content: space-between; min-height: 32px; padding: 2px 8px; }
 #details-toggle { color: var(--label-2); font-size: var(--fs-12); padding: 4px 8px; }
-#details-toggle[aria-expanded="true"] { color: var(--label); background: var(--fill-2); }
+#details-toggle:not([aria-expanded="true"]):hover { background: var(--fill-2); color: var(--label); }
 #notes-close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; color: var(--label-2); background: transparent; }
 #notes-close:hover { color: var(--label); background: var(--fill); }
 .notes-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 180ms ease; }
@@ -3290,9 +3224,11 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 /* The header stops where the rows do, before the scrollbar gutter. */
 #suggestions .lh { margin-right: var(--cleanup-gutter, 0px); }
 .side .nv.active:hover { background: color-mix(in srgb, var(--sidebar-active) 85%, var(--label) 4%); }
-/* Row spacing leaves room for the same 1px paint growth as standalone controls. */
-:is(.fr, .nv, .agent-option, .item-name, th button)::before { content: ""; }
-:is(.fr, .nv, .agent-option, .item-name, th button):hover::before { inset: -1px; }
+/* Row spacing leaves room for the same 1px paint growth as standalone controls. Sidebar rows are
+   out: their fill is translucent, and an inherited copy on ::before would paint it twice. */
+:is(.fr, .agent-option, .item-name, th button)::before { content: ""; }
+:is(.fr, .agent-option, .item-name, th button):hover::before { inset: -1px; }
+.nv::before { content: none; }
 .scan-split, .scan-split #hub-scan { border-radius: var(--scan-control-radius); }
 #rescan-picker summary { border-radius: 0 var(--scan-control-radius) var(--scan-control-radius) 0; }
 #hub-scan, #rescan-picker summary { height: var(--scan-control-height); min-height: var(--scan-control-height); }
@@ -3345,8 +3281,8 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 .badge.safe { background: var(--success-bg); color: var(--success-text); }
 .link, a, footer button, .agent-option a,
 .item-actions button, .item-name:hover { color: var(--label); }
-.link:hover, a:hover, footer button:hover, .link:active, footer button:active,
-.item-actions button:hover { background: var(--fill); }
+.link:hover, a:hover, footer button:hover, .item-actions button:hover { background: var(--fill); }
+.link:active, footer button:active { background: var(--fill-2); }
 .link .i, .sort-chevron { color: var(--label-2); }
 .location-remove { width: 20px; height: 20px; padding: 0; }
 #scan-options #desktop.legacy-target { display: none; }
