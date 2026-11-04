@@ -3740,6 +3740,7 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #session-mark { display: inline-flex; }
 #session-mark .i { width: 18px; height: 18px; }
 #terminal-status { color: var(--label-2); font-size: var(--fs-12); white-space: nowrap; }
+#terminal-status:empty { display: none; }
 .agent-topbar .btn { font-size: var(--fs-12); min-height: 32px; padding: 0 10px; }
 #agent-empty { margin: auto; padding: 32px 16px; display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center; }
 #agent-empty[hidden] { display: none; }
@@ -3905,7 +3906,7 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #scan-options #desktop.legacy-target { display: none; }
 #scan-agent-link, #remembered-overview { align-self: flex-start; }
 #agent-empty { width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; gap: 16px; }
-/* Start session sits in the established top-right slot (the Scan/Rescan split elsewhere): same
+/* Ask agent sits in the established top-right slot (the Scan/Rescan split elsewhere): same
    height, radius and right edge. It stays positioned so its hover paint can't spill onto the pane. */
 .agent-topbar #agent-start { position: relative; margin: 0; flex: none; height: var(--scan-control-height); min-height: var(--scan-control-height); padding: 0 16px; border-radius: var(--scan-control-radius); font-size: var(--fs-13); white-space: nowrap; }
 /* Stop and Restart share that slot's height while a session runs, so nothing shifts. */
@@ -4234,5 +4235,4 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) button:hover { color: v
 
 /* App identity below the macOS window buttons; keep the row draggable. */
 .side { padding-top: 48px; }
-.side-brand { display: flex; align-items: center; gap: 8px; height: 28px; margin: 0 0 -6px; padding: 0 8px; color: var(--label); font-size: var(--fs-16, 16px); font-weight: 600; letter-spacing: -.005em; user-select: none; -webkit-user-select: none; cursor: default; --wails-draggable: drag; }
-.side-brand img { width: 24px; height: 24px; flex: none; pointer-events: none; }
+.side-brand { display: flex; align-items: center; height: 28px; margin: 0 0 -6px; padding: 0 8px; color: var(--label); font-size: var(--fs-20, 20px); font-weight: 700; letter-spacing: -.005em; user-select: none; -webkit-user-select: none; cursor: default; --wails-draggable: drag; }

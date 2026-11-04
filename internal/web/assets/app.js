@@ -50,7 +50,14 @@ function index(n, parent, base) {
     index(c, n, parent ? base : palette[i % palette.length]),
   );
 }
-function tooltip(e, n) {
+function share(bytes, total) {
+  return total > 0 ? (bytes / total) * 100 : null;
+}
+function shareLabel(bytes, total, scope = "") {
+  const value = share(bytes, total);
+  return value === null ? "—" : value.toFixed(1) + "%" + scope;
+}
+function tooltip(e, n, total = snapshot?.volume?.capacity, scope = " of disk") {
   const t = $("tooltip");
   t.replaceChildren(
     document.createTextNode(n.category_name ? categoryLabel(n.category_name) : n.path),
@@ -58,9 +65,7 @@ function tooltip(e, n) {
     dom(
       "span",
       "",
-      snapshot?.volume?.capacity
-        ? ((n.bytes / snapshot.volume.capacity) * 100).toFixed(1) + "% of disk"
-        : "Disk capacity unavailable",
+      shareLabel(n.bytes, total, scope),
     ),
   );
   t.hidden = false;
@@ -70,19 +75,24 @@ function tooltip(e, n) {
 }
 function chartTooltip(node, label, bytes) {
   const capacity = snapshot?.volume?.capacity;
-  node.title = `${label}: ${fmt(bytes)}, ${capacity ? ((bytes / capacity) * 100).toFixed(1) : "—"}% of disk`;
+  node.title = `${label}: ${fmt(bytes)}, ${shareLabel(bytes, capacity, " of disk")}`;
   node.onpointermove = (e) => tooltip(e, { path: label, bytes });
   node.onpointerleave = () => ($("tooltip").hidden = true);
 }
 let navigationVersion = 0;
+const categoryOrders = new WeakMap();
+const explorerOrder = () => sortKey + ":" + sortAsc;
 async function loadChildren(n, offset = 0) {
   if (n.synthetic && !n.category_name) return;
+  const order = explorerOrder();
   const url = n.category_name
     ? `/api/category?name=${encodeURIComponent(n.category_name)}&offset=${offset}&sort=${sortKey}&asc=${Number(sortAsc)}`
     : `/api/node?id=${n.id}&depth=3&offset=${offset}&sort=${sortKey}&asc=${Number(sortAsc)}`;
   const r = await fetch(url);
   if (!r.ok) throw Error("Unable to load folder: " + r.status);
   const data = await r.json();
+  if (n.category_name && (order !== explorerOrder() || (offset &&
+      (categoryOrders.get(n) !== order || n.children.length !== offset)))) return;
   if (offset) {
     n.children = [...(n.children || []), ...(data.children || [])];
     n.child_count = data.child_count;
@@ -90,7 +100,7 @@ async function loadChildren(n, offset = 0) {
     // Category API nodes carry filesystem-shaped data, but remain category views.
     const category = n.category_name;
     Object.assign(n, data);
-    if (category) { n.category_name = category; n.synthetic = true; }
+    if (category) { n.category_name = category; n.synthetic = true; categoryOrders.set(n, order); }
   }
   index(n, parents.get(n), colors.get(n));
   n.loaded = true;
@@ -111,7 +121,7 @@ async function navigate(n) {
   if (n.kind !== "directory" && !n.synthetic) return;
   const version = ++navigationVersion;
   try {
-    if (!n.synthetic || n.category_name) await loadChildren(n);
+    if (!n.synthetic || (n.category_name && categoryOrders.get(n) !== explorerOrder())) await loadChildren(n);
     if (version !== navigationVersion) return;
     current = n;
     resetExplorerScroll();
@@ -167,7 +177,7 @@ function canvasChart(w, h) {
   canvas.onpointermove = (e) => {
     const z = hit(e);
     canvas.style.cursor = z ? "pointer" : "default";
-    if (z) tooltip(e, z.node);
+    if (z) tooltip(e, z.node, current.bytes, explorerShareScope());
     else $("tooltip").hidden = true;
   };
   canvas.onpointerleave = e => { if (!$("tooltip").contains(e.relatedTarget)) $("tooltip").hidden = true; };
@@ -383,7 +393,12 @@ function render() {
     });
   renderTable();
 }
+function explorerShareScope() {
+  if (current.category_name) return " of current category";
+  return mode === "categories" && current === root ? " of scan" : " of current folder";
+}
 function renderTable() {
+  $("explorer-share").textContent = "Share" + explorerShareScope();
   $("explorer").classList.toggle("category-summary", mode === "categories" && current === root);
   updateSortHeaders("[data-sort]", sortKey, sortAsc);
   const children = [...(current.children || [])];
@@ -425,7 +440,7 @@ function renderTable() {
     const bar = dom("div", "size-bar"),
       fill = dom("i");
     fill.style.width =
-      Math.min(100, (n.bytes / Math.max(1, current.bytes)) * 100) + "%";
+      Math.min(100, share(n.bytes, current.bytes) ?? 0) + "%";
     fill.style.background = dot.style.background;
     bar.append(fill);
     name.append(bar);
@@ -435,7 +450,7 @@ function renderTable() {
       dom(
         "td",
         "",
-        ((n.bytes / Math.max(1, current.bytes)) * 100).toFixed(1) + "%",
+        shareLabel(n.bytes, current.bytes),
       ),
       dom("td", "", fmt(n.bytes)),
       dom("td", "", n.files == null || n.synthetic ? "—" : Number(n.files).toLocaleString()),
@@ -490,7 +505,9 @@ function renderTable() {
     body.append(tr);
   }
 }
+const categoryTrees = new WeakMap();
 function categoryTree() {
+  if (categoryTrees.has(snapshot)) return categoryTrees.get(snapshot);
   const r = {
     name: "All categories",
     path: "Categories",
@@ -510,6 +527,7 @@ function categoryTree() {
       children: [],
     });
   index(r);
+  categoryTrees.set(snapshot, r);
   return r;
 }
 
@@ -896,9 +914,8 @@ for (const button of document.querySelectorAll("[data-sort]")) button.onclick = 
   sortAsc = sortKey === button.dataset.sort ? !sortAsc : button.dataset.sort === "name";
   sortKey = button.dataset.sort;
   try {
-    // Fully loaded and synthetic views can be sorted without a request. Only
-    // paginated filesystem/category nodes need the server's global ordering.
-    if ((current.child_count || 0) > (current.children || []).length && (!current.synthetic || current.category_name)) await loadChildren(current);
+    // Category pages and partially loaded folders use the server's global order.
+    if (current.category_name || (!current.synthetic && (current.child_count || 0) > (current.children || []).length)) await loadChildren(current);
     shown = 200; resetExplorerScroll(); render();
   } catch (e) { showFeedback(e.message); }
 };
@@ -1462,7 +1479,7 @@ function renderOverview() {
       "http://www.w3.org/2000/svg",
       "title",
     );
-    title.textContent = `${label}: ${gb(bytes)}, ${capacity ? ((bytes / capacity) * 100).toFixed(1) : "—"}% of disk`;
+    title.textContent = `${label}: ${gb(bytes)}, ${shareLabel(bytes, capacity, " of disk")}`;
     c.append(title);
     svg.append(c);
   }
@@ -1563,10 +1580,7 @@ function renderOverview() {
       icon("fill-" + (n.other ? "dots-three-circle" : itemIcon(n.name))),
     );
     fill.style.width =
-      Math.min(
-        100,
-        (n.bytes / Math.max(1, folders[0]?.bytes || scan.bytes)) * 100,
-      ) + "%";
+      Math.min(100, share(n.bytes, scan.bytes) ?? 0) + "%";
     track.append(fill);
     const label = dom("span", "n");
     label.append(dom("span", "nt", n.name));
@@ -1578,7 +1592,7 @@ function renderOverview() {
       dom(
         "span",
         "p num",
-        ((n.bytes / Math.max(1, scan.bytes)) * 100).toFixed(1) + "%",
+        shareLabel(n.bytes, scan.bytes),
       ),
       dom("span", "s num", fmt(n.bytes)),
     );

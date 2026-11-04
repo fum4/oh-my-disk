@@ -53,6 +53,7 @@ Common options:
   --no-cache        Do not read/write a scan cache
   --port N          UI port (default 0 = random localhost port)
   --binary          Display binary KiB/MiB/GiB instead of decimal units
+  --ui              Open the browser explorer after scan
   --no-open         Do not open a browser
   --version         Show the installed release version
   --help            Show this help
@@ -142,6 +143,7 @@ func run(args []string) error {
 	noCache := fs.Bool("no-cache", false, "no cache")
 	port := fs.Int("port", 0, "UI port")
 	binary := fs.Bool("binary", false, "binary display units")
+	openScanUI := fs.Bool("ui", false, "open the browser explorer after scan")
 	noOpen := fs.Bool("no-open", false, "don't open browser")
 	rest := args[1:]
 	pos := ""
@@ -154,6 +156,9 @@ func run(args []string) error {
 			return nil
 		}
 		return err
+	}
+	if *openScanUI && cmd != "scan" {
+		return errors.New("--ui is only supported by scan")
 	}
 	if fs.NArg() > 0 {
 		if pos != "" || fs.NArg() > 1 {
@@ -252,6 +257,11 @@ func run(args []string) error {
 			return err
 		}
 	}
+	if cmd == "ui" || *openScanUI {
+		display.phase("starting UI")
+		display.close()
+		return web.Serve(ctx, s, web.Options{Port: *port, Open: !*noOpen, JSON: *jsonPath})
+	}
 	var output any
 	switch cmd {
 	case "scan":
@@ -280,10 +290,7 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-	case "ui":
-		display.phase("starting UI")
-		display.close()
-		return web.Serve(ctx, s, web.Options{Port: *port, Open: !*noOpen, JSON: *jsonPath})
+
 	}
 	if *jsonPath != "" {
 		display.phase("exporting JSON")

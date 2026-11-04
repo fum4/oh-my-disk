@@ -4,9 +4,15 @@
 
 A local disk-space analyzer with read-only scanning and explicit Move to Trash for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a native Wails macOS desktop app and a DaisyDisk-inspired explorer shared with the CLI.
 
-**It never deletes, moves, or edits scanned content.** There is no cleanup subcommand, execution hook, cleanup API, or generated cleanup script. Suggested commands are plain text for a human to review. The desktop app only invokes macOS `open` for Reveal in Finder and Full Disk Access settings. The CLI browser UI invokes the platform browser opener. Suggested cleanup commands are never run.
+Scanning reads filesystem metadata. In the desktop app, **Move to Trash** moves selected items after you review the paths and confirm. Suggested cleanup commands are displayed as text for manual review.
 
 ## Install
+
+Download the universal macOS DMG or the CLI for macOS or Linux (ARM64 or AMD64) from the [Nomadware releases catalogue](https://releases.nomadware.io/#oh-my-disk) or [GitHub Releases](https://github.com/fum4/oh-my-disk/releases/latest). The catalogue also provides a [CLI installer script](https://releases.nomadware.io/oh-my-disk/install.sh).
+
+The macOS app is ad-hoc signed. Gatekeeper may block the downloaded app while Developer ID signing and notarization are deferred.
+
+### Build the CLI from source
 
 Requires Go 1.26 or newer (the current Wails v2.17.1 requirement). Go can download the toolchain automatically. The CLI needs no Node, frontend build, CDN or database.
 
@@ -17,7 +23,7 @@ go build -o oh-my-disk .
 ./oh-my-disk --help
 ```
 
-Or install with `go install github.com/fum4/oh-my-disk@latest` after this version is published. To cross-compile:
+Or install with `go install github.com/fum4/oh-my-disk@latest`. To cross-compile:
 
 ```sh
 GOOS=darwin GOARCH=arm64 go build -o oh-my-disk-macos .
@@ -101,11 +107,9 @@ and packaged with
 `iconutil`. On hosts where `iconutil` rejects the iconset, a standard PNG-based
 ICNS packer is used. A Wails post-build hook installs that ICNS and renews the
 ad-hoc signature. `make icon` also updates `internal/web/assets/brand-icon.png`,
-shared by the sidebar, browser favicon and touch icon, so all branding stays in sync.
+used by the browser favicon and touch icon.
 No network artwork is used. The macOS plist uses the stable
-bundle ID `com.fum4.oh-my-disk`. **TODO before distribution:** Developer ID
-signing, hardened runtime/entitlements review, notarization and stapling.
-Local builds are ad-hoc signed, without a Developer ID.
+bundle ID `com.fum4.oh-my-disk`. Local builds are ad-hoc signed.
 
 See [desktop verification notes](app/VERIFICATION.md) for the checks and host
 limitations recorded during implementation.
@@ -335,8 +339,7 @@ Round 14 fixture checks: `scripts/ui-remembered-smoke.cjs` covers returning choi
 
 ## Releases
 
-Every push to `master` (normally a PR merge) runs the release workflow. The first
-release is `v1.0.0`; subsequent commits increment the stable patch version. A retry
+Every push to `master` (normally a PR merge) runs the release workflow. Version allocation starts at `v1.0.0` and increments the stable patch version for each new release commit. A retry
 of the same tagged commit reuses its version and draft assets rather than replacing
 published bytes. `workflow_dispatch` on `master` can resume a failed release.
 
@@ -373,8 +376,7 @@ installs rclone from the publisher’s existing toolchain definition, then its
 Older/missing latest resumes normal
 publication. A historical GitHub retry is not marked latest. Only after verification
 and a successful catalogue update does the GitHub Release become public.
-The shell installer is
-`https://releases.nomadware.io/oh-my-disk/install.sh` after the first release.
+The catalogue serves the CLI installer at [install.sh](https://releases.nomadware.io/oh-my-disk/install.sh).
 
 Provision `RELEASES_SIGNING_KEY`, `R2_RELEASES_ACCESS_KEY_ID`, and
 `R2_RELEASES_SECRET_ACCESS_KEY` from the releases repo using its secure

@@ -88,8 +88,22 @@ func TestLazyPagesAndBudget(t *testing.T) {
 			t.Fatalf("accepted %s", path)
 		}
 	}
-	if get("/api/category?name=unknown").Code != 200 {
-		t.Fatal("category route failed")
+	for _, tc := range []struct {
+		query, firstPath string
+	}{
+		{"", "/root/d000/0"},
+		{"&offset=2", "/root/d000/10"},
+		{"&sort=name&asc=1&offset=2", "/root/d002/0"},
+		{"&offset=2", "/root/d000/10"},
+	} {
+		response := get("/api/category?name=unknown&limit=2" + tc.query)
+		var page scanner.Node
+		if err := json.Unmarshal(response.Body.Bytes(), &page); response.Code != 200 || err != nil {
+			t.Fatalf("category request %q: status %d, decode error %v", tc.query, response.Code, err)
+		}
+		if page.ChildCount != 17500 || len(page.Children) != 2 || page.Children[0].Path != tc.firstPath {
+			t.Fatalf("incorrect category page for %q: %+v", tc.query, page)
+		}
 	}
 }
 
