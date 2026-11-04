@@ -29,11 +29,12 @@
 
 - [x] After the Nomadware release integration ships: remove the app icon from the sidebar and enlarge the “oh-my-disk” sidebar heading. Keep the finalized Prism app/Dock icon unchanged. Requested by the owner on 2026-11-03.
 - [ ] Remove tooltips across the app.
-- [ ] Fix the glossy look of dropdowns.
-- [ ] "How we counted" panel: add a slide animation and rename it.
+- [x] Fix the glossy look of dropdowns.
+- [x] "How we counted" panel: add a slide animation.
+- [ ] "How we counted" panel: rename it.
 - [ ] Sunburst: make the hovered segment slightly larger.
 - [ ] Sunburst and treemap hover tooltips: add a small swatch in the segment's color.
-- [ ] Categories and Folders lists: the size bars are barely visible, and they disappear on hover.
+- [x] Categories and Folders lists: the size bars are barely visible, and they disappear on hover.
 - [ ] Category map and Space map: move "Click to explore · center to go back" next to the left-side text.
 - [ ] Remove the divider between the header and the page content.
 - [ ] Use a folder icon for "Show in Finder" actions.
