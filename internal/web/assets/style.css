@@ -2778,6 +2778,7 @@ th button { cursor: pointer; }
   text-align: center;
 }
 #welcome .launch-card h3 {
+  color: var(--label);
   font-size: var(--fs-28);
   font-weight: 700;
   letter-spacing: -.3px;
@@ -3103,6 +3104,7 @@ body.agent-page-active .main-content > :not(#agent-page, .bar.intro, #access-ban
 #session-picker summary::-webkit-details-marker { display: none; }
 #session-picker summary:hover { background: var(--fill); }
 #session-mark { display: inline-flex; }
+#session-mark:empty { display: none; }
 #session-mark .i { width: 18px; height: 18px; }
 #terminal-status { color: var(--label-2); font-size: var(--fs-12); white-space: nowrap; }
 #terminal-status:empty { display: none; }
@@ -3483,7 +3485,7 @@ footer { position: relative; inset: auto; }
 #terminal-screen .xterm-viewport::-webkit-scrollbar-track { margin-block: var(--scroll-track-block); }
 
 /* Agent page before a scan: no session header; CLI + model sit under the scan bar. */
-.agent-selectors { display: flex; align-items: center; gap: 16px; }
+.agent-selectors { display: flex; align-items: center; gap: var(--s4); margin-left: -10px; }
 #agent-start[hidden] { display: none; }
 /* Agent page shares the scanned-path title + subtitle with the other pages (hidden before a scan). */
 body.agent-page-active .bar.intro { margin-bottom: 16px; }
