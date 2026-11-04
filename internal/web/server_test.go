@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"slices"
 	"sort"
@@ -149,6 +150,32 @@ func TestFirstIdsMatchesFullSortPrefix(t *testing.T) {
 	}
 	if !slices.Equal(ids, input) {
 		t.Fatal("firstIds reordered the shared category index")
+	}
+}
+
+func TestLocateReturnsChainFromRoot(t *testing.T) {
+	root := &scanner.Node{Name: "root", Path: "/root", Kind: "directory", Children: []*scanner.Node{
+		{Name: "cache", Path: "/root/cache", Kind: "directory", Children: []*scanner.Node{
+			{Name: "big file", Path: "/root/cache/big file", Kind: "file", OwnBytes: 8},
+		}},
+	}}
+	h := SnapshotHandlerRead(&report.Snapshot{Scan: &scanner.Result{Root: root, Tree: scanner.Compact(root)}})
+	get := func(path string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, httptest.NewRequest("GET", "/api/locate?path="+url.QueryEscape(path), nil))
+		return w
+	}
+	var chain []scanner.Node
+	if err := json.Unmarshal(get("/root/cache/big file").Body.Bytes(), &chain); err != nil {
+		t.Fatal(err)
+	}
+	if len(chain) != 3 || chain[0].Path != "/root" || chain[1].Path != "/root/cache" || chain[2].Kind != "file" {
+		t.Fatalf("wrong chain: %+v", chain)
+	}
+	for _, path := range []string{"/root/gone", "/elsewhere", ""} {
+		if code := get(path).Code; code != 404 {
+			t.Fatalf("%q: status %d", path, code)
+		}
 	}
 }
 
