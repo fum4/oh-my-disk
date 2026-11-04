@@ -91,13 +91,17 @@
   --shadow-card:
     0 0 0 0.5px rgba(18, 22, 38, 0.07), 0 1px 2px rgba(18, 22, 38, 0.05),
     0 4px 16px -4px rgba(18, 22, 38, 0.07);
+  --shadow-popover: 0 8px 28px rgba(18, 22, 38, 0.16);
+  --shadow-dialog:
+    0 0 0 0.5px var(--hair-2), 0 24px 80px rgba(18, 22, 38, 0.22);
   /* motion */
   --motion-fast: 150ms;
   --motion-panel: 180ms; /* keep in step with the hide timer in toggleNotes (app.js) */
   --ease: ease;
   /* layout */
-  --cleanup-columns: 18px 28px minmax(0, 1fr) 80px 56px 72px;
+  --cleanup-columns: 18px 28px minmax(0, 1fr) 80px 52px 72px;
   --scrollbar-size: 10px; /* the gutter ::-webkit-scrollbar reserves */
+  --content-inset: 24px; /* .main-content's side padding; overlays pinned to it follow */
   --scan-control-height: 36px;
   --scan-control-radius: var(--r-ctl);
   --scroll-inset: var(--s6);
@@ -139,6 +143,9 @@
     --c-free: #3c3e45;
     --shadow-card:
       0 0 0 0.5px #ffffff0d, 0 1px 2px #0002, 0 4px 16px -4px #0003;
+    --shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.45);
+    --shadow-dialog:
+      0 0 0 0.5px var(--hair-2), 0 24px 80px rgba(0, 0, 0, 0.5);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1194,7 +1201,6 @@ footer button {
 }
 #notes {
   font-size: var(--fs-12);
-  color: var(--label-2);
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -1209,7 +1215,7 @@ dialog {
   max-width: min(540px, calc(100vw - 32px));
   background: var(--card);
   color: var(--label);
-  box-shadow: 0 24px 80px #0003;
+  box-shadow: var(--shadow-dialog);
 }
 dialog::backdrop {
   background: rgba(18, 22, 38, 0.25);
@@ -1487,12 +1493,6 @@ dialog pre {
   }
 }
 @media (min-width: 1250px) {
-  footer {
-    position: absolute;
-    left: 24px;
-    right: 24px;
-    bottom: 2px;
-  }
   .grid {
     margin-bottom: 0;
   }
@@ -1515,9 +1515,6 @@ dialog pre {
 }
 #hub-scan {
   min-width: 143px;
-}
-.main-content:has(#notes:not([hidden])) footer {
-  position: static;
 }
 
 #children td {
@@ -1706,11 +1703,6 @@ footer {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 12px;
-}
-#notes {
-  flex: none;
-  max-height: 25vh;
-  overflow: auto;
 }
 #tooltip {
   pointer-events: none;
@@ -2028,7 +2020,7 @@ body.native-app {
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  padding: 32px 24px 12px;
+  padding: 32px var(--content-inset) 12px;
   gap: 16px;
   background: var(--window);
   border-left: 1px solid var(--hair-2);
@@ -2068,24 +2060,6 @@ footer {
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 12px;
-}
-.main-content:has(#notes:not([hidden])) footer {
-  position: static;
-}
-#notes {
-  position: absolute;
-  bottom: 52px;
-  left: 24px;
-  right: 24px;
-  z-index: 25;
-  padding: 16px;
-  max-height: 40vh;
-  overflow: auto;
-  border-radius: var(--r-md);
-  background: var(--card);
-  box-shadow:
-    var(--shadow-card),
-    0 8px 32px #0002;
 }
 #content-grid {
   flex: 1;
@@ -2371,9 +2345,9 @@ body:has(#welcome:not([hidden])) #hub-scan {
   padding: 8px 12px;
   background: var(--card);
   box-shadow:
-    var(--shadow-card),
-    0 4px 24px #0002;
-  border-radius: var(--r-ctl);
+    0 0 0 0.5px var(--hair-2),
+    var(--shadow-popover);
+  border-radius: var(--r-md);
 }
 #agent-terminal {
   position: relative;
@@ -2418,11 +2392,14 @@ body:has(#welcome:not([hidden])) #hub-scan {
   }
 }
 @media (max-width: 1150px) {
+  :root {
+    --content-inset: 16px;
+  }
   .side {
     width: 184px;
   }
   .main-content {
-    padding: 32px 16px 12px;
+    padding: 32px var(--content-inset) 12px;
   }
   .bar {
     flex-wrap: wrap;
@@ -2480,6 +2457,9 @@ body:has(#welcome:not([hidden])) #hub-scan {
   }
 }
 @media (max-width: 700px) {
+  :root {
+    --content-inset: 12px;
+  }
   .side {
     width: 60px;
     padding: 52px 4px 12px;
@@ -2500,7 +2480,7 @@ body:has(#welcome:not([hidden])) #hub-scan {
     justify-content: center;
   }
   .main-content {
-    padding: 16px 12px 8px;
+    padding: 16px var(--content-inset) 8px;
     overflow: hidden;
     gap: 8px;
   }
@@ -2623,15 +2603,23 @@ body:has(#welcome:not([hidden])) #hub-scan {
 #agent-picker summary { cursor: pointer; color: var(--label-2); padding: 8px 0; }
 #agent-choice { color: var(--label); font-weight: 600; margin-left: 6px; }
 .agent-menu {
-  position: absolute; top: 100%; right: 0; z-index: 50;
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
   width: 240px; max-width: calc(100vw - 48px);
   background: var(--card); color: var(--label);
   border: 1px solid var(--hair-2); border-radius: var(--r-md);
-  box-shadow: 0 8px 24px #0002; padding: 8px;
+  box-shadow: var(--shadow-popover); padding: var(--s1);
+}
+/* The menu clamps to a 12px screen margin; this puts its right edge back on the split button's. */
+#rescan-picker-menu.floating-menu { translate: calc(12px - var(--content-inset)) 0; }
+/* Saved locations, then a separator, then the "choose another" action, in both folder menus. */
+:is(#folder-options, #rescan-options):not(:empty) {
+  margin-bottom: var(--s1);
+  padding-bottom: var(--s1);
+  border-bottom: var(--hairline) solid var(--hair-2);
 }
 .agent-option {
   width: 100%; display: flex; justify-content: space-between; align-items: center;
-  gap: 12px; padding: 10px; border: 0; border-radius: var(--r-sm);
+  gap: var(--s3); padding: var(--s2); border: 0; border-radius: var(--r-ctl);
   background: none; color: var(--label); text-align: left; font: inherit;
 }
 button.agent-option { cursor: pointer; }
@@ -2774,7 +2762,6 @@ th button { cursor: pointer; }
 #agent-mark .i { width: 16px; height: 16px; }
 .agent-chevron { width: 12px; height: 12px; transition: transform var(--motion-fast); }
 #agent-picker[open] .agent-chevron { transform: rotate(180deg); }
-.agent-menu { top: calc(100% + 8px); }
 #scan-agent-slot .agent-menu { right: auto; left: 0; }
 
 #agent-terminal {
@@ -2890,7 +2877,6 @@ th button { cursor: pointer; }
 .scan-command-bar summary:hover, .scan-command-bar summary:active { transform: none; scale: none; }
 .scan-command-bar button::before, .scan-command-bar button::after { transform: none; }
 .folder-menu { left: 0; right: auto; }
-.folder-menu #landing-choose { border-top: .5px solid var(--hair-2); border-radius: 0 0 var(--r-sm) var(--r-sm); margin-top: 4px; }
 @media (max-width: 700px) {
   #scan-agent-slot .agent-menu { left: auto; right: 0; }
   .scan-command-bar .segment-label,
@@ -2944,7 +2930,6 @@ button:not(:disabled):hover::before, summary:hover::before { inset: -1px; }
 }
 #rescan-picker summary::-webkit-details-marker { display: none; }
 #rescan-picker summary::marker { content: ""; }
-#rescan-new { margin-top: 4px; }
 .options-strip {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px;
   flex: none; padding: 0 0 var(--s3); border-bottom: var(--hairline) solid var(--hair-2);
@@ -2997,7 +2982,7 @@ body:has(#welcome:not([hidden])) .scan-split,
 
 .banner button, #scan-strip button, #rescan-picker summary { border: 0; }
 #rescan-picker summary { box-shadow: inset 1px 0 var(--hair-2); }
-.agent-option, .location-row { border-radius: var(--r-ctl); }
+.location-row { border-radius: var(--r-ctl); }
 
 /* Round 10: one scan command, focused progress, and disclosures that own their content. */
 .gh, .segment-label, .scan-command-bar #agent-analyze { color: var(--label-2); }
@@ -3055,23 +3040,14 @@ body:has(#welcome:not([hidden])) #counting-disclosure { display: none; }
 .map-panel .legend { margin-top: 12px; gap: 8px 12px; flex: none; }
 
 footer { min-height: 20px; }
-#counting-disclosure { flex: none; border-radius: var(--r-md); background: transparent; transition: background-color var(--motion-fast) ease; }
-#counting-disclosure.open { background: var(--surface-deep); }
+#counting-disclosure { flex: none; }
 .counting-heading { display: flex; align-items: center; justify-content: space-between; min-height: 32px; padding: 2px 8px; }
 #details-toggle { color: var(--label-2); font-size: var(--fs-12); padding: 4px 8px; }
 #details-toggle:not([aria-expanded="true"]):hover { background: var(--fill-2); color: var(--label); }
 #notes-close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; color: var(--label-2); background: transparent; }
 #notes-close:hover { color: var(--label); background: var(--fill); }
-.notes-reveal { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 180ms ease; }
-.open .notes-reveal { grid-template-rows: 1fr; }
-#notes {
-  position: static; min-height: 0; max-height: 32vh; overflow: auto;
-  padding: 0 16px; margin: 0; border-radius: 0 0 var(--r-md) var(--r-md);
-  background: transparent; box-shadow: none; color: var(--label); font-size: var(--fs-12);
-}
 #notes h3 { font-size: var(--fs-12); font-weight: 600; margin: 12px 0 8px; color: var(--label); }
 #notes h3:first-child { margin-top: 8px; }
-#notes > :last-child { padding-bottom: 12px; }
 .note-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) auto; align-items: baseline; gap: 12px; padding: 6px 0; line-height: 1.5; border: 0; }
 .note-term { color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .note-copy { color: var(--label); }
@@ -3096,7 +3072,6 @@ footer { min-height: 20px; }
   /* Reduced motion: no rotation; the arc breathes slowly so the scan still reads as live. */
   #scan-spinner { animation: none !important; will-change: auto; }
   #scan-spinner .scan-sweep { animation: scan-pulse 2.4s ease-in-out infinite !important; }
-  .notes-reveal, #counting-disclosure { transition: none; }
 }
 /* Reserve a complete header and at least one list row above the drawer. */
 #agent-terminal { max-height: min(50vh, calc(100dvh - 440px)); }
@@ -3327,18 +3302,12 @@ th button:hover { background: var(--fill); color: var(--label); }
 .fr:hover .n, .item-name:hover, .file-label:hover, .filename:hover { color: var(--label); }
 /* Accounting is a fixed trigger with an upward overlay and a joined button tab. */
 #counting-slot { min-width: 0; }
-#counting-disclosure { position: relative; border-radius: 0; }
-#counting-disclosure.open { background: transparent; }
 .counting-heading { padding: 0; min-height: 28px; justify-content: flex-start; gap: 12px; }
 #scan-status { color: var(--label-2); font-size: var(--fs-12); }
 #details-toggle { flex: none; position: relative; z-index: 61; padding: 4px 8px; border: 1px solid transparent; border-radius: 0 0 var(--r-ctl) var(--r-ctl); }
 #details-toggle[aria-expanded="true"] { background: var(--surface-deep); border-color: var(--hair-2); border-top-color: var(--surface-deep); }
 #details-toggle[aria-expanded="true"]::after { content: ""; position: absolute; top: -1px; right: -9px; width: 8px; height: 8px; background: radial-gradient(circle at 100% 100%, transparent 7px, var(--surface-deep) 7.5px); pointer-events: none; }
-.notes-reveal { position: absolute; bottom: calc(100% - 1px); left: 0; width: min(680px, calc(100vw - 290px)); z-index: 60; display: block; visibility: hidden; }
-.open .notes-reveal { visibility: visible; }
-#notes { position: relative; max-height: min(400px, 55vh); padding: 12px 16px; border: 1px solid var(--hair-2); border-radius: var(--r-md) var(--r-md) var(--r-md) 0; background: var(--surface-deep); box-shadow: 0 8px 32px #0003; }
 #notes-close { position: absolute; top: 8px; right: 8px; }
-#notes > h3:first-of-type { margin-top: 0; padding-right: 32px; }
 #remembered-card { order: -1 !important; flex: none; max-height: 42vh; overflow: auto; padding: 16px; border-radius: var(--r-md); margin-bottom: 16px; }
 .remembered-heading { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .remembered-row { display: flex; align-items: center; gap: 8px; border-top: var(--hairline) solid var(--success-border); }
@@ -3349,8 +3318,7 @@ th button:hover { background: var(--fill); color: var(--label); }
 .remembered-row .num { white-space: nowrap; font-variant-numeric: tabular-nums; }
 #remembered-card .btn.pri { margin-top: 12px; }
 .growth-warning { position: relative; color: var(--amber); display: inline-flex; cursor: help; }
-.growth-tooltip { position: absolute; bottom: calc(100% + 6px); right: 0; width: 260px; padding: 10px; border-radius: var(--r-ctl); background: var(--surface-deep); color: var(--label); box-shadow: 0 0 0 1px var(--hair-2), 0 4px 16px #0003; z-index: 80; font-size: var(--fs-12); line-height: 1.5; display: none; }
-.growth-warning:hover .growth-tooltip, .growth-warning:focus .growth-tooltip { display: block; }
+.growth-tooltip { position: fixed; display: block; width: 260px; padding: 10px; border-radius: var(--r-ctl); background: var(--surface-deep); color: var(--label); box-shadow: 0 0 0 1px var(--hair-2), var(--shadow-popover); z-index: 80; font-size: var(--fs-12); line-height: 1.5; }
 .remember-toggle { display: flex; align-items: center; gap: 8px; margin: 16px 0; color: var(--label); font-size: var(--fs-13); }
 #remembered-manager { width: min(640px, calc(100vw - 48px)); }
 #remembered-paths { max-height: 50vh; overflow: auto; margin: 16px 0; }
@@ -3360,20 +3328,17 @@ th button:hover { background: var(--fill); color: var(--label); }
   :root { --cleanup-columns: 18px 24px minmax(0, 1fr) 68px 40px 58px; }
   .lh, .it { gap: var(--s2); }
   .suggestion-details { padding-left: 66px; }
-  .notes-reveal { width: min(640px, calc(100vw - 48px)); }
   .scan-command-bar .kbd { display: none; }
   #agent-empty { padding-inline: 0; }
   #welcome .scan-command-bar #agent-picker summary { gap: 4px; padding: 0 6px; }
 }
 #overview-back, #scan-agent-link { color: var(--label); }
-.growth-tooltip { position: fixed; right: auto; bottom: auto; }
 #scan-feedback > .icon-action { margin-left: auto; }
 .location-remove.icon-action { position: absolute; width: 20px; height: 20px; min-height: 20px; }
 .detail-path > .ellipsized-path { display: flex; overflow: hidden; }
 .path-prefix { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .path-tail { flex: none; max-width: 55%; overflow: hidden; text-overflow: ellipsis; }
 .detail-command { background: color-mix(in srgb, var(--card) 92%, black); }
-.growth-tooltip { display: block; }
 .growth-tooltip[hidden] { display: none; }
 #scan-feedback > .icon-action:hover { color: var(--label); background: var(--fill); }
 
@@ -3403,10 +3368,27 @@ th button:hover { background: var(--fill); color: var(--label); }
 }
 :is(.cleanup-head th.rt, .files-panel th:nth-child(n+3)) button { flex-direction: row-reverse; }
 /* How we counted: the panel spans the content width and joins the button tab. */
-footer, .main-content:has(#notes:not([hidden])) footer { position: relative; inset: auto; }
-#counting-disclosure { position: static; }
-#counting-disclosure .notes-reveal { left: 0; right: 0; width: auto; bottom: calc(100% - 1px); }
-#notes { inset: auto; width: 100%; max-height: min(400px, 55vh); border-radius: var(--r-md) var(--r-md) var(--r-md) 0; }
+footer { position: relative; inset: auto; }
+/* The panel rises from behind its tab: the clip hides it below the tab's top edge, and opens once
+   it has landed so its shadow shows. Closing runs in reverse before toggleNotes hides it. */
+.notes-reveal {
+  position: absolute; bottom: calc(100% - 1px); left: 0; right: 0; z-index: 60; visibility: hidden;
+  clip-path: inset(-64px -64px 0 -64px);
+  transition: visibility 0s linear var(--motion-panel);
+}
+.open .notes-reveal {
+  visibility: visible; clip-path: inset(-64px);
+  transition: visibility 0s, clip-path 0s linear var(--motion-panel);
+}
+#notes {
+  position: relative; display: flex; flex-direction: column; width: 100%; max-height: min(400px, 55vh);
+  overflow: hidden; border: 1px solid var(--hair-2); border-radius: var(--r-md) var(--r-md) var(--r-md) 0;
+  background: var(--surface-deep); box-shadow: var(--shadow-popover); color: var(--label);
+  transform: translateY(100%);
+  transition: transform var(--motion-panel) var(--ease);
+}
+.open #notes { transform: none; }
+#notes[hidden] { display: none; }
 /* Rescan progress stops one toolbar gap before the Rescan split button, whatever its width. */
 #scan-options #scan-strip { right: calc(var(--scan-split-width, 146px) + 12px); }
 
@@ -3418,11 +3400,10 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 #effort-choice { color: var(--label-2); }
 #effort-choice::before { content: "·"; margin-right: 6px; color: var(--label-3, var(--label-2)); }
 #model-picker .agent-menu { width: 220px; }
-#model-picker .agent-option { padding: 8px 10px; font-size: var(--fs-13); }
 #model-picker .agent-option:disabled { color: var(--label-2); cursor: default; }
 #effort-section { margin-top: 4px; padding-top: 4px; border-top: var(--hairline) solid var(--hair); }
-.model-menu-label { padding: 6px 10px 4px; color: var(--label-2); font-size: var(--fs-11); font-weight: 600; }
-#model-note { margin: 4px 0 0; padding: 6px 10px 4px; color: var(--label-2); font-size: var(--fs-12); }
+.model-menu-label { padding: 6px var(--s2) var(--s1); color: var(--label-2); font-size: var(--fs-11); font-weight: 600; }
+#model-note { margin: var(--s1) 0 0; padding: 6px var(--s2) var(--s1); color: var(--label-2); font-size: var(--fs-12); }
 .model-hint { border: 0; background: none; padding: 4px 8px; border-radius: var(--r-sm); color: var(--label-2); font: inherit; font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
 .model-hint:hover { background: var(--fill); color: var(--label); }
 
@@ -3448,8 +3429,6 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 #scan-agent-link[hidden] { display: none; }
 
 /* Round 16: the close button stays pinned while the counting notes scroll. */
-#notes { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
-#notes[hidden] { display: none; }
 #notes > #notes-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 16px; }
 #notes-body > h3:first-of-type { margin-top: 0; padding-right: 32px; }
 #notes-body > :last-child { padding-bottom: 0; }
@@ -3458,7 +3437,7 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 
 /* Round 16: a quiet top-edge handle resizes the counting panel upward. */
 #notes-resize { position: absolute; top: 0; left: 12px; right: 48px; height: 6px; z-index: 3; cursor: ns-resize; touch-action: none; }
-#notes-resize::after { content: ""; position: absolute; left: 50%; top: 2px; width: 32px; height: 3px; margin-left: -16px; border-radius: var(--r-full); background: var(--label-3); opacity: 0; transition: opacity 120ms ease; }
+#notes-resize::after { content: ""; position: absolute; left: 50%; top: 2px; width: 32px; height: 3px; margin-left: -16px; border-radius: var(--r-full); background: var(--label-3); opacity: 0; transition: opacity var(--motion-fast) var(--ease); }
 #notes-resize:hover::after, .notes-resizing #notes-resize::after { opacity: .6; }
 .notes-resizing, .notes-resizing * { cursor: ns-resize !important; user-select: none; }
 
@@ -3491,12 +3470,12 @@ footer, .main-content:has(#notes:not([hidden])) footer { position: relative; ins
 .suggestion-details + .suggestion-card { margin-top: 2px; }
 
 /* Round 16: export confirmations are bottom-right toasts. */
-#toasts { position: fixed; right: 20px; bottom: 20px; z-index: 10001; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
-.toast { pointer-events: auto; display: flex; align-items: center; gap: 10px; max-width: min(420px, calc(100vw - 40px)); padding: 8px 8px 8px 12px; border-radius: var(--r-ctl); background: var(--card); color: var(--label); border: 1px solid var(--hair-2); box-shadow: 0 8px 24px #0000002e; font-size: var(--fs-13); }
+#toasts { position: fixed; right: var(--content-inset); bottom: var(--s5); z-index: 10001; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: center; gap: var(--s2); max-width: min(420px, calc(100vw - 40px)); padding: 6px 6px 6px var(--s3); border-radius: var(--r-md); background: var(--card); color: var(--label); border: 1px solid var(--hair-2); box-shadow: var(--shadow-popover); font-size: var(--fs-13); }
 .toast > .i { flex: none; width: 16px; height: 16px; color: var(--success-icon); }
 .toast-copy { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toast-action { flex: none; height: 26px; padding: 0 10px; border: 0; border-radius: var(--r-sm); background: var(--fill); color: var(--label); font: inherit; font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
-.toast-action:hover { background: var(--fill-2, var(--fill)); }
+.toast-action { flex: none; height: 24px; padding: 0 var(--s2); border: 0; border-radius: var(--r-sm); background: var(--fill); color: var(--label); font: inherit; font-size: var(--fs-12); cursor: pointer; white-space: nowrap; }
+.toast-action:hover { background: var(--fill-2); }
 .toast .toast-close { flex: none; width: 24px; height: 24px; min-height: 24px; border-radius: var(--r-sm); color: var(--label-2); background: transparent; }
 .toast .toast-close .i { width: 12px; height: 12px; }
 .toast .toast-close:hover { color: var(--label); background: var(--fill); }
