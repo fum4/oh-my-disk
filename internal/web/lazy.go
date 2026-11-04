@@ -44,16 +44,21 @@ func installAPI(mux *http.ServeMux, s *report.Snapshot) {
 		scan.Root = visible(t, 0, 2, 0, 200, &budget, "bytes", false)
 		out := *s
 		out.Scan = &scan
-		out.Suggestions, _ = rules.Select(s.Suggestions, "score", "", "", 100)
+		ranked, _ := rules.Select(s.Suggestions, "score", "", "", 0)
+		out.Suggestions = ranked[:min(len(ranked), 100)]
+		reclaimable, other := rules.Totals(s.Suggestions)
 		if len(scan.Skipped) > 500 {
 			scan.Skipped = scan.Skipped[:500]
 		}
 		respond(w, struct {
 			*report.Snapshot
-			SkippedCount int            `json:"skipped_count"`
-			Volume       *report.Volume `json:"volume,omitempty"`
-			VolumeNote   string         `json:"volume_note"`
-		}{&out, len(s.Scan.Skipped), volume(s), report.VolumeNote})
+			SkippedCount     int            `json:"skipped_count"`
+			SuggestionCount  int            `json:"suggestion_count"`
+			ReclaimableBytes int64          `json:"reclaimable_bytes"`
+			NotCountedBytes  int64          `json:"not_counted_bytes"`
+			Volume           *report.Volume `json:"volume,omitempty"`
+			VolumeNote       string         `json:"volume_note"`
+		}{&out, len(s.Scan.Skipped), len(ranked), reclaimable, other, volume(s), report.VolumeNote})
 	})
 	mux.HandleFunc("/api/suggest", func(w http.ResponseWriter, r *http.Request) {
 		limit, ok := param(r, "limit", 100, 1, 500)

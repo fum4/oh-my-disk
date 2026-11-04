@@ -736,6 +736,12 @@ function cleanupRunButton(s, card) {
       if (r?.measured) {
         const freed = Math.max(0, r.before - r.after);
         s.bytes = r.after;
+        if (s.reclaimable) {
+          snapshot.reclaimable_bytes = Math.max(0, snapshot.reclaimable_bytes - freed);
+          if (snapshot.volume) snapshot.volume.available += freed;
+          renderVolume();
+          renderOverview();
+        }
         if (size) { size.textContent = fmt(r.after); size.title = "Measured after cleanup"; }
         showToast(freed > 0 ? `${s.suggested_command} freed ${fmt(freed)}` : `${s.suggested_command} finished · nothing to free`);
       } else {
@@ -827,10 +833,7 @@ function renderSuggestions() {
       name,
       dom("div", "d", `${categoryLabel(s.category)}, ${s.stale_days} days unused`),
     );
-    const safe =
-      !s.personal &&
-      !s.incomplete &&
-      ["cache", "reinstallable"].includes(s.safety);
+    const safe = s.reclaimable;
     const badge = dom(
       "span",
       "badge " + (s.personal ? "rev personal" : safe ? "safe" : "rev"),
@@ -1419,16 +1422,9 @@ function renderOverview() {
   if (!snapshot) return;
   const scan = snapshot.scan.root,
     v = snapshot.volume;
-  const suggestions = snapshot.suggestions || [];
-  const reclaim = suggestions
-    .filter(
-      (s) =>
-        !s.personal &&
-        !s.incomplete &&
-        ["cache", "reinstallable"].includes(s.safety),
-    )
-    .reduce((sum, s) => sum + s.bytes, 0);
-  const lowerBound = suggestions.length === 100;
+  const reclaim = snapshot.reclaimable_bytes,
+    notCounted = snapshot.not_counted_bytes,
+    suggestionCount = snapshot.suggestion_count;
   const capacity = v?.capacity || 0,
     free = v?.available || 0;
   const clean = Math.min(reclaim, scan.bytes, v?.used ?? scan.bytes);
@@ -1555,23 +1551,30 @@ function renderOverview() {
     : "Disk capacity unavailable";
   $("nav-folders").textContent = fmt(scan.bytes);
   $("nav-categories").textContent = Object.keys(snapshot.categories).length;
-  $("nav-cleanup-tab").textContent = (lowerBound ? "≥ " : "") + fmt(reclaim);
+  $("nav-cleanup-tab").textContent = fmt(reclaim);
   $("home-total").textContent = scan.name + ", " + fmt(scan.bytes);
   const reclaimDisplay = reclaim > 0 && reclaim < 1e8 ? fmt(reclaim).split(" ") : [(reclaim / 1e9).toFixed(1), "GB"];
   $("reclaim-total").replaceChildren(
-    document.createTextNode(
-      (lowerBound ? "≥ " : "") + reclaimDisplay[0],
-    ),
+    document.createTextNode(reclaimDisplay[0]),
     dom("small", "", reclaimDisplay[1]),
   );
-  $("reclaim-total").title = lowerBound
-    ? "At least this much among the top 100 suggestions; actual reclaimed space can differ."
-    : "Allocated bytes in disjoint suggestions; actual reclaimed space can differ.";
+  $("reclaim-note").replaceChildren(dom("p", "", "Only caches and data you can rebuild or download again."));
+  if (notCounted > 0) {
+    const more = dom("p", "", `Another ${fmt(notCounted)} can be cleaned after you review it. `);
+    const review = dom("button", "link", "Review it");
+    // Largest lists personal files and unrecognized folders, which Best leaves out.
+    review.onclick = () => {
+      if (suggestionSort !== "size") document.querySelector('[data-suggest-sort="size"]').click();
+      $("review-cleanup").click();
+    };
+    more.append(review);
+    $("reclaim-note").append(more);
+  }
   $("rail-count").textContent =
-    suggestions.length + (lowerBound ? "+" : "") + " suggestions";
+    suggestionCount + (suggestionCount === 1 ? " suggestion" : " suggestions");
   $("free-now").textContent = v ? gb(free) : "—";
   $("free-after").textContent = v
-    ? (lowerBound ? "≥ " : "") + gb(Math.min(capacity, free + clean))
+    ? gb(Math.min(capacity, free + clean))
     : "—";
   $("bar-now").style.width = (capacity ? (free / capacity) * 100 : 0) + "%";
   $("bar-after").style.left = $("bar-now").style.width;
