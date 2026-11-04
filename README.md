@@ -213,7 +213,7 @@ Cleanup suggestions default to **Score**, with **Size** and **Time since last ac
 
 **Effort is never part of the score.** Staleness uses the later of latest subtree mtime/regular-file atime and clamps future timestamps to zero days. Project artifacts use the enclosing project’s latest subtree mtime, so old `target` files in an active project are not treated as an abandoned project. Projects are recognized by markers including `package.json`, `Cargo.toml`, `pyproject.toml`, `go.mod`, Gradle/Maven/Swift/CMake manifests and `.git`. Generic `build`, `dist`, `target`, `.venv`, `.next` and `.turbo` names outside a recognized project are not assumed safe.
 
-More specific locations take precedence over enclosing aggregates: Hugging Face models are not mislabeled as expendable generic `.cache` contents. The final score pass selects disjoint paths. Category totals attribute each entry’s own blocks to its nearest matching rule and sum to the scan total. Ranking measures candidates, not a promise that every allocated byte can be freed.
+More specific locations take precedence over enclosing aggregates: Hugging Face models are not mislabeled as expendable generic `.cache` contents. The final score pass selects disjoint paths. Category totals attribute each entry’s own blocks to its nearest matching rule and sum to the scan total. Ranking measures candidates, not a promise that every allocated byte can be freed. **You could get back** counts every complete `cache` and `reinstallable` suggestion outside personal folders; `user-data` such as Docker disks and unrecognized folders appear for review but never count, so removing them leaves that total unchanged. Its note shows how much isn't counted.
 
 Extend or override rules:
 

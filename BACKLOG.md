@@ -17,7 +17,10 @@
 - [ ] Support more agent providers.
 - [ ] Add more icons, categories, CLI commands and explanations where useful.
 - [ ] Explain what each "What you can clean" CLI command does.
-- [ ] "You could get back" banner: drop the "≥", and add more useful content because it feels too empty.
+- [x] "You could get back" banner: drop the "≥" and say what the total counts.
+- [ ] "You could get back" banner: add more useful content because it feels too empty.
+- [ ] Fix `PersonalData` matching `downloads` anywhere in a path: `Library/Caches/Homebrew/downloads`, a `cache` item, shows "Your files" and is left out of "You could get back". First step: anchor personal folder names to the home directory.
+- [ ] Don't count pnpm store bytes as reclaimable while projects still share them. On a real store 82% of files were hardlinked into `node_modules`, so neither `pnpm store prune` nor deleting the store frees those blocks. APFS clones hide the same sharing. First step: record link count at scan time and report the shared share per suggestion.
 - [x] Finalize the app icon (Prism storage blocks).
 - [x] Use the same disk usage percentage in explorer charts and lists, and label the share in Overview.
 - [x] Index categories per scan and reuse sorted drill-down pages.

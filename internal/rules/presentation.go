@@ -15,15 +15,35 @@ func CleanupScore(raw float64) float64 {
 	}
 	return 100 * raw / (raw + 1e9)
 }
+
+// Reclaimable reports whether a suggestion counts toward "You could get back":
+// complete, regenerable and not personal. Anything else is listed for review only.
+func (s Suggestion) Reclaimable() bool {
+	return !s.Incomplete && !PersonalData(s.Path) && (s.Safety == "cache" || s.Safety == "reinstallable")
+}
+
+// Totals splits disjoint suggestions into reclaimable bytes and everything else.
+func Totals(in []Suggestion) (reclaimable, other int64) {
+	for _, s := range in {
+		if s.Reclaimable() {
+			reclaimable += s.Bytes
+		} else {
+			other += s.Bytes
+		}
+	}
+	return reclaimable, other
+}
+
 func (s Suggestion) MarshalJSON() ([]byte, error) {
 	effective := math.Min(s.Score, rankScore(s.Path, s.Bytes, s.Safety, s.Rule, s.StaleDays, s.Incomplete))
 	type plain Suggestion
 	return json.Marshal(struct {
 		plain
-		Score    float64 `json:"score"`
-		Badge    string  `json:"badge"`
-		Personal bool    `json:"personal"`
-	}{plain(s), CleanupScore(effective), fmt.Sprintf("%s · stale %dd · %.1f GB", s.Safety, s.StaleDays, float64(s.Bytes)/1e9), PersonalData(s.Path) || s.Safety == "user-data"})
+		Score       float64 `json:"score"`
+		Badge       string  `json:"badge"`
+		Personal    bool    `json:"personal"`
+		Reclaimable bool    `json:"reclaimable"`
+	}{plain(s), CleanupScore(effective), fmt.Sprintf("%s · stale %dd · %.1f GB", s.Safety, s.StaleDays, float64(s.Bytes)/1e9), PersonalData(s.Path) || s.Safety == "user-data", s.Reclaimable()})
 }
 func Select(in []Suggestion, key, category, safety string, limit int) ([]Suggestion, error) {
 	if key == "" {
