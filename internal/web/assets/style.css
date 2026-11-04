@@ -643,7 +643,8 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin: var(--s4) 0 var(--s2);
+  gap: var(--s2);
+  margin: 0 0 var(--s2);
 }
 .seg,
 .view-switch {
@@ -860,9 +861,6 @@ button:where(:not(:disabled)):hover {
 .folder-card {
   min-height: 0;
   overflow: auto;
-}
-.tools {
-  gap: 8px;
 }
 .tools .cnt {
   white-space: nowrap;
@@ -2720,7 +2718,7 @@ button, summary, label, nav, .bar, .ch, .tools, thead, th {
   user-select: none;
 }
 th button { cursor: pointer; }
-#suggestions > .gain { margin-bottom: 18px; }
+#suggestions > .gain { margin-bottom: var(--s4); }
 .agent-control {
   --wails-draggable: no-drag;
   width: fit-content;
