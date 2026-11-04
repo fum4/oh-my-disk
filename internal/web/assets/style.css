@@ -1430,12 +1430,8 @@ dialog pre {
   .it .s {
     font-size: var(--fs-12);
   }
-  .it .tile {
-    width: 24px;
-    height: 24px;
-  }
   .badge {
-    padding: 0 4px;
+    padding: 0 var(--s1);
     gap: 2px;
   }
   .badge svg {
@@ -1726,6 +1722,13 @@ dialog {
   }
 }
 @media (min-width: 701px) and (max-width: 1150px) {
+  :root {
+    --cleanup-columns: 18px 24px minmax(0, 1fr) 68px 52px 64px;
+  }
+  .lh,
+  .it {
+    gap: var(--s2);
+  }
   .grid:not(.full-view) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(340px, 1fr);
@@ -1773,7 +1776,7 @@ dialog {
     height: 24px;
   }
   .badge {
-    padding: 0 4px;
+    padding: 0 6px;
   }
   .badge svg {
     display: none;
@@ -2460,6 +2463,7 @@ body:has(#welcome:not([hidden])) #hub-scan {
     margin-top: 12px;
   }
   .side .group:has(#locations),
+  .side .side-brand,
   .side .vol {
     display: none;
   }
@@ -3315,9 +3319,10 @@ th button:hover { background: var(--fill); color: var(--label); }
 .remembered-managed { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: var(--hairline) solid var(--hair); }
 .remembered-managed > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font: var(--fs-11) var(--mono); }
 @media (max-width: 700px) {
-  :root { --cleanup-columns: 18px 24px minmax(0, 1fr) 68px 40px 58px; }
+  :root { --cleanup-columns: 18px minmax(0, 1fr) 64px 60px; }
   .lh, .it { gap: var(--s2); }
-  .suggestion-details { padding-left: 66px; }
+  .it .tile, .it .sc, .cleanup-head th:nth-child(2), .cleanup-head th:nth-child(5) { display: none; }
+  .suggestion-details { padding-left: var(--s3); }
   .scan-command-bar .kbd { display: none; }
   #agent-empty { padding-inline: 0; }
   #welcome .scan-command-bar #agent-picker summary { gap: 4px; padding: 0 6px; }
