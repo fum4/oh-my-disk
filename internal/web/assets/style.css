@@ -3005,7 +3005,6 @@ body:has(#welcome:not([hidden])) #counting-disclosure { display: none; }
 .scan-track { stroke: var(--c-free); }
 .scan-sweep { stroke: var(--c-files); stroke-linecap: round; stroke-dasharray: 210 780; transform: rotate(-90deg); transform-origin: 140px 140px; }
 @keyframes scan-orbit { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@keyframes scan-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
 .scan-count { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; }
 .scan-count strong { font-size: var(--fs-28); font-weight: 600; letter-spacing: -1px; line-height: 1.2; }
 .scan-count span, #scan-stats { font-size: var(--fs-13); color: var(--label-2); }
@@ -3057,8 +3056,9 @@ footer { min-height: 20px; }
   .page-link { font-size: var(--fs-12); padding: 2px 4px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  /* Reduced motion: no rotation; the arc breathes slowly so the scan still reads as live. */
-  #scan-rotor { animation: scan-pulse 2.4s ease-in-out infinite !important; will-change: opacity; }
+  /* The owner's call: the ring always rotates, because it's how a scan shows it's alive.
+     This outranks the blanket animation reset for reduced motion. */
+  #scan-rotor { animation: scan-orbit 3.6s linear infinite !important; }
 }
 /* Reserve a complete header and at least one list row above the drawer. */
 #agent-terminal { max-height: min(50vh, calc(100dvh - 440px)); }
