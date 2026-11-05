@@ -79,7 +79,7 @@ func TestScanRejectsInvalidAndConcurrentRequests(t *testing.T) {
 
 func TestRunCleanupRefusesUnlistedAndMeasures(t *testing.T) {
 	a := &App{}
-	if _, err := a.RunCleanup("rm -rf /", "/tmp"); err == nil {
+	if _, err := a.RunCleanup("rm -rf /", "/tmp", 80, 24); err == nil {
 		t.Fatal("unlisted cleanup ran")
 	}
 	if len(a.CleanupCommands()) == 0 {
@@ -97,5 +97,34 @@ func TestRunCleanupRefusesUnlistedAndMeasures(t *testing.T) {
 	}
 	if _, ok := measure(context.Background(), "relative"); ok {
 		t.Fatal("relative paths must not be measured")
+	}
+}
+
+func TestCleanupLiveBuffersAndStops(t *testing.T) {
+	var l cleanupLive
+	if got := l.drain(); len(got) != 0 {
+		t.Fatalf("drain on empty = %q", got)
+	}
+	l.cancel() // nothing running: must not panic
+	l.Write(make([]byte, maxCleanupBacklog))
+	l.Write([]byte("newest"))
+	got := l.drain()
+	if len(got) != maxCleanupBacklog || string(got[len(got)-6:]) != "newest" {
+		t.Fatalf("backlog kept %d bytes", len(got))
+	}
+	if len(l.drain()) != 0 {
+		t.Fatal("drain must empty the buffer")
+	}
+	stopped := false
+	l.begin(func() { stopped = true })
+	l.cancel()
+	if !stopped {
+		t.Fatal("cancel did not stop the run")
+	}
+	stopped = false
+	l.end()
+	l.cancel()
+	if stopped {
+		t.Fatal("cancel reached a finished run")
 	}
 }

@@ -3570,3 +3570,36 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) button:hover { color: v
 /* App identity below the macOS window buttons; keep the row draggable. */
 .side { padding-top: 48px; }
 .side-brand { display: flex; align-items: center; height: 28px; margin: 0 0 -6px; padding: 0 8px; color: var(--label); font-size: var(--fs-20); font-weight: 700; letter-spacing: -.005em; user-select: none; -webkit-user-select: none; cursor: default; --wails-draggable: drag; }
+
+/* Run command terminal: floats bottom right, above the page and below dialogs and toasts. */
+:root { --run-terminal-header: 40px; --run-terminal-screen: 220px; }
+#run-terminal {
+  position: fixed; right: var(--content-inset); bottom: var(--s5); z-index: 9000;
+  display: flex; flex-direction: column;
+  width: min(480px, calc(100vw - 2 * var(--content-inset)));
+  overflow: hidden;
+  background: var(--terminal-bg); color: var(--terminal-text);
+  border: 1px solid var(--hair); border-radius: var(--r-md);
+  box-shadow: var(--shadow-popover);
+}
+#run-terminal[hidden] { display: none; }
+#run-terminal.minimized { width: min(360px, calc(100vw - 2 * var(--content-inset))); }
+#run-terminal-header {
+  display: flex; align-items: center; gap: var(--s2);
+  flex: none; height: var(--run-terminal-header); padding: 0 var(--s1) 0 var(--s3);
+  font-size: var(--fs-12);
+}
+#run-terminal.minimized #run-terminal-header { cursor: pointer; }
+#run-terminal-icon { display: inline-flex; flex: none; width: 14px; height: 14px; }
+#run-terminal-icon .i { width: 14px; height: 14px; }
+#run-terminal[data-state="done"] #run-terminal-icon { color: var(--green); }
+#run-terminal[data-state="failed"] #run-terminal-icon { color: var(--red); }
+#run-terminal-command { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+#run-terminal-status { flex: none; color: var(--label-2); white-space: nowrap; }
+#run-terminal[data-state="failed"] #run-terminal-status { color: var(--red); }
+#run-terminal-screen { flex: none; height: var(--run-terminal-screen); padding: 0 var(--s3) var(--s2); }
+#run-terminal.minimized #run-terminal-screen { display: none; }
+#run-terminal-screen .xterm-viewport { background: var(--terminal-bg) !important; }
+/* Toasts share the corner, so they sit above the terminal rather than behind it. */
+body.run-terminal-open #toasts { bottom: calc(var(--s5) + var(--run-terminal-header) + var(--run-terminal-screen) + var(--s2)); }
+body.run-terminal-minimized #toasts { bottom: calc(var(--s5) + var(--run-terminal-header) + var(--s2)); }

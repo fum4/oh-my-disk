@@ -4,7 +4,7 @@
 
 A local disk-space analyzer with read-only scanning and explicit Move to Trash for developers. Find the caches, SDKs, models, build outputs and forgotten downloads filling your home folder. Written in Go for macOS Apple Silicon and Linux, with a native Wails macOS desktop app and a DaisyDisk-inspired explorer shared with the CLI.
 
-Scanning reads filesystem metadata. In the desktop app, **Move to Trash** moves selected items after you review the paths and confirm. Suggested cleanup commands are displayed as text for manual review.
+Scanning reads filesystem metadata. In the desktop app, **Move to Trash** moves selected items after you review the paths and confirm. Suggested cleanup commands are shown as text to review. A few that are a tool's own clean command, like `pnpm store prune`, can also be run with a button, with their output in a floating terminal.
 
 ## Install
 

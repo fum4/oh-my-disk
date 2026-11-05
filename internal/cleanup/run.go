@@ -6,16 +6,19 @@
 package cleanup
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+
+	"github.com/creack/pty"
 )
 
 // allowed maps a rule's exact suggested command to the argv we execute. Every entry is
@@ -95,28 +98,21 @@ func Lookup(name, path string) (string, error) {
 // Result is what one run reports back to the UI.
 type Result struct {
 	Command  string `json:"command"`
-	Output   string `json:"output"`
 	ExitCode int    `json:"exitCode"`
 }
 
-const outputTail = 1200
+const (
+	runTimeout = 15 * time.Minute
+	// stopGrace is how long a stopped command gets to exit before it is killed.
+	stopGrace = 3 * time.Second
+	// outputGrace bounds the wait for the last output: a background child that inherited
+	// the terminal must not keep a finished run open.
+	outputGrace = time.Second
+)
 
-// Tail keeps the last n bytes of output, trimmed to whole lines where possible.
-func Tail(b []byte, n int) string {
-	s := strings.TrimSpace(string(b))
-	if len(s) <= n {
-		return s
-	}
-	s = s[len(s)-n:]
-	if i := strings.IndexByte(s, '\n'); i >= 0 && i < len(s)-1 {
-		s = s[i+1:]
-	}
-	return "…" + s
-}
-
-// Run executes an allowlisted command with the login PATH. The error carries the
-// output tail so the UI can show why it failed.
-func Run(ctx context.Context, command string) (Result, error) {
+// Run executes an allowlisted command with the login PATH, streaming what it prints to
+// output as it happens. Cancelling ctx stops it.
+func Run(ctx context.Context, command string, cols, rows uint16, output io.Writer) (Result, error) {
 	res := Result{Command: command}
 	argv, ok := Argv(command)
 	if !ok {
@@ -127,31 +123,66 @@ func Run(ctx context.Context, command string) (Result, error) {
 	if err != nil {
 		return res, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
+	res.ExitCode, err = execute(ctx, bin, argv[1:], path, cols, rows, output)
+	if err != nil {
+		return res, fmt.Errorf("%s failed: %w", command, err)
+	}
+	return res, nil
+}
+
+// execute gives the command a real terminal for its output, so tools stream lines and
+// progress instead of buffering them for a pipe. Stdin stays empty and the terminal isn't
+// a controlling one, so nothing can sit waiting on a prompt no one can answer.
+func execute(ctx context.Context, bin string, args []string, path string, cols, rows uint16, output io.Writer) (int, error) {
+	ptmx, tty, err := pty.Open()
+	if err != nil {
+		return -1, err
+	}
+	defer ptmx.Close()
+	if err = pty.Setsize(ptmx, &pty.Winsize{Cols: cols, Rows: rows}); err != nil {
+		tty.Close()
+		return -1, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, runTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, argv[1:]...)
-	env := []string{"PATH=" + path}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Env = []string{"PATH=" + path, "TERM=xterm-256color"}
 	for _, kv := range os.Environ() {
-		if !strings.HasPrefix(kv, "PATH=") {
-			env = append(env, kv)
+		if !strings.HasPrefix(kv, "PATH=") && !strings.HasPrefix(kv, "TERM=") {
+			cmd.Env = append(cmd.Env, kv)
 		}
 	}
-	cmd.Env = env
 	if home, e := os.UserHomeDir(); e == nil {
 		cmd.Dir = home
 	}
-	var out bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &out
-	err = cmd.Run()
-	res.Output = Tail(out.Bytes(), outputTail)
-	if cmd.ProcessState != nil {
-		res.ExitCode = cmd.ProcessState.ExitCode()
-	}
-	if err != nil {
-		if res.Output != "" {
-			return res, fmt.Errorf("%s failed: %s", command, res.Output)
+	cmd.Stdout, cmd.Stderr = tty, tty
+	// Its own process group, so stopping it also stops whatever it started.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.Cancel = func() error {
+		if e := syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM); e != nil {
+			return os.ErrProcessDone
 		}
-		return res, fmt.Errorf("%s failed: %v", command, err)
+		return nil
 	}
-	return res, nil
+	cmd.WaitDelay = stopGrace
+	err = cmd.Start()
+	tty.Close()
+	if err != nil {
+		return -1, err
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		io.Copy(output, ptmx) // ends with an error once the terminal closes; that's normal
+	}()
+	err = cmd.Wait()
+	select {
+	case <-done:
+	case <-time.After(outputGrace):
+	}
+	code := -1
+	if cmd.ProcessState != nil {
+		code = cmd.ProcessState.ExitCode()
+	}
+	return code, err
 }

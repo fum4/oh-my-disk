@@ -2,11 +2,14 @@ package cleanup
 
 import (
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -74,7 +77,7 @@ func TestAllowlistComesFromRules(t *testing.T) {
 }
 
 func TestRunRejectsUnlisted(t *testing.T) {
-	if _, err := Run(context.Background(), "rm -rf /"); err == nil {
+	if _, err := Run(context.Background(), "rm -rf /", 80, 24, io.Discard); err == nil {
 		t.Fatal("unlisted command ran")
 	}
 }
@@ -93,12 +96,93 @@ func TestLookupUsesOnlyAbsoluteDirs(t *testing.T) {
 	}
 }
 
-func TestTail(t *testing.T) {
-	if Tail([]byte("  ok\n"), 10) != "ok" {
-		t.Fatal("trim")
+func script(t *testing.T, body string) string {
+	t.Helper()
+	bin := filepath.Join(t.TempDir(), "tool")
+	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	got := Tail([]byte(strings.Repeat("x", 20)+"\nlast line"), 12)
-	if got != "…last line" {
-		t.Fatalf("Tail = %q", got)
+	return bin
+}
+
+// syncBuffer is safe to read while a run is still writing to it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func TestExecuteStreamsThroughATerminal(t *testing.T) {
+	bin := script(t, `[ -t 1 ] && echo "stdout is a terminal"; stty size <&1; echo oops >&2`)
+	var out syncBuffer
+	code, err := execute(context.Background(), bin, nil, os.Getenv("PATH"), 91, 17, &out)
+	if err != nil || code != 0 {
+		t.Fatalf("execute = %d %v, output %q", code, err, out.String())
+	}
+	for _, want := range []string{"stdout is a terminal", "17 91", "oops"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output %q lacks %q", out.String(), want)
+		}
+	}
+}
+
+func TestExecuteReportsFailure(t *testing.T) {
+	var out syncBuffer
+	code, err := execute(context.Background(), script(t, "echo nope; exit 3"), nil, os.Getenv("PATH"), 80, 24, &out)
+	if err == nil || code != 3 || !strings.Contains(out.String(), "nope") {
+		t.Fatalf("execute = %d %v, output %q", code, err, out.String())
+	}
+}
+
+// A command that asks a question gets an empty answer rather than hanging the run.
+func TestExecuteNeverWaitsForInput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	var out syncBuffer
+	if _, err := execute(ctx, script(t, "read answer; echo answered"), nil, os.Getenv("PATH"), 80, 24, &out); ctx.Err() != nil {
+		t.Fatalf("hung on input: %v", err)
+	}
+}
+
+func TestExecuteStopsTheWholeProcessGroup(t *testing.T) {
+	marker := filepath.Join(t.TempDir(), "survived")
+	bin := script(t, "(sleep 2; touch '"+marker+"') &\necho started\nwait")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var out syncBuffer
+	result := make(chan error, 1)
+	go func() {
+		_, err := execute(ctx, bin, nil, os.Getenv("PATH"), 80, 24, &out)
+		result <- err
+	}()
+	for deadline := time.Now().Add(20 * time.Second); !strings.Contains(out.String(), "started"); {
+		if time.Now().After(deadline) {
+			t.Fatal("never started")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("a stopped run must report an error")
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("did not stop")
+	}
+	time.Sleep(2500 * time.Millisecond) // past the child's own sleep: its marker must not appear
+	if _, err := os.Stat(marker); err == nil {
+		t.Fatal("the child survived stopping the command")
 	}
 }
