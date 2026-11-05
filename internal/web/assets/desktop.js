@@ -1,5 +1,6 @@
 "use strict";
 const nativeApp = window.go?.main?.App;
+const OPENING_CACHE_PHASE = "Opening last cached scan"; // app/main.go sets this on launch
 const accessDismissalKey = "omd-access-warning-dismissed";
 let accessDismissed = false;
 try {
@@ -157,7 +158,11 @@ if (nativeApp) {
       const s = await nativeApp.State();
       home = s.home;
       window.scanHome = home;
-      const presentingScan = s.busy || (s.phase === "Complete" && s.revision !== revision);
+      // Reopening the cached scan on launch keeps the app busy, but it isn't a scan to present.
+      const openingCache = s.phase === OPENING_CACHE_PHASE;
+      const scanFinishing = s.phase === "Complete" && s.revision !== revision;
+      const working = s.busy || scanFinishing;
+      const presentingScan = working && !openingCache;
       window.agentStateChanged?.(s);
       for (const id of [
         "start-scan",
@@ -167,21 +172,20 @@ if (nativeApp) {
         "scan-another",
         "landing-choose",
       ])
-        $(id).disabled = presentingScan;
+        $(id).disabled = working;
       document
         .querySelectorAll(".location-open")
-        .forEach((b) => (b.disabled = presentingScan));
+        .forEach((b) => (b.disabled = working));
       $("start-scan").textContent = s.hasScan ? "Rescan" : "Scan";
       if (document.body.classList.contains("is-scanning") !== presentingScan)
         scanState(presentingScan);
       $("scan-strip").hidden = !presentingScan;
-      $("cancel-scan").hidden =
-        !s.busy || s.phase === "Opening last cached scan";
+      $("cancel-scan").hidden = !s.busy || openingCache;
       $("open-last").hidden = !s.hasScan || opened || !!snapshot;
-      $("open-last").disabled = presentingScan;
+      $("open-last").disabled = working;
       $("export-json").disabled = !s.hasScan;
       $("export-summary").disabled = !s.hasScan;
-      updateScanProgress(s);
+      if (!openingCache) updateScanProgress(s);
       if (s.error) reportError(s.error);
       else if (!s.busy && /Cancel[le]+d/i.test(s.phase)) showFeedback("Scan canceled. Try again or choose a folder.", "info");
       $("access-banner").hidden = accessDismissed || !s.protected.length;

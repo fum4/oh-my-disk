@@ -1777,7 +1777,6 @@ function renderHeading() {
 function updateScanProgress(state) {
   const phase = (state.phase || "walking").toLowerCase();
   $("progress").textContent = !state.busy ? state.phase :
-    phase.includes("open") ? "Opening your scan…" :
     /class|scor/.test(phase) ? "Scoring cleanup…" :
     /aggreg|measur|siz|cache|writ/.test(phase) ? "Measuring sizes…" : "Walking folders…";
   desiredEntries = Math.max(desiredEntries, Number(state.entries) || 0);
