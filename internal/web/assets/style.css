@@ -1462,11 +1462,12 @@ dialog pre {
     box-shadow: none !important;
   }
 }
+/* Spinners keep turning under Reduce Motion, because they're how the app shows it's working.
+   Decorative animation opts out on its own, like the launch title. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *:before,
   *:after {
-    animation: none !important;
     transition: none !important;
     scroll-behavior: auto !important;
   }
@@ -3055,11 +3056,6 @@ footer { min-height: 20px; }
   .note-value { grid-column: 2; }
   .page-link { font-size: var(--fs-12); padding: 2px 4px; }
 }
-@media (prefers-reduced-motion: reduce) {
-  /* The owner's call: the ring always rotates, because it's how a scan shows it's alive.
-     This outranks the blanket animation reset for reduced motion. */
-  #scan-rotor { animation: scan-orbit 3.6s linear infinite !important; }
-}
 /* Reserve a complete header and at least one list row above the drawer. */
 #agent-terminal { max-height: min(50vh, calc(100dvh - 440px)); }
 #content-grid { container-type: size; }
@@ -3558,8 +3554,6 @@ th:is([aria-sort="ascending"], [aria-sort="descending"]) button:hover { color: v
 .detail-command .command-run.running { opacity: 1; }
 #explorer-loading { flex: none; margin: 0 var(--s2) 0 auto; align-self: center; }
 .run-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--green) 28%, transparent); border-top-color: var(--green); animation: spin .8s linear infinite; }
-@media (prefers-reduced-motion: reduce) { .run-spinner { animation: run-pulse 1.6s ease-in-out infinite !important; border-color: var(--green); } }
-@keyframes run-pulse { 50% { opacity: .35; } }
 #children tr.located-row {
   background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
