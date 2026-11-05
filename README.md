@@ -319,14 +319,14 @@ Launch argv (paths below are placeholders; these are arguments passed directly, 
 ```sh
 claude --model opus --mcp-config <session>/mcp.json --strict-mcp-config --tools '' \
   --append-system-prompt '<contents of internal/agents/context.md>' -- \
-  "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
+  "<agents.InitialPrompt>"
 
 codex -m gpt-6.1-sol -c model_reasoning_effort=medium --no-daemon --sandbox read-only -c 'mcp_servers={}' \
   -c 'mcp_servers.oh-my-disk.command="<app>/Contents/MacOS/oh-my-disk-cli"' \
   -c 'mcp_servers.oh-my-disk.args=["mcp"]' \
   -c 'mcp_servers.oh-my-disk.env.OMD_SESSION_SCAN="<session>/scan.bin"' \
   -c 'developer_instructions="<escaped advisor context>"' -- \
-  "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
+  "<agents.InitialPrompt>"
 ```
 
 Flags were verified against the installed CLIs' `--help`. Claude's built-in tools are disabled and its MCP list is isolated. Codex uses its read-only sandbox and replaces the session MCP table before configuring the six read-only disk tools. The advisor never deletes or runs cleanup commands, keeps personal/iCloud/Photos/Music/Documents data off-limits, and tells users to review candidates in the app and use **Move to Trash**. These rules guide recommendations; existing app Trash checks and confirmation remain unchanged. Starting an agent sends the metadata it requests to your configured AI provider under that CLI's account and settings; ordinary scanning remains local. No terminal content or credentials are logged by the app.
