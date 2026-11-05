@@ -143,7 +143,7 @@ const wait = async (fn) => {
   const w = dom.window,
     $ = (id) => w.document.getElementById(id);
   w.eval(
-    ["app.js", "locations.js", "desktop.js", "agents.js"]
+    ["app.js", "locations.js", "desktop.js", "terminal-theme.js", "agents.js"]
       .map((file) => fs.readFileSync("internal/web/assets/" + file, "utf8"))
       .join("\n"),
   );

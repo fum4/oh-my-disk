@@ -16,12 +16,20 @@
     <script src="/vendor/addon-web-links.js" defer></script>
     <script src="/vendor/addon-unicode11.js" defer></script>
     <script src="/vendor/addon-webgl.js" defer></script>
+    <script src="/terminal-theme.js" defer></script>
+    <script src="/run-terminal.js" defer></script>
     <script src="/agents.js" defer></script>
   </head>
   <body>
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">
       <symbol id="regular-x" viewBox="0 0 24 24">
         <path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="regular-minus" viewBox="0 0 24 24">
+        <path d="M5 12h14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+      </symbol>
+      <symbol id="regular-caret-up" viewBox="0 0 24 24">
+        <path d="M5 15l7-7 7 7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>
       </symbol>
       <symbol id="agent-claude" viewBox="0 0 24 24">
         <path d="M12 2v20M2 12h20M5 5l14 14M5 19L19 5M8 3l8 18M3 8l18 8M3 16l18-8M8 21l8-18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
@@ -847,6 +855,16 @@
       <span>Removed from Locations</span
       ><button id="undo-location" class="link">Undo</button>
     </div>
+    <aside id="run-terminal" aria-label="Command output" hidden>
+      <div id="run-terminal-header">
+        <span id="run-terminal-icon" aria-hidden="true"></span>
+        <code id="run-terminal-command"></code>
+        <span id="run-terminal-status" role="status"></span>
+        <button id="run-terminal-minimize" class="icon-action"></button>
+        <button id="run-terminal-close" class="icon-action"><svg class="i" aria-hidden="true"><use href="#regular-x"></use></svg></button>
+      </div>
+      <div id="run-terminal-screen"></div>
+    </aside>
     <div id="tooltip" role="tooltip" hidden></div>
   </body>
 </html>

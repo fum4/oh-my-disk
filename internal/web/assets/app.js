@@ -754,9 +754,11 @@ function cleanupRunButton(s, card) {
     run.classList.add("running"); run.setAttribute("aria-busy", "true");
     run.title = "Running " + s.suggested_command + "…"; run.setAttribute("aria-label", run.title);
     run.replaceChildren(dom("span", "run-spinner"));
+    const size = card.querySelector(".suggestion-size");
+    const markStale = () => { if (size) { size.classList.add("stale"); size.title = "Size before cleanup; rescan to refresh"; } };
+    const terminal = window.runTerminal.start(s.suggested_command);
     try {
-      const r = await window.go.main.App.RunCleanup(s.suggested_command, s.path);
-      const size = card.querySelector(".suggestion-size");
+      const r = await window.go.main.App.RunCleanup(s.suggested_command, s.path, terminal.cols, terminal.rows);
       if (r?.measured) {
         const freed = Math.max(0, r.before - r.after);
         s.bytes = r.after;
@@ -767,13 +769,14 @@ function cleanupRunButton(s, card) {
           renderOverview();
         }
         if (size) { size.textContent = fmt(r.after); size.title = "Measured after cleanup"; }
-        showToast(freed > 0 ? `${s.suggested_command} freed ${fmt(freed)}` : `${s.suggested_command} finished · nothing to free`);
+        await window.runTerminal.finish("done", freed > 0 ? `Freed ${fmt(freed)}` : "Nothing to free");
       } else {
-        if (size) { size.classList.add("stale"); size.title = "Size before cleanup; rescan to refresh"; }
-        showToast(`${s.suggested_command} finished`);
+        markStale();
+        await window.runTerminal.finish("done", "Finished");
       }
     } catch (err) {
-      showToast(String(err?.message || err).slice(-280), "", "error");
+      markStale();
+      await window.runTerminal.finish("failed", "Failed", String(err?.message || err));
     } finally {
       cleanupRunning = false;
       document.querySelectorAll(".command-run").forEach(b => { b.disabled = false; });
