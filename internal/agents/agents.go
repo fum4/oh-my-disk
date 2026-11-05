@@ -19,7 +19,7 @@ import (
 //go:embed context.md
 var Context string
 
-const InitialPrompt = "Analyze my latest oh-my-disk scan and tell me what's taking space and what's safe to clean, biggest wins first."
+const InitialPrompt = "Analyze my latest oh-my-disk scan. Reply with a small overview of 2 or 3 sentences on what's taking space and how much I could get back, then a list of what to clean, biggest wins first. For each item give its name and size, what it is, and the command to clean it up, as your instructions describe. Mark anything I should check before removing. End your reply with the list: no notes or closing remarks after it."
 const DefaultCodexModel = "gpt-6.1-sol"
 const DefaultClaudeModel = "opus"
 
