@@ -91,6 +91,7 @@ unrelated mounted volumes by default.
 Build prerequisites: macOS, Xcode command-line tools, Go 1.26+, and Node/npm for
 Wails tooling (there is no npm install or frontend compilation for this app).
 `make` installs the pinned Wails CLI and keeps Go caches/tools under `.build/`.
+Each `make app` or `make app-universal` first deletes the previous `build/bin/`, so only the latest app is kept.
 After installing Wails yourself, the direct equivalent is:
 
 ```sh
