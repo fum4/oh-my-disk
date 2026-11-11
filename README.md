@@ -382,5 +382,5 @@ The catalogue serves the CLI installer at [install.sh](https://releases.nomadwar
 Provision `RELEASES_SIGNING_KEY`, `R2_RELEASES_ACCESS_KEY_ID`, and
 `R2_RELEASES_SECRET_ACCESS_KEY` from the releases repo using its secure
 `secrets:gh-push` task. These sign download checksums, not Apple code signatures.
-Apple Developer ID signing/notarization is explicitly deferred in `BACKLOG.md`;
+Apple Developer ID signing/notarization is explicitly deferred in `ledger/backlog.md`;
 DMGs currently contain an ad-hoc-signed app and may be blocked by Gatekeeper.
