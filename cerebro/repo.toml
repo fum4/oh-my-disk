@@ -1,0 +1,24 @@
+# Everything about oh-my-disk as a repo, for cerebro (cerebro docs/plan.md § 8.1).
+
+[repo]
+name = "oh-my-disk"
+
+# No prior tier: agents merge, as they do today (docs/decisions/log/2026-11-11-agents-merge-oh-my-disk.md, the owner may veto).
+[merge]
+by = "agents"
+approval_paths = [
+  "cerebro/**",
+  ".github/workflows/**",
+  "infra/terraform/**",
+  "secrets/manifest",
+  "**/migrations/**",
+]
+
+[docs]
+runbooks = "docs/runbooks"
+
+# Public repo: GitHub Actions (.github/workflows/ci.yml) is the CI and the required checks gate the merge.
+# These are the same checks run by hand: go vet, then the Makefile's vet + tests.
+[gates]
+pre-push = "go vet ./..."
+pre-merge = "make check"
